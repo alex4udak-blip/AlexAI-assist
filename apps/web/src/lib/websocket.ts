@@ -1,3 +1,5 @@
+import { config } from './config';
+
 type MessageHandler = (data: unknown) => void;
 
 class WebSocketClient {
@@ -9,8 +11,7 @@ class WebSocketClient {
   private reconnectDelay = 1000;
 
   constructor() {
-    const wsUrl = import.meta.env.VITE_WS_URL || 'ws://localhost:8000';
-    this.url = `${wsUrl}/ws`;
+    this.url = `${config.wsUrl}/ws`;
   }
 
   connect(): void {
