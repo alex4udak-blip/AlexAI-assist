@@ -11,7 +11,7 @@ interface Stats {
 export default function MenuBar() {
   const [stats, setStats] = useState<Stats>({
     eventsToday: 0,
-    lastSync: 'Never',
+    lastSync: 'Никогда',
     status: 'collecting',
   });
 
@@ -54,7 +54,7 @@ export default function MenuBar() {
     try {
       setStats((prev) => ({ ...prev, status: 'syncing' }));
       await invoke('sync_now');
-      setStats((prev) => ({ ...prev, status: 'collecting', lastSync: 'Just now' }));
+      setStats((prev) => ({ ...prev, status: 'collecting', lastSync: 'Только что' }));
     } catch (e) {
       console.error('Failed to sync:', e);
       setStats((prev) => ({ ...prev, status: 'collecting' }));
@@ -80,7 +80,7 @@ export default function MenuBar() {
               <h1 className="text-sm font-semibold text-text-primary">Observer</h1>
               <div className="flex items-center gap-1.5">
                 <span className={`w-1.5 h-1.5 rounded-full ${statusColors[stats.status]}`} />
-                <span className="text-xs text-text-tertiary capitalize">{stats.status}</span>
+                <span className="text-xs text-text-tertiary capitalize">{stats.status === 'collecting' ? 'Сбор' : stats.status === 'paused' ? 'Пауза' : 'Синхронизация'}</span>
               </div>
             </div>
           </div>
@@ -91,11 +91,11 @@ export default function MenuBar() {
       <div className="p-4">
         <div className="grid grid-cols-2 gap-3">
           <div className="bg-bg-tertiary rounded-lg p-3">
-            <p className="text-xs text-text-muted">Events Today</p>
+            <p className="text-xs text-text-muted">Событий сегодня</p>
             <p className="text-xl font-bold text-text-primary">{stats.eventsToday}</p>
           </div>
           <div className="bg-bg-tertiary rounded-lg p-3">
-            <p className="text-xs text-text-muted">Last Sync</p>
+            <p className="text-xs text-text-muted">Последняя синхр.</p>
             <p className="text-sm font-medium text-text-primary">{stats.lastSync}</p>
           </div>
         </div>
@@ -110,12 +110,12 @@ export default function MenuBar() {
           {stats.status === 'collecting' ? (
             <>
               <Pause className="w-4 h-4" />
-              Pause Collection
+              Приостановить сбор
             </>
           ) : (
             <>
               <Play className="w-4 h-4" />
-              Resume Collection
+              Возобновить сбор
             </>
           )}
         </button>
@@ -126,7 +126,7 @@ export default function MenuBar() {
           className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-text-secondary hover:text-text-primary hover:bg-bg-hover transition-colors disabled:opacity-50"
         >
           <RefreshCw className={`w-4 h-4 ${stats.status === 'syncing' ? 'animate-spin' : ''}`} />
-          Sync Now
+          Синхронизировать
         </button>
 
         <button
@@ -134,7 +134,7 @@ export default function MenuBar() {
           className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-text-secondary hover:text-text-primary hover:bg-bg-hover transition-colors"
         >
           <ExternalLink className="w-4 h-4" />
-          Open Dashboard
+          Открыть дашборд
         </button>
       </div>
 

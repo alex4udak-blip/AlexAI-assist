@@ -23,7 +23,7 @@ interface Stats {
 export default function Main() {
   const [stats, setStats] = useState<Stats>({
     eventsToday: 0,
-    lastSync: 'Never',
+    lastSync: 'Никогда',
     status: 'collecting',
     topApps: [],
     activeTime: 0,
@@ -92,7 +92,7 @@ export default function Main() {
                   }`}
                 />
                 <span className="text-xs text-text-tertiary capitalize">
-                  {stats.status}
+                  {stats.status === 'collecting' ? 'Сбор' : stats.status === 'paused' ? 'Пауза' : 'Синхронизация'}
                 </span>
               </div>
             </div>
@@ -122,7 +122,7 @@ export default function Main() {
           <div className="bg-bg-secondary rounded-xl p-4 border border-border-subtle">
             <div className="flex items-center gap-2 mb-2">
               <BarChart3 className="w-4 h-4 text-text-tertiary" />
-              <span className="text-xs text-text-muted">Events Today</span>
+              <span className="text-xs text-text-muted">Событий сегодня</span>
             </div>
             <p className="text-2xl font-bold text-text-primary">
               {stats.eventsToday}
@@ -131,7 +131,7 @@ export default function Main() {
           <div className="bg-bg-secondary rounded-xl p-4 border border-border-subtle">
             <div className="flex items-center gap-2 mb-2">
               <Clock className="w-4 h-4 text-text-tertiary" />
-              <span className="text-xs text-text-muted">Active Time</span>
+              <span className="text-xs text-text-muted">Активное время</span>
             </div>
             <p className="text-2xl font-bold text-text-primary">
               {formatTime(stats.activeTime)}
@@ -143,7 +143,7 @@ export default function Main() {
         <div className="bg-bg-secondary rounded-xl p-4 border border-border-subtle">
           <h2 className="text-sm font-semibold text-text-primary mb-3 flex items-center gap-2">
             <Monitor className="w-4 h-4" />
-            Top Applications
+            Топ приложений
           </h2>
           {stats.topApps.length > 0 ? (
             <div className="space-y-2">
@@ -161,7 +161,7 @@ export default function Main() {
             </div>
           ) : (
             <p className="text-sm text-text-muted text-center py-4">
-              No activity recorded yet
+              Активность ещё не записана
             </p>
           )}
         </div>
@@ -169,7 +169,7 @@ export default function Main() {
         {/* Sync Status */}
         <div className="bg-bg-secondary rounded-xl p-4 border border-border-subtle">
           <div className="flex items-center justify-between mb-2">
-            <span className="text-sm text-text-secondary">Last Sync</span>
+            <span className="text-sm text-text-secondary">Последняя синхр.</span>
             <span className="text-sm text-text-primary">{stats.lastSync}</span>
           </div>
           <button
@@ -180,7 +180,7 @@ export default function Main() {
             <RefreshCw
               className={`w-4 h-4 ${stats.status === 'syncing' ? 'animate-spin' : ''}`}
             />
-            {stats.status === 'syncing' ? 'Syncing...' : 'Sync Now'}
+            {stats.status === 'syncing' ? 'Синхронизация...' : 'Синхронизировать'}
           </button>
         </div>
 
@@ -190,7 +190,7 @@ export default function Main() {
           className="w-full py-3 bg-accent-gradient text-white text-sm font-medium rounded-lg hover:opacity-90 transition-opacity flex items-center justify-center gap-2"
         >
           <ExternalLink className="w-4 h-4" />
-          Open Web Dashboard
+          Открыть веб-дашборд
         </button>
       </main>
     </div>

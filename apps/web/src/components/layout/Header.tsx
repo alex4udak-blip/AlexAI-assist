@@ -15,7 +15,7 @@ export default function Header() {
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-muted" />
             <input
               type="text"
-              placeholder="Search..."
+              placeholder="Поиск..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="w-full bg-bg-tertiary border border-border-subtle rounded-lg pl-10 pr-4 py-2 text-sm text-text-primary placeholder:text-text-muted focus:border-accent-primary focus:outline-none transition-colors"
@@ -32,7 +32,7 @@ export default function Header() {
               )}
             />
             <span className="text-text-tertiary">
-              {isConnected ? 'Connected' : 'Disconnected'}
+              {isConnected ? 'Подключено' : 'Отключено'}
             </span>
           </div>
 

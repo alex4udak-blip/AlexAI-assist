@@ -5,9 +5,9 @@ use tauri::{
 };
 
 pub fn create_tray(app: &App) -> Result<(), Box<dyn std::error::Error>> {
-    let quit = MenuItem::with_id(app, "quit", "Quit Observer", true, None::<&str>)?;
-    let show = MenuItem::with_id(app, "show", "Show Window", true, None::<&str>)?;
-    let dashboard = MenuItem::with_id(app, "dashboard", "Open Dashboard", true, None::<&str>)?;
+    let quit = MenuItem::with_id(app, "quit", "Выйти из Observer", true, None::<&str>)?;
+    let show = MenuItem::with_id(app, "show", "Показать окно", true, None::<&str>)?;
+    let dashboard = MenuItem::with_id(app, "dashboard", "Открыть дашборд", true, None::<&str>)?;
     let separator = MenuItem::with_id(app, "sep", "─────────────", false, None::<&str>)?;
 
     let menu = Menu::with_items(app, &[&show, &dashboard, &separator, &quit])?;

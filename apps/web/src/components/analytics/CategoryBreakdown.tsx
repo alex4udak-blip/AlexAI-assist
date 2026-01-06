@@ -13,7 +13,7 @@ export function CategoryBreakdown({ data, loading }: CategoryBreakdownProps) {
     return (
       <Card>
         <CardHeader>
-          <CardTitle>Time by Category</CardTitle>
+          <CardTitle>Время по категориям</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="h-64 skeleton rounded" />
@@ -28,7 +28,7 @@ export function CategoryBreakdown({ data, loading }: CategoryBreakdownProps) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Time by Category</CardTitle>
+        <CardTitle>Время по категориям</CardTitle>
       </CardHeader>
       <CardContent>
         <div className="flex items-center gap-8">

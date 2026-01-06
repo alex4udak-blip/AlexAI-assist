@@ -5,11 +5,11 @@ import { Badge } from '../components/ui/Badge';
 
 export default function DownloadPage() {
   const features = [
-    'Runs in the menu bar',
-    'Collects activity via Accessibility API',
-    'Syncs automatically with server',
-    'Low resource usage',
-    'Auto-updates',
+    'Работает в строке меню',
+    'Собирает активность через Accessibility API',
+    'Автоматически синхронизируется с сервером',
+    'Низкое потребление ресурсов',
+    'Автоматические обновления',
   ];
 
   return (
@@ -19,10 +19,10 @@ export default function DownloadPage() {
           <Monitor className="w-10 h-10 text-white" />
         </div>
         <h1 className="text-3xl font-bold text-text-primary">
-          Download Observer
+          Скачать Observer
         </h1>
         <p className="text-text-tertiary mt-2">
-          Get the desktop app to start collecting activity data
+          Получите десктопное приложение для сбора данных об активности
         </p>
       </div>
 
@@ -36,7 +36,7 @@ export default function DownloadPage() {
                   macOS (Universal)
                 </h3>
                 <p className="text-sm text-text-tertiary">
-                  Works on Intel and Apple Silicon
+                  Работает на Intel и Apple Silicon
                 </p>
               </div>
             </div>
@@ -54,11 +54,11 @@ export default function DownloadPage() {
 
           <Button className="w-full" size="lg">
             <Download className="w-5 h-5" />
-            Download for macOS
+            Скачать для macOS
           </Button>
 
           <p className="text-xs text-text-muted text-center mt-4">
-            Requires macOS 10.15 or later. ~50MB download.
+            Требуется macOS 10.15 или новее. ~50 МБ загрузка.
           </p>
         </CardContent>
       </Card>
@@ -66,27 +66,27 @@ export default function DownloadPage() {
       <Card>
         <CardContent className="p-6">
           <h3 className="font-semibold text-text-primary mb-4">
-            Installation Instructions
+            Инструкция по установке
           </h3>
           <ol className="space-y-4 text-sm text-text-secondary">
             <li className="flex gap-3">
               <span className="w-6 h-6 rounded-full bg-accent-muted text-accent-primary flex items-center justify-center text-xs font-medium shrink-0">
                 1
               </span>
-              <span>Download the .dmg file from the button above</span>
+              <span>Скачайте .dmg файл, нажав кнопку выше</span>
             </li>
             <li className="flex gap-3">
               <span className="w-6 h-6 rounded-full bg-accent-muted text-accent-primary flex items-center justify-center text-xs font-medium shrink-0">
                 2
               </span>
-              <span>Open the downloaded file and drag Observer to Applications</span>
+              <span>Откройте скачанный файл и перетащите Observer в Программы</span>
             </li>
             <li className="flex gap-3">
               <span className="w-6 h-6 rounded-full bg-accent-muted text-accent-primary flex items-center justify-center text-xs font-medium shrink-0">
                 3
               </span>
               <span>
-                Launch Observer and grant Accessibility permissions when prompted
+                Запустите Observer и предоставьте разрешение Accessibility при запросе
               </span>
             </li>
             <li className="flex gap-3">
@@ -94,7 +94,7 @@ export default function DownloadPage() {
                 4
               </span>
               <span>
-                Observer will appear in your menu bar and start collecting data
+                Observer появится в строке меню и начнёт сбор данных
               </span>
             </li>
           </ol>
@@ -103,13 +103,13 @@ export default function DownloadPage() {
 
       <div className="text-center text-sm text-text-muted">
         <p>
-          Having trouble? Check the{' '}
+          Возникли проблемы? Посмотрите{' '}
           <a href="#" className="text-accent-primary hover:underline">
-            installation guide
+            руководство по установке
           </a>{' '}
-          or{' '}
+          или{' '}
           <a href="#" className="text-accent-primary hover:underline">
-            report an issue
+            сообщите о проблеме
           </a>
           .
         </p>

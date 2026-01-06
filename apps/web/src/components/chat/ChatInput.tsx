@@ -29,7 +29,7 @@ export function ChatInput({
             value={value}
             onChange={(e) => onChange(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder="Type a message..."
+            placeholder="Введите сообщение..."
             disabled={disabled}
             rows={1}
             className={cn(
@@ -60,7 +60,7 @@ export function ChatInput({
         </div>
       </div>
       <p className="text-xs text-text-muted mt-2 text-center">
-        Press Enter to send, Shift+Enter for new line
+        Нажмите Enter для отправки, Shift+Enter для новой строки
       </p>
     </div>
   );

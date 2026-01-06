@@ -12,16 +12,16 @@ import {
 import { cn } from '../../lib/utils';
 
 const navItems = [
-  { to: '/', icon: LayoutDashboard, label: 'Dashboard' },
-  { to: '/agents', icon: Bot, label: 'Agents' },
-  { to: '/analytics', icon: BarChart3, label: 'Analytics' },
-  { to: '/history', icon: History, label: 'History' },
-  { to: '/chat', icon: MessageSquare, label: 'Chat' },
+  { to: '/', icon: LayoutDashboard, label: 'Главная' },
+  { to: '/agents', icon: Bot, label: 'Агенты' },
+  { to: '/analytics', icon: BarChart3, label: 'Аналитика' },
+  { to: '/history', icon: History, label: 'История' },
+  { to: '/chat', icon: MessageSquare, label: 'Чат' },
 ];
 
 const bottomItems = [
-  { to: '/settings', icon: Settings, label: 'Settings' },
-  { to: '/download', icon: Download, label: 'Download App' },
+  { to: '/settings', icon: Settings, label: 'Настройки' },
+  { to: '/download', icon: Download, label: 'Скачать' },
 ];
 
 export default function Sidebar() {
@@ -34,7 +34,7 @@ export default function Sidebar() {
           </div>
           <div>
             <h1 className="text-lg font-bold text-text-primary">Observer</h1>
-            <p className="text-xs text-text-tertiary">AI Meta-Agent</p>
+            <p className="text-xs text-text-tertiary">AI Мета-Агент</p>
           </div>
         </div>
       </div>

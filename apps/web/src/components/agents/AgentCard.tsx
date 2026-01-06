@@ -62,7 +62,7 @@ export function AgentCard({
                 className="w-full flex items-center gap-2 px-4 py-2 text-sm text-text-secondary hover:text-text-primary hover:bg-bg-hover"
               >
                 <Settings className="w-4 h-4" />
-                Edit
+                Редактировать
               </button>
               <button
                 onClick={() => {
@@ -72,7 +72,7 @@ export function AgentCard({
                 className="w-full flex items-center gap-2 px-4 py-2 text-sm text-status-error hover:bg-status-error/10"
               >
                 <Trash2 className="w-4 h-4" />
-                Delete
+                Удалить
               </button>
             </div>
           )}
@@ -81,13 +81,13 @@ export function AgentCard({
 
       <div className="grid grid-cols-3 gap-4 mb-4">
         <div>
-          <p className="text-xs text-text-muted">Total Runs</p>
+          <p className="text-xs text-text-muted">Всего запусков</p>
           <p className="text-lg font-semibold text-text-primary">
             {agent.run_count}
           </p>
         </div>
         <div>
-          <p className="text-xs text-text-muted">Success Rate</p>
+          <p className="text-xs text-text-muted">Успешность</p>
           <p className="text-lg font-semibold text-text-primary">
             {agent.run_count > 0
               ? ((agent.success_count / agent.run_count) * 100).toFixed(0)
@@ -96,7 +96,7 @@ export function AgentCard({
           </p>
         </div>
         <div>
-          <p className="text-xs text-text-muted">Time Saved</p>
+          <p className="text-xs text-text-muted">Сэкономлено времени</p>
           <p className="text-lg font-semibold text-text-primary">
             {formatDuration(agent.total_time_saved_seconds)}
           </p>
@@ -105,14 +105,14 @@ export function AgentCard({
 
       {agent.last_run_at && (
         <p className="text-xs text-text-muted mb-4">
-          Last run: {formatRelativeTime(agent.last_run_at)}
+          Последний запуск: {formatRelativeTime(agent.last_run_at)}
         </p>
       )}
 
       <div className="flex items-center gap-2">
         <Button size="sm" onClick={() => onRun?.(agent.id)}>
           <Play className="w-4 h-4" />
-          Run Now
+          Запустить
         </Button>
         {agent.status === 'active' ? (
           <Button
@@ -121,7 +121,7 @@ export function AgentCard({
             onClick={() => onDisable?.(agent.id)}
           >
             <Pause className="w-4 h-4" />
-            Disable
+            Выключить
           </Button>
         ) : (
           <Button
@@ -130,7 +130,7 @@ export function AgentCard({
             onClick={() => onEnable?.(agent.id)}
           >
             <Play className="w-4 h-4" />
-            Enable
+            Включить
           </Button>
         )}
       </div>

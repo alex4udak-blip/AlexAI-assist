@@ -8,11 +8,11 @@ import { useTimeline } from '../hooks/useAnalytics';
 import { formatDateTime, truncate } from '../lib/utils';
 
 const categoryOptions = [
-  { value: '', label: 'All Categories' },
-  { value: 'coding', label: 'Coding' },
-  { value: 'browsing', label: 'Browsing' },
-  { value: 'writing', label: 'Writing' },
-  { value: 'communication', label: 'Communication' },
+  { value: '', label: 'Все категории' },
+  { value: 'coding', label: 'Программирование' },
+  { value: 'browsing', label: 'Браузинг' },
+  { value: 'writing', label: 'Письмо' },
+  { value: 'communication', label: 'Коммуникация' },
 ];
 
 export default function History() {
@@ -37,15 +37,15 @@ export default function History() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-text-primary">History</h1>
+        <h1 className="text-2xl font-bold text-text-primary">История</h1>
         <p className="text-text-tertiary mt-1">
-          Browse your activity history
+          Просмотр истории активности
         </p>
       </div>
 
       <div className="flex flex-wrap gap-4">
         <Input
-          placeholder="Search events..."
+          placeholder="Поиск событий..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           className="w-64"
@@ -58,10 +58,10 @@ export default function History() {
         />
         <Select
           options={[
-            { value: '24', label: 'Last 24 hours' },
-            { value: '48', label: 'Last 48 hours' },
-            { value: '72', label: 'Last 72 hours' },
-            { value: '168', label: 'Last week' },
+            { value: '24', label: 'Последние 24 часа' },
+            { value: '48', label: 'Последние 48 часов' },
+            { value: '72', label: 'Последние 72 часа' },
+            { value: '168', label: 'Последняя неделя' },
           ]}
           value={hours.toString()}
           onChange={(e) => setHours(parseInt(e.target.value))}
@@ -86,7 +86,7 @@ export default function History() {
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
                     <p className="font-medium text-text-primary">
-                      {event.app_name || 'Unknown App'}
+                      {event.app_name || 'Неизвестное приложение'}
                     </p>
                     {event.category && (
                       <Badge variant="default">{event.category}</Badge>
@@ -110,12 +110,12 @@ export default function History() {
         <Card className="p-12 text-center">
           <Calendar className="w-12 h-12 text-text-muted mx-auto mb-4" />
           <h3 className="text-lg font-semibold text-text-primary mb-2">
-            No events found
+            События не найдены
           </h3>
           <p className="text-text-tertiary">
             {search || category
-              ? 'Try adjusting your filters'
-              : 'Activity will appear here once the collector starts sending data'}
+              ? 'Попробуйте изменить фильтры'
+              : 'Активность появится здесь, когда сборщик начнёт отправлять данные'}
           </p>
         </Card>
       )}

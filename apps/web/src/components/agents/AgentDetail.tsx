@@ -19,9 +19,9 @@ export function AgentDetail({ agent, onBack, onRun, onEdit }: AgentDetailProps) 
   const [activeTab, setActiveTab] = useState('overview');
 
   const tabs = [
-    { id: 'overview', label: 'Overview' },
-    { id: 'logs', label: 'Logs' },
-    { id: 'code', label: 'Code', icon: <Code className="w-4 h-4" /> },
+    { id: 'overview', label: 'Обзор' },
+    { id: 'logs', label: 'Логи' },
+    { id: 'code', label: 'Код', icon: <Code className="w-4 h-4" /> },
   ];
 
   return (
@@ -53,11 +53,11 @@ export function AgentDetail({ agent, onBack, onRun, onEdit }: AgentDetailProps) 
         <div className="flex items-center gap-2">
           <Button variant="secondary" onClick={() => onEdit?.(agent.id)}>
             <Settings className="w-4 h-4" />
-            Edit
+            Редактировать
           </Button>
           <Button onClick={() => onRun?.(agent.id)}>
             <Play className="w-4 h-4" />
-            Run Now
+            Запустить
           </Button>
         </div>
       </div>
@@ -68,18 +68,18 @@ export function AgentDetail({ agent, onBack, onRun, onEdit }: AgentDetailProps) 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <Card>
             <CardHeader>
-              <CardTitle>Statistics</CardTitle>
+              <CardTitle>Статистика</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <p className="text-sm text-text-muted">Total Runs</p>
+                  <p className="text-sm text-text-muted">Всего запусков</p>
                   <p className="text-2xl font-bold text-text-primary">
                     {agent.run_count}
                   </p>
                 </div>
                 <div>
-                  <p className="text-sm text-text-muted">Success Rate</p>
+                  <p className="text-sm text-text-muted">Успешность</p>
                   <p className="text-2xl font-bold text-status-success">
                     {agent.run_count > 0
                       ? ((agent.success_count / agent.run_count) * 100).toFixed(0)
@@ -88,13 +88,13 @@ export function AgentDetail({ agent, onBack, onRun, onEdit }: AgentDetailProps) 
                   </p>
                 </div>
                 <div>
-                  <p className="text-sm text-text-muted">Time Saved</p>
+                  <p className="text-sm text-text-muted">Сэкономлено времени</p>
                   <p className="text-2xl font-bold text-text-primary">
                     {formatDuration(agent.total_time_saved_seconds)}
                   </p>
                 </div>
                 <div>
-                  <p className="text-sm text-text-muted">Errors</p>
+                  <p className="text-sm text-text-muted">Ошибок</p>
                   <p className="text-2xl font-bold text-status-error">
                     {agent.error_count}
                   </p>
@@ -105,23 +105,23 @@ export function AgentDetail({ agent, onBack, onRun, onEdit }: AgentDetailProps) 
 
           <Card>
             <CardHeader>
-              <CardTitle>Configuration</CardTitle>
+              <CardTitle>Конфигурация</CardTitle>
             </CardHeader>
             <CardContent>
               <dl className="space-y-3">
                 <div>
-                  <dt className="text-sm text-text-muted">Type</dt>
+                  <dt className="text-sm text-text-muted">Тип</dt>
                   <dd className="text-text-primary">{agent.agent_type}</dd>
                 </div>
                 <div>
-                  <dt className="text-sm text-text-muted">Created</dt>
+                  <dt className="text-sm text-text-muted">Создан</dt>
                   <dd className="text-text-primary">
                     {formatDateTime(agent.created_at)}
                   </dd>
                 </div>
                 {agent.last_run_at && (
                   <div>
-                    <dt className="text-sm text-text-muted">Last Run</dt>
+                    <dt className="text-sm text-text-muted">Последний запуск</dt>
                     <dd className="text-text-primary">
                       {formatDateTime(agent.last_run_at)}
                     </dd>
@@ -129,7 +129,7 @@ export function AgentDetail({ agent, onBack, onRun, onEdit }: AgentDetailProps) 
                 )}
                 {agent.last_error && (
                   <div>
-                    <dt className="text-sm text-text-muted">Last Error</dt>
+                    <dt className="text-sm text-text-muted">Последняя ошибка</dt>
                     <dd className="text-status-error text-sm">
                       {agent.last_error}
                     </dd>
@@ -148,7 +148,7 @@ export function AgentDetail({ agent, onBack, onRun, onEdit }: AgentDetailProps) 
       <TabPanel id="code" activeTab={activeTab}>
         <Card>
           <CardHeader>
-            <CardTitle>Agent Code</CardTitle>
+            <CardTitle>Код агента</CardTitle>
           </CardHeader>
           <CardContent>
             {agent.code ? (
@@ -157,7 +157,7 @@ export function AgentDetail({ agent, onBack, onRun, onEdit }: AgentDetailProps) 
               </pre>
             ) : (
               <p className="text-text-muted text-center py-8">
-                No custom code defined
+                Пользовательский код не определён
               </p>
             )}
           </CardContent>

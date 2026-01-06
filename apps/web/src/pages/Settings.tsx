@@ -23,7 +23,7 @@ export default function Settings() {
   const handleClearData = () => {
     if (
       confirm(
-        'Are you sure you want to clear all local data? This cannot be undone.'
+        'Вы уверены, что хотите очистить все локальные данные? Это действие нельзя отменить.'
       )
     ) {
       localStorage.clear();
@@ -34,19 +34,19 @@ export default function Settings() {
   return (
     <div className="space-y-6 max-w-2xl">
       <div>
-        <h1 className="text-2xl font-bold text-text-primary">Settings</h1>
+        <h1 className="text-2xl font-bold text-text-primary">Настройки</h1>
         <p className="text-text-tertiary mt-1">
-          Configure Observer preferences
+          Настройте параметры Observer
         </p>
       </div>
 
       <Card>
         <CardHeader>
-          <CardTitle>General</CardTitle>
+          <CardTitle>Общие</CardTitle>
         </CardHeader>
         <CardContent className="space-y-6">
           <Switch
-            label="Enable notifications"
+            label="Включить уведомления"
             checked={settings.notifications}
             onChange={(checked) =>
               setSettings((s) => ({ ...s, notifications: checked }))
@@ -54,7 +54,7 @@ export default function Settings() {
           />
 
           <Switch
-            label="Start on system boot"
+            label="Запускать при загрузке системы"
             checked={settings.autoStart}
             onChange={(checked) =>
               setSettings((s) => ({ ...s, autoStart: checked }))
@@ -62,12 +62,12 @@ export default function Settings() {
           />
 
           <Select
-            label="Sync interval"
+            label="Интервал синхронизации"
             options={[
-              { value: '10', label: 'Every 10 seconds' },
-              { value: '30', label: 'Every 30 seconds' },
-              { value: '60', label: 'Every minute' },
-              { value: '300', label: 'Every 5 minutes' },
+              { value: '10', label: 'Каждые 10 секунд' },
+              { value: '30', label: 'Каждые 30 секунд' },
+              { value: '60', label: 'Каждую минуту' },
+              { value: '300', label: 'Каждые 5 минут' },
             ]}
             value={settings.syncInterval}
             onChange={(e) =>
@@ -79,16 +79,16 @@ export default function Settings() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Data & Privacy</CardTitle>
+          <CardTitle>Данные и конфиденциальность</CardTitle>
         </CardHeader>
         <CardContent className="space-y-6">
           <Select
-            label="Data retention period"
+            label="Срок хранения данных"
             options={[
-              { value: '7', label: '7 days' },
-              { value: '30', label: '30 days' },
-              { value: '90', label: '90 days' },
-              { value: '365', label: '1 year' },
+              { value: '7', label: '7 дней' },
+              { value: '30', label: '30 дней' },
+              { value: '90', label: '90 дней' },
+              { value: '365', label: '1 год' },
             ]}
             value={settings.dataRetention}
             onChange={(e) =>
@@ -98,14 +98,14 @@ export default function Settings() {
 
           <div className="pt-4 border-t border-border-subtle">
             <h4 className="text-sm font-medium text-text-primary mb-2">
-              Danger Zone
+              Опасная зона
             </h4>
             <p className="text-sm text-text-tertiary mb-4">
-              Clear all local data including settings and cached information.
+              Очистить все локальные данные, включая настройки и кэшированную информацию.
             </p>
             <Button variant="danger" onClick={handleClearData}>
               <Trash2 className="w-4 h-4" />
-              Clear Local Data
+              Очистить локальные данные
             </Button>
           </div>
         </CardContent>
@@ -113,11 +113,11 @@ export default function Settings() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Connection</CardTitle>
+          <CardTitle>Подключение</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           <Input
-            label="Server URL"
+            label="URL сервера"
             value={import.meta.env.VITE_API_URL || 'http://localhost:8000'}
             disabled
           />
@@ -125,11 +125,11 @@ export default function Settings() {
           <div className="flex items-center gap-4">
             <div className="flex items-center gap-2">
               <span className="w-2 h-2 bg-status-success rounded-full" />
-              <span className="text-sm text-text-secondary">Connected</span>
+              <span className="text-sm text-text-secondary">Подключено</span>
             </div>
             <Button variant="ghost" size="sm">
               <RefreshCw className="w-4 h-4" />
-              Test Connection
+              Проверить подключение
             </Button>
           </div>
         </CardContent>
@@ -138,7 +138,7 @@ export default function Settings() {
       <div className="flex justify-end">
         <Button onClick={handleSave}>
           <Save className="w-4 h-4" />
-          Save Settings
+          Сохранить настройки
         </Button>
       </div>
     </div>

@@ -20,16 +20,16 @@ interface AgentFormData {
 }
 
 const agentTypes = [
-  { value: 'monitor', label: 'Monitor' },
-  { value: 'reporter', label: 'Reporter' },
-  { value: 'assistant', label: 'Assistant' },
-  { value: 'automation', label: 'Automation' },
+  { value: 'monitor', label: 'Мониторинг' },
+  { value: 'reporter', label: 'Репортер' },
+  { value: 'assistant', label: 'Ассистент' },
+  { value: 'automation', label: 'Автоматизация' },
 ];
 
 const triggerTypes = [
-  { value: 'schedule', label: 'Schedule (cron)' },
-  { value: 'event', label: 'Event-based' },
-  { value: 'pattern', label: 'Pattern match' },
+  { value: 'schedule', label: 'Расписание (cron)' },
+  { value: 'event', label: 'По событию' },
+  { value: 'pattern', label: 'По паттерну' },
   { value: 'webhook', label: 'Webhook' },
 ];
 
@@ -64,28 +64,28 @@ export function CreateAgentModal({
   };
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title="Create Agent" size="lg">
+    <Modal isOpen={isOpen} onClose={onClose} title="Создать агента" size="lg">
       <form onSubmit={handleSubmit} className="space-y-4">
         <Input
-          label="Name"
+          label="Название"
           name="name"
           value={formData.name}
           onChange={handleChange}
-          placeholder="My Agent"
+          placeholder="Мой агент"
           required
         />
 
         <Textarea
-          label="Description"
+          label="Описание"
           name="description"
           value={formData.description}
           onChange={handleChange}
-          placeholder="What does this agent do?"
+          placeholder="Что делает этот агент?"
           rows={3}
         />
 
         <Select
-          label="Agent Type"
+          label="Тип агента"
           name="agent_type"
           value={formData.agent_type}
           onChange={handleChange}
@@ -93,7 +93,7 @@ export function CreateAgentModal({
         />
 
         <Select
-          label="Trigger Type"
+          label="Тип триггера"
           name="trigger_type"
           value={formData.trigger_type}
           onChange={handleChange}
@@ -101,23 +101,23 @@ export function CreateAgentModal({
         />
 
         <Input
-          label="Trigger Value"
+          label="Значение триггера"
           name="trigger_value"
           value={formData.trigger_value}
           onChange={handleChange}
           placeholder={
             formData.trigger_type === 'schedule'
-              ? '0 9 * * * (every day at 9 AM)'
-              : 'Enter trigger condition'
+              ? '0 9 * * * (каждый день в 9:00)'
+              : 'Введите условие триггера'
           }
         />
 
         <div className="flex justify-end gap-3 pt-4">
           <Button type="button" variant="secondary" onClick={onClose}>
-            Cancel
+            Отмена
           </Button>
           <Button type="submit" loading={loading}>
-            Create Agent
+            Создать агента
           </Button>
         </div>
       </form>
