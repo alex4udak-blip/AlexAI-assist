@@ -38,6 +38,8 @@ app = FastAPI(
 )
 
 # CORS middleware
+print(f"[CORS] Allowed origins: {settings.allowed_origins}")
+print(f"[CORS] Raw env value: {settings.allowed_origins_str}")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.allowed_origins,
