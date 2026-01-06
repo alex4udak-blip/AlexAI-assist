@@ -18,7 +18,7 @@ export function ProductivityScore({ data, loading }: ProductivityScoreProps) {
     return (
       <Card>
         <CardHeader>
-          <CardTitle>Productivity Score</CardTitle>
+          <CardTitle>Оценка продуктивности</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="h-32 skeleton rounded" />
@@ -37,7 +37,7 @@ export function ProductivityScore({ data, loading }: ProductivityScoreProps) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Productivity Score</CardTitle>
+        <CardTitle>Оценка продуктивности</CardTitle>
         <div
           className={cn(
             'flex items-center gap-1 text-sm',
@@ -86,7 +86,7 @@ export function ProductivityScore({ data, loading }: ProductivityScoreProps) {
           <div className="flex-1 space-y-4">
             <div>
               <div className="flex justify-between text-sm mb-1">
-                <span className="text-text-secondary">Productive Events</span>
+                <span className="text-text-secondary">Продуктивных событий</span>
                 <span className="text-text-primary">
                   {data?.productive_events ?? 0}
                 </span>
@@ -95,7 +95,7 @@ export function ProductivityScore({ data, loading }: ProductivityScoreProps) {
             </div>
             <div>
               <div className="flex justify-between text-sm mb-1">
-                <span className="text-text-secondary">Total Events</span>
+                <span className="text-text-secondary">Всего событий</span>
                 <span className="text-text-primary">
                   {data?.total_events ?? 0}
                 </span>

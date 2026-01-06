@@ -12,9 +12,9 @@ import {
 } from '../hooks/useAnalytics';
 
 const periodOptions = [
-  { value: '7', label: 'Last 7 days' },
-  { value: '14', label: 'Last 14 days' },
-  { value: '30', label: 'Last 30 days' },
+  { value: '7', label: 'Последние 7 дней' },
+  { value: '14', label: 'Последние 14 дней' },
+  { value: '30', label: 'Последние 30 дней' },
 ];
 
 export default function Analytics() {
@@ -35,9 +35,9 @@ export default function Analytics() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-text-primary">Analytics</h1>
+          <h1 className="text-2xl font-bold text-text-primary">Аналитика</h1>
           <p className="text-text-tertiary mt-1">
-            Insights into your activity patterns
+            Анализ ваших паттернов активности
           </p>
         </div>
         <Select

@@ -11,7 +11,7 @@ export function AppUsage({ data, loading }: AppUsageProps) {
     return (
       <Card>
         <CardHeader>
-          <CardTitle>Top Applications</CardTitle>
+          <CardTitle>Топ приложений</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="h-64 skeleton rounded" />
@@ -25,7 +25,7 @@ export function AppUsage({ data, loading }: AppUsageProps) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Top Applications</CardTitle>
+        <CardTitle>Топ приложений</CardTitle>
       </CardHeader>
       <CardContent>
         <div className="h-64">

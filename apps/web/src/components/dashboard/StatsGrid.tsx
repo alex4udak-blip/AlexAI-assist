@@ -22,26 +22,26 @@ interface StatsGridProps {
 export function StatsGrid({ stats, loading }: StatsGridProps) {
   const items: Stat[] = [
     {
-      label: 'Events Today',
+      label: 'Событий сегодня',
       value: stats?.totalEvents ?? 0,
       change: 12,
       icon: Activity,
     },
     {
-      label: 'Active Agents',
+      label: 'Активных агентов',
       value: stats?.activeAgents ?? 0,
       change: 0,
       icon: Bot,
     },
     {
-      label: 'Suggestions',
+      label: 'Предложений',
       value: stats?.suggestions ?? 0,
       change: 3,
       icon: Sparkles,
     },
     {
-      label: 'Time Saved',
-      value: stats?.timeSaved ? `${stats.timeSaved}m` : '0m',
+      label: 'Сэкономлено',
+      value: stats?.timeSaved ? `${stats.timeSaved}м` : '0м',
       change: 15,
       icon: Clock,
     },
@@ -79,7 +79,7 @@ export function StatsGrid({ stats, loading }: StatsGridProps) {
                   )}
                 >
                   {stat.change > 0 ? '+' : ''}
-                  {stat.change}% from yesterday
+                  {stat.change}% к вчера
                 </p>
               )}
             </div>

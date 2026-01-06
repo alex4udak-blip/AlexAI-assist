@@ -20,7 +20,7 @@ export function TrendChart({ data, loading }: TrendChartProps) {
     return (
       <Card>
         <CardHeader>
-          <CardTitle>Activity Trends</CardTitle>
+          <CardTitle>Тренды активности</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="h-64 skeleton rounded" />
@@ -37,7 +37,7 @@ export function TrendChart({ data, loading }: TrendChartProps) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Activity Trends</CardTitle>
+        <CardTitle>Тренды активности</CardTitle>
       </CardHeader>
       <CardContent>
         <div className="h-64">

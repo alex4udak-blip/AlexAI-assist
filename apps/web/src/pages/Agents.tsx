@@ -63,7 +63,7 @@ export default function Agents() {
   };
 
   const handleDelete = async (id: string) => {
-    if (confirm('Are you sure you want to delete this agent?')) {
+    if (confirm('Вы уверены, что хотите удалить этого агента?')) {
       await deleteAgent(id);
       if (selectedAgentId === id) {
         setSelectedAgentId(null);
@@ -87,14 +87,14 @@ export default function Agents() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-text-primary">Agents</h1>
+          <h1 className="text-2xl font-bold text-text-primary">Агенты</h1>
           <p className="text-text-tertiary mt-1">
-            Manage your automation agents
+            Управляйте своими агентами автоматизации
           </p>
         </div>
         <Button onClick={() => setShowCreateModal(true)}>
           <Plus className="w-4 h-4" />
-          Create Agent
+          Создать агента
         </Button>
       </div>
 
@@ -137,14 +137,14 @@ export default function Agents() {
       ) : (
         <div className="bg-bg-secondary border border-border-subtle rounded-xl p-12 text-center">
           <h3 className="text-lg font-semibold text-text-primary mb-2">
-            No agents yet
+            Пока нет агентов
           </h3>
           <p className="text-text-tertiary mb-4">
-            Create your first agent to automate repetitive tasks
+            Создайте своего первого агента для автоматизации рутинных задач
           </p>
           <Button onClick={() => setShowCreateModal(true)}>
             <Plus className="w-4 h-4" />
-            Create Agent
+            Создать агента
           </Button>
         </div>
       )}

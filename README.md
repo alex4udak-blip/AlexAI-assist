@@ -1,104 +1,104 @@
-# Observer - Personal AI Meta-Agent System
+# Observer - Персональная AI Мета-Агентная Система
 
-A complete personal AI system that observes your workflow, finds patterns, and creates autonomous agents to help you work more efficiently.
+Полноценная персональная AI система, которая наблюдает за вашим рабочим процессом, находит паттерны поведения и создаёт автономных агентов для повышения эффективности работы.
 
-## Features
+## Возможности
 
-- Observes everything you do on Mac via Accessibility API (not screenshots)
-- Finds patterns in your behavior
-- Suggests automations based on detected patterns
-- Creates agents that work autonomously
-- Can code, deploy, and fix bugs by itself
+- Наблюдает за всеми действиями на Mac через Accessibility API (без скриншотов)
+- Находит паттерны в вашем поведении
+- Предлагает автоматизации на основе обнаруженных паттернов
+- Создаёт агентов, которые работают автономно
+- Может писать код, деплоить и исправлять баги самостоятельно
 
-## Architecture
+## Архитектура
 
 ```
-RAILWAY (cloud)
-├── server/          → FastAPI backend
-├── web/             → React dashboard + PWA
-├── PostgreSQL       → Database (Railway addon)
-└── Redis            → Queues (Railway addon)
+RAILWAY (облако)
+├── server/          → FastAPI бэкенд
+├── web/             → React дашборд + PWA
+├── PostgreSQL       → База данных (Railway addon)
+└── Redis            → Очереди (Railway addon)
 
 GITHUB ACTIONS
-└── Builds Mac app (.dmg) on each release
+└── Собирает Mac приложение (.dmg) при каждом релизе
 
-MAC (local)
-└── Observer.app     → Menu Bar + Collector (Tauri)
-    ├── Collects data via Accessibility API
-    ├── Sends to Railway server
-    ├── Shows notifications
-    └── Quick actions menu
+MAC (локально)
+└── Observer.app     → Меню-бар + Сборщик (Tauri)
+    ├── Собирает данные через Accessibility API
+    ├── Отправляет на Railway сервер
+    ├── Показывает уведомления
+    └── Быстрые действия в меню
 
 ANDROID
-└── PWA              → Install web dashboard as app
+└── PWA              → Установка веб-дашборда как приложения
 ```
 
-## Getting Started
+## Быстрый старт
 
-### Development Flow
+### Процесс разработки
 
-1. Clone this repository
-2. Push to main branch
-3. Connect repo to Railway for auto-deploy
-4. Download Mac app from the web dashboard
+1. Клонируйте этот репозиторий
+2. Запушьте в main ветку
+3. Подключите репозиторий к Railway для авто-деплоя
+4. Скачайте Mac приложение с веб-дашборда
 
-### Environment Variables
+### Переменные окружения
 
-#### Server (Railway)
+#### Сервер (Railway)
 ```
-DATABASE_URL=             # Auto-set by Railway PostgreSQL
-REDIS_URL=                # Auto-set by Railway Redis
-CLAUDE_OAUTH_TOKEN=       # Your Claude API token
-ALLOWED_ORIGINS=          # Your web dashboard URL
-SECRET_KEY=               # Generate: openssl rand -hex 32
+DATABASE_URL=             # Автоматически от Railway PostgreSQL
+REDIS_URL=                # Автоматически от Railway Redis
+CLAUDE_OAUTH_TOKEN=       # Ваш Claude API токен
+ALLOWED_ORIGINS=          # URL вашего веб-дашборда
+SECRET_KEY=               # Генерация: openssl rand -hex 32
 ```
 
-#### Web (Railway)
+#### Веб (Railway)
 ```
-VITE_API_URL=             # Server URL
+VITE_API_URL=             # URL сервера
 VITE_WS_URL=              # WebSocket URL (wss://...)
 ```
 
-## Tech Stack
+## Технологический стек
 
-### Server
+### Сервер
 - Python 3.12+
 - FastAPI
 - SQLAlchemy 2.0 (async)
-- Alembic (migrations)
+- Alembic (миграции)
 - PostgreSQL
 - Redis
 
-### Web Dashboard
+### Веб-дашборд
 - React 18 + TypeScript
 - Vite
 - Tailwind CSS
 - Framer Motion
 - Recharts
-- Lucide React (icons)
-- PWA with service worker
+- Lucide React (иконки)
+- PWA с service worker
 
-### Mac App
+### Mac приложение
 - Tauri 2.0
-- Rust backend
-- React frontend
-- Auto-updater
+- Rust бэкенд
+- React фронтенд
+- Авто-обновления
 
-## Project Structure
+## Структура проекта
 
 ```
 observer/
-├── CLAUDE.md                 # Instructions for Claude Code
+├── CLAUDE.md                 # Инструкции для Claude Code
 ├── README.md
-├── .github/workflows/        # CI/CD pipelines
+├── .github/workflows/        # CI/CD пайплайны
 ├── apps/
-│   ├── server/              # FastAPI backend
-│   ├── web/                 # React dashboard
-│   └── desktop/             # Tauri Mac app
+│   ├── server/              # FastAPI бэкенд
+│   ├── web/                 # React дашборд
+│   └── desktop/             # Tauri Mac приложение
 └── packages/
-    └── shared/              # Shared types and constants
+    └── shared/              # Общие типы и константы
 ```
 
-## License
+## Лицензия
 
 MIT

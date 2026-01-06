@@ -38,21 +38,21 @@ export function SuggestionCard({
               </p>
             </div>
             <Badge variant={impactColors[suggestion.impact as keyof typeof impactColors] || 'default'}>
-              {suggestion.impact} impact
+              {suggestion.impact === 'high' ? 'высокий' : suggestion.impact === 'medium' ? 'средний' : 'низкий'} эффект
             </Badge>
           </div>
 
           <div className="flex items-center gap-4 mt-4">
             <div className="flex items-center gap-1 text-xs text-text-muted">
-              <span>Confidence:</span>
+              <span>Уверенность:</span>
               <span className="text-text-secondary">
                 {(suggestion.confidence * 100).toFixed(0)}%
               </span>
             </div>
             <div className="flex items-center gap-1 text-xs text-text-muted">
-              <span>Time saved:</span>
+              <span>Экономия:</span>
               <span className="text-text-secondary">
-                {suggestion.time_saved_minutes}m/day
+                {suggestion.time_saved_minutes}м/день
               </span>
             </div>
           </div>
@@ -63,7 +63,7 @@ export function SuggestionCard({
               onClick={() => onAccept?.(suggestion.id)}
             >
               <Check className="w-4 h-4" />
-              Accept
+              Принять
             </Button>
             <Button
               variant="ghost"
@@ -71,10 +71,10 @@ export function SuggestionCard({
               onClick={() => onDismiss?.(suggestion.id)}
             >
               <X className="w-4 h-4" />
-              Dismiss
+              Отклонить
             </Button>
             <Button variant="ghost" size="sm" className="ml-auto">
-              Learn more
+              Подробнее
               <ArrowRight className="w-4 h-4" />
             </Button>
           </div>

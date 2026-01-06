@@ -49,7 +49,7 @@ export function ChatWindow() {
       const errorMessage: ChatMessage = {
         id: Date.now().toString(),
         role: 'assistant',
-        content: 'Sorry, I encountered an error. Please try again.',
+        content: 'Извините, произошла ошибка. Попробуйте ещё раз.',
         timestamp: new Date().toISOString(),
       };
       setMessages((prev) => [...prev, errorMessage]);
@@ -67,11 +67,11 @@ export function ChatWindow() {
               <Send className="w-8 h-8 text-white" />
             </div>
             <h2 className="text-xl font-semibold text-text-primary mb-2">
-              Chat with Observer
+              Чат с Observer
             </h2>
             <p className="text-text-tertiary max-w-md">
-              Ask questions about your activity patterns, get suggestions for
-              automations, or request help with your workflow.
+              Задавайте вопросы о паттернах вашей активности, получайте предложения
+              по автоматизации или просите помощи с рабочим процессом.
             </p>
           </div>
         ) : (
@@ -92,7 +92,7 @@ export function ChatWindow() {
                 style={{ animationDelay: '0.2s' }}
               />
             </div>
-            <span className="text-sm">Observer is thinking...</span>
+            <span className="text-sm">Observer думает...</span>
           </div>
         )}
         <div ref={messagesEndRef} />

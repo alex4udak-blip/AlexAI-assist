@@ -1,31 +1,31 @@
-# Claude Code Instructions for Observer
+# Инструкции Claude Code для Observer
 
-## Project Overview
-Observer is a personal AI meta-agent system. Follow these guidelines strictly.
+## Обзор проекта
+Observer — это персональная AI мета-агентная система. Строго следуйте этим рекомендациям.
 
-## Code Style
-- TypeScript: strict mode, no any
-- Python: type hints everywhere, async/await
-- Use meaningful variable names
-- Comments only for complex logic
+## Стиль кода
+- TypeScript: strict режим, никаких any
+- Python: type hints везде, async/await
+- Используйте осмысленные имена переменных
+- Комментарии только для сложной логики
 
-## UI Rules
-- NO EMOJIS anywhere in the UI
-- Use Lucide React icons only
-- Dark theme only
-- Animations with Framer Motion
-- Mobile-responsive
+## Правила UI
+- НИКАКИХ ЭМОДЗИ в интерфейсе
+- Только иконки Lucide React
+- Только тёмная тема
+- Анимации через Framer Motion
+- Адаптивный дизайн
 
 ## Git
-- Conventional commits (feat:, fix:, chore:)
-- One feature per commit
-- Clear commit messages
+- Конвенциональные коммиты (feat:, fix:, chore:)
+- Одна фича на коммит
+- Понятные сообщения коммитов
 
-## Testing
-- Write tests for critical paths
-- Services must have unit tests
+## Тестирование
+- Пишите тесты для критичных путей
+- Сервисы должны иметь unit-тесты
 
-## Security
-- Never commit secrets
-- Validate all inputs
-- Sanitize user data
+## Безопасность
+- Никогда не коммитьте секреты
+- Валидируйте все входные данные
+- Санитизируйте пользовательские данные

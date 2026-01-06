@@ -57,9 +57,9 @@ export default function Dashboard() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-text-primary">Dashboard</h1>
+        <h1 className="text-2xl font-bold text-text-primary">Главная</h1>
         <p className="text-text-tertiary mt-1">
-          Overview of your activity and automations
+          Обзор вашей активности и автоматизаций
         </p>
       </div>
 
@@ -91,7 +91,7 @@ export default function Dashboard() {
         />
         <div className="space-y-4">
           <h2 className="text-lg font-semibold text-text-primary">
-            Suggestions
+            Предложения
           </h2>
           {suggestionsLoading ? (
             <div className="space-y-4">
@@ -110,9 +110,9 @@ export default function Dashboard() {
             ))
           ) : (
             <div className="bg-bg-secondary border border-border-subtle rounded-xl p-8 text-center">
-              <p className="text-text-muted">No suggestions yet</p>
+              <p className="text-text-muted">Пока нет предложений</p>
               <p className="text-xs text-text-tertiary mt-1">
-                Keep using your device to generate patterns
+                Продолжайте использовать устройство для выявления паттернов
               </p>
             </div>
           )}
