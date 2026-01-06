@@ -42,8 +42,8 @@ print(f"[CORS] Allowed origins: {settings.allowed_origins}")
 print(f"[CORS] Raw env value: {settings.allowed_origins_str}")
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.allowed_origins,
-    allow_credentials=True,
+    allow_origins=["*"],  # Allow all origins temporarily for debugging
+    allow_credentials=False,  # Must be False when using wildcard
     allow_methods=["*"],
     allow_headers=["*"],
 )
