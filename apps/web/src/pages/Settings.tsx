@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Save, Trash2, RefreshCw } from 'lucide-react';
+import { config } from '../lib/config';
 import { Card, CardHeader, CardTitle, CardContent } from '../components/ui/Card';
 import { Input } from '../components/ui/Input';
 import { Switch } from '../components/ui/Switch';
@@ -118,7 +119,7 @@ export default function Settings() {
         <CardContent className="space-y-4">
           <Input
             label="URL сервера"
-            value={import.meta.env.VITE_API_URL || 'http://localhost:8000'}
+            value={config.apiUrl}
             disabled
           />
 
