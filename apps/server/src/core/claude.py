@@ -29,7 +29,7 @@ class ClaudeClient:
             response = await client.post(
                 f"{self.base_url}/messages",
                 headers={
-                    "Authorization": f"Bearer {self.token}",
+                    "x-api-key": self.token,
                     "Content-Type": "application/json",
                     "anthropic-version": "2023-06-01",
                 },
