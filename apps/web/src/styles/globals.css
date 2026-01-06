@@ -1,0 +1,98 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  * {
+    @apply border-border-default;
+  }
+
+  body {
+    @apply bg-bg-primary text-text-primary font-sans antialiased;
+  }
+
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+
+  ::-webkit-scrollbar-track {
+    @apply bg-bg-secondary;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    @apply bg-bg-hover rounded-full;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    @apply bg-text-muted;
+  }
+}
+
+@layer components {
+  .card {
+    @apply bg-bg-secondary border border-border-subtle rounded-xl p-5
+           hover:border-border-default transition-colors duration-200;
+  }
+
+  .btn-primary {
+    @apply bg-accent-gradient text-white font-medium px-4 py-2 rounded-lg
+           hover:opacity-90 transition-opacity duration-200
+           focus:outline-none focus:ring-2 focus:ring-accent-primary/50;
+  }
+
+  .btn-secondary {
+    @apply bg-transparent border border-border-default text-text-secondary
+           font-medium px-4 py-2 rounded-lg
+           hover:bg-bg-hover hover:text-text-primary transition-all duration-200;
+  }
+
+  .input {
+    @apply w-full bg-bg-tertiary border border-border-default rounded-lg
+           px-4 py-2.5 text-text-primary placeholder:text-text-muted
+           focus:border-accent-primary focus:ring-1 focus:ring-accent-primary/30
+           transition-all duration-200 outline-none;
+  }
+
+  .badge {
+    @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium
+           bg-accent-muted text-accent-primary;
+  }
+
+  .badge-success {
+    @apply bg-status-success/10 text-status-success;
+  }
+
+  .badge-warning {
+    @apply bg-status-warning/10 text-status-warning;
+  }
+
+  .badge-error {
+    @apply bg-status-error/10 text-status-error;
+  }
+}
+
+@layer utilities {
+  .text-gradient {
+    @apply bg-accent-gradient bg-clip-text text-transparent;
+  }
+
+  .animate-in {
+    animation: animate-in 0.2s ease-out;
+  }
+
+  @keyframes animate-in {
+    from {
+      opacity: 0;
+      transform: translateY(4px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  .skeleton {
+    @apply bg-bg-tertiary animate-pulse rounded;
+  }
+}
