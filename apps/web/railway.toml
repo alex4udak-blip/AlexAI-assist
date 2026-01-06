@@ -3,7 +3,7 @@ builder = "nixpacks"
 buildCommand = "npm ci && npm run build"
 
 [deploy]
-startCommand = "npx serve dist -s -l $PORT"
+startCommand = "npx serve dist -s -p ${PORT:-3000}"
 
 [service]
 internalPort = 3000
