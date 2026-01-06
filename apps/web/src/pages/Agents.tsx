@@ -114,22 +114,10 @@ export default function Agents() {
             >
               <AgentCard
                 agent={agent}
-                onRun={(e) => {
-                  e?.stopPropagation?.();
-                  handleRun(agent.id);
-                }}
-                onEnable={(e) => {
-                  e?.stopPropagation?.();
-                  handleEnable(agent.id);
-                }}
-                onDisable={(e) => {
-                  e?.stopPropagation?.();
-                  handleDisable(agent.id);
-                }}
-                onDelete={(e) => {
-                  e?.stopPropagation?.();
-                  handleDelete(agent.id);
-                }}
+                onRun={() => handleRun(agent.id)}
+                onEnable={() => handleEnable(agent.id)}
+                onDisable={() => handleDisable(agent.id)}
+                onDelete={() => handleDelete(agent.id)}
               />
             </div>
           ))}
