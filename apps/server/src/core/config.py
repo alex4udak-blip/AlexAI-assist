@@ -1,9 +1,8 @@
 """Application configuration."""
 
 from functools import lru_cache
-from typing import List, Union
+from typing import List
 
-from pydantic import field_validator
 from pydantic_settings import BaseSettings
 
 
@@ -29,16 +28,13 @@ class Settings(BaseSettings):
     algorithm: str = "HS256"
     access_token_expire_minutes: int = 30
 
-    # CORS
-    allowed_origins: List[str] = ["http://localhost:5173", "http://localhost:3000"]
+    # CORS - stored as comma-separated string, parsed via property
+    allowed_origins_str: str = "http://localhost:5173,http://localhost:3000"
 
-    @field_validator("allowed_origins", mode="before")
-    @classmethod
-    def parse_allowed_origins(cls, v: Union[str, List[str]]) -> List[str]:
-        """Parse allowed_origins from comma-separated string or list."""
-        if isinstance(v, str):
-            return [origin.strip() for origin in v.split(",") if origin.strip()]
-        return v
+    @property
+    def allowed_origins(self) -> List[str]:
+        """Parse allowed_origins from comma-separated string."""
+        return [origin.strip() for origin in self.allowed_origins_str.split(",") if origin.strip()]
 
     # Claude API
     claude_oauth_token: str = ""
