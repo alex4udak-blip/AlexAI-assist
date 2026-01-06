@@ -1,8 +1,8 @@
 import { useCallback } from 'react';
-import { api, type Agent, type AgentCreate } from '../lib/api';
+import { api, type AgentCreate, type QueryParams } from '../lib/api';
 import { useApi, useMutation } from './useApi';
 
-export function useAgents(params?: Record<string, unknown>) {
+export function useAgents(params?: QueryParams) {
   const fetcher = useCallback(() => api.getAgents(params), [params]);
   return useApi(fetcher, [JSON.stringify(params)]);
 }
@@ -40,7 +40,7 @@ export function useDisableAgent() {
   return useMutation((id: string) => api.disableAgent(id));
 }
 
-export function useAgentLogs(id: string, params?: Record<string, unknown>) {
+export function useAgentLogs(id: string, params?: QueryParams) {
   const fetcher = useCallback(
     () => api.getAgentLogs(id, params),
     [id, params]

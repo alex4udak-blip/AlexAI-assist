@@ -1,7 +1,9 @@
 const API_URL = import.meta.env.VITE_API_URL || '';
 
+export type QueryParams = Record<string, string | number | boolean | undefined>;
+
 interface FetchOptions extends RequestInit {
-  params?: Record<string, string | number | boolean | undefined>;
+  params?: QueryParams;
 }
 
 async function fetchApi<T>(
@@ -43,7 +45,7 @@ async function fetchApi<T>(
 
 export const api = {
   // Events
-  getEvents: (params?: Record<string, unknown>) =>
+  getEvents: (params?: QueryParams) =>
     fetchApi<Event[]>('/api/v1/events', { params }),
   getTimeline: (hours = 24) =>
     fetchApi<Event[]>('/api/v1/events/timeline', { params: { hours } }),
@@ -54,14 +56,14 @@ export const api = {
     }),
 
   // Patterns
-  getPatterns: (params?: Record<string, unknown>) =>
+  getPatterns: (params?: QueryParams) =>
     fetchApi<Pattern[]>('/api/v1/patterns', { params }),
-  detectPatterns: (params?: Record<string, unknown>) =>
+  detectPatterns: (params?: QueryParams) =>
     fetchApi<DetectedPatterns>('/api/v1/patterns/detect', { params }),
   getPattern: (id: string) => fetchApi<Pattern>(`/api/v1/patterns/${id}`),
 
   // Suggestions
-  getSuggestions: (params?: Record<string, unknown>) =>
+  getSuggestions: (params?: QueryParams) =>
     fetchApi<Suggestion[]>('/api/v1/suggestions', { params }),
   acceptSuggestion: (id: string) =>
     fetchApi<{ agent_id: string }>(`/api/v1/suggestions/${id}/accept`, {
@@ -73,7 +75,7 @@ export const api = {
     }),
 
   // Agents
-  getAgents: (params?: Record<string, unknown>) =>
+  getAgents: (params?: QueryParams) =>
     fetchApi<Agent[]>('/api/v1/agents', { params }),
   getAgent: (id: string) => fetchApi<Agent>(`/api/v1/agents/${id}`),
   createAgent: (data: AgentCreate) =>
@@ -97,19 +99,19 @@ export const api = {
     fetchApi<Agent>(`/api/v1/agents/${id}/enable`, { method: 'POST' }),
   disableAgent: (id: string) =>
     fetchApi<Agent>(`/api/v1/agents/${id}/disable`, { method: 'POST' }),
-  getAgentLogs: (id: string, params?: Record<string, unknown>) =>
+  getAgentLogs: (id: string, params?: QueryParams) =>
     fetchApi<AgentLog[]>(`/api/v1/agents/${id}/logs`, { params }),
 
   // Analytics
-  getSummary: (params?: Record<string, unknown>) =>
+  getSummary: (params?: QueryParams) =>
     fetchApi<AnalyticsSummary>('/api/v1/analytics/summary', { params }),
-  getCategories: (params?: Record<string, unknown>) =>
+  getCategories: (params?: QueryParams) =>
     fetchApi<CategoryBreakdown[]>('/api/v1/analytics/categories', { params }),
-  getAppUsage: (params?: Record<string, unknown>) =>
+  getAppUsage: (params?: QueryParams) =>
     fetchApi<AppUsage[]>('/api/v1/analytics/apps', { params }),
-  getProductivity: (params?: Record<string, unknown>) =>
+  getProductivity: (params?: QueryParams) =>
     fetchApi<ProductivityScore>('/api/v1/analytics/productivity', { params }),
-  getTrends: (params?: Record<string, unknown>) =>
+  getTrends: (params?: QueryParams) =>
     fetchApi<TrendData[]>('/api/v1/analytics/trends', { params }),
 
   // Chat

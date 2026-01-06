@@ -1,4 +1,4 @@
-import { Send, Mic } from 'lucide-react';
+import { Send } from 'lucide-react';
 import { cn } from '../../lib/utils';
 
 interface ChatInputProps {

@@ -1,28 +1,28 @@
 import { useCallback } from 'react';
-import { api } from '../lib/api';
+import { api, type QueryParams } from '../lib/api';
 import { useApi } from './useApi';
 
-export function useAnalyticsSummary(params?: Record<string, unknown>) {
+export function useAnalyticsSummary(params?: QueryParams) {
   const fetcher = useCallback(() => api.getSummary(params), [params]);
   return useApi(fetcher, [JSON.stringify(params)]);
 }
 
-export function useCategories(params?: Record<string, unknown>) {
+export function useCategories(params?: QueryParams) {
   const fetcher = useCallback(() => api.getCategories(params), [params]);
   return useApi(fetcher, [JSON.stringify(params)]);
 }
 
-export function useAppUsage(params?: Record<string, unknown>) {
+export function useAppUsage(params?: QueryParams) {
   const fetcher = useCallback(() => api.getAppUsage(params), [params]);
   return useApi(fetcher, [JSON.stringify(params)]);
 }
 
-export function useProductivity(params?: Record<string, unknown>) {
+export function useProductivity(params?: QueryParams) {
   const fetcher = useCallback(() => api.getProductivity(params), [params]);
   return useApi(fetcher, [JSON.stringify(params)]);
 }
 
-export function useTrends(params?: Record<string, unknown>) {
+export function useTrends(params?: QueryParams) {
   const fetcher = useCallback(() => api.getTrends(params), [params]);
   return useApi(fetcher, [JSON.stringify(params)]);
 }

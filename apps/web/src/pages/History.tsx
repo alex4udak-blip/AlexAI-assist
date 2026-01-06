@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Calendar, Filter } from 'lucide-react';
+import { Calendar } from 'lucide-react';
 import { Card } from '../components/ui/Card';
 import { Input } from '../components/ui/Input';
 import { Select } from '../components/ui/Select';
