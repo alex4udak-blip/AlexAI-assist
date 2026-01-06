@@ -13,12 +13,11 @@ function getApiUrl(): string {
     return 'http://localhost:8000';
   }
 
-  // In production on Railway, derive server URL from web URL
-  // web-production-XXXX.up.railway.app -> server-production-XXXX.up.railway.app
+  // In production on Railway - use the actual server domain
   const hostname = window.location.hostname;
   if (hostname.includes('.up.railway.app')) {
-    const serverHostname = hostname.replace('web-', 'server-');
-    return `https://${serverHostname}`;
+    // Railway assigns different IDs to each service, so we hardcode the server URL
+    return 'https://server-production-0b14.up.railway.app';
   }
 
   // Fallback
@@ -35,11 +34,10 @@ function getWsUrl(): string {
     return 'ws://localhost:8000';
   }
 
-  // In production on Railway, derive from API URL
+  // In production on Railway - use the actual server domain
   const hostname = window.location.hostname;
   if (hostname.includes('.up.railway.app')) {
-    const serverHostname = hostname.replace('web-', 'server-');
-    return `wss://${serverHostname}`;
+    return 'wss://server-production-0b14.up.railway.app';
   }
 
   // Fallback
