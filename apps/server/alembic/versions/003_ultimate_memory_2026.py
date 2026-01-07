@@ -2,8 +2,8 @@
 Ultimate Memory System 2026
 Based on: Hindsight (4-network) + O-Mem (persona) + MemOS (scheduling) + Memory-R1 (RL ops)
 
-Revision ID: 003_ultimate_memory_2026
-Revises: 002_add_chat_messages
+Revision ID: 003
+Revises: 002
 Create Date: 2026-01-07
 """
 
@@ -13,8 +13,8 @@ from sqlalchemy.dialects.postgresql import UUID, JSONB, ARRAY
 from datetime import datetime
 
 # revision identifiers
-revision = "003_ultimate_memory_2026"
-down_revision = "002_add_chat_messages"
+revision = "003"
+down_revision = "002"
 branch_labels = None
 depends_on = None
 
