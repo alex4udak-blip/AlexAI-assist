@@ -91,6 +91,45 @@ def create_vector_index_if_available(index_name: str, table_name: str, column_na
         logger.warning(f"Could not create vector index {index_name}: {e}")
 
 
+def table_exists(table_name: str) -> bool:
+    """Check if a table already exists in the database."""
+    try:
+        conn = op.get_bind()
+        result = conn.execute(
+            sa.text(f"SELECT 1 FROM information_schema.tables WHERE table_name = '{table_name}'")
+        )
+        return result.fetchone() is not None
+    except Exception:
+        return False
+
+
+def safe_create_table(table_name: str, *columns, **kwargs) -> None:
+    """Create table only if it doesn't exist (idempotent)."""
+    if table_exists(table_name):
+        logger.info(f"Table {table_name} already exists, skipping creation")
+        return
+    try:
+        op.create_table(table_name, *columns, **kwargs)
+        logger.info(f"Created table {table_name}")
+    except Exception as e:
+        # Table might have been created by concurrent process
+        if "already exists" in str(e).lower():
+            logger.info(f"Table {table_name} already exists (concurrent creation)")
+        else:
+            raise
+
+
+def safe_create_index(index_name: str, table_name: str, columns: list[str]) -> None:
+    """Create index only if it doesn't exist (idempotent)."""
+    try:
+        op.create_index(index_name, table_name, columns)
+    except Exception as e:
+        if "already exists" in str(e).lower():
+            logger.info(f"Index {index_name} already exists, skipping")
+        else:
+            logger.warning(f"Could not create index {index_name}: {e}")
+
+
 def upgrade() -> None:
     # Try to enable pgvector extension (will gracefully fail on Railway/managed PostgreSQL)
     try_enable_pgvector()
@@ -101,7 +140,7 @@ def upgrade() -> None:
     # ===========================================
     # NETWORK 1: FACT NETWORK (Objective truths)
     # ===========================================
-    op.create_table(
+    safe_create_table(
         "memory_facts",
         sa.Column("id", UUID(as_uuid=True), primary_key=True),
         sa.Column("session_id", sa.String(64), nullable=False, index=True),
@@ -143,7 +182,7 @@ def upgrade() -> None:
     # ===========================================
     # NETWORK 2: EXPERIENCE NETWORK (What happened)
     # ===========================================
-    op.create_table(
+    safe_create_table(
         "memory_experiences",
         sa.Column("id", UUID(as_uuid=True), primary_key=True),
         sa.Column("session_id", sa.String(64), nullable=False, index=True),
@@ -180,7 +219,7 @@ def upgrade() -> None:
     # ===========================================
 
     # Entities (apps, people, projects, concepts)
-    op.create_table(
+    safe_create_table(
         "memory_entities",
         sa.Column("id", UUID(as_uuid=True), primary_key=True),
         sa.Column("session_id", sa.String(64), index=True),
@@ -209,7 +248,7 @@ def upgrade() -> None:
     create_vector_index_if_available("idx_entities_embedding", "memory_entities")
 
     # Relationships (Temporal KG - Zep/Graphiti style)
-    op.create_table(
+    safe_create_table(
         "memory_relationships",
         sa.Column("id", UUID(as_uuid=True), primary_key=True),
         sa.Column("session_id", sa.String(64), index=True),
@@ -236,7 +275,7 @@ def upgrade() -> None:
     # ===========================================
     # NETWORK 4: BELIEF NETWORK (Evolving opinions)
     # ===========================================
-    op.create_table(
+    safe_create_table(
         "memory_beliefs",
         sa.Column("id", UUID(as_uuid=True), primary_key=True),
         sa.Column("session_id", sa.String(64), nullable=False, index=True),
@@ -266,7 +305,7 @@ def upgrade() -> None:
     # ===========================================
     # O-MEM WORKING MEMORY (Topic-based)
     # ===========================================
-    op.create_table(
+    safe_create_table(
         "memory_topics",
         sa.Column("id", UUID(as_uuid=True), primary_key=True),
         sa.Column("session_id", sa.String(64), nullable=False, index=True),
@@ -288,7 +327,7 @@ def upgrade() -> None:
     )
 
     # O-MEM EPISODIC INDEX (Keyword-based)
-    op.create_table(
+    safe_create_table(
         "memory_keyword_index",
         sa.Column("id", UUID(as_uuid=True), primary_key=True),
         sa.Column("session_id", sa.String(64), nullable=False, index=True),
@@ -302,7 +341,7 @@ def upgrade() -> None:
     # ===========================================
     # MemOS MEMCUBE (Unified memory unit)
     # ===========================================
-    op.create_table(
+    safe_create_table(
         "memory_cubes",
         sa.Column("id", UUID(as_uuid=True), primary_key=True),
         sa.Column("session_id", sa.String(64), nullable=False, index=True),
@@ -331,7 +370,7 @@ def upgrade() -> None:
     # ===========================================
     # A-MEM LINKS (Zettelkasten connections)
     # ===========================================
-    op.create_table(
+    safe_create_table(
         "memory_links",
         sa.Column("id", UUID(as_uuid=True), primary_key=True),
         # Source and target
@@ -352,7 +391,7 @@ def upgrade() -> None:
     # ===========================================
     # MEMORY-R1 OPERATIONS LOG
     # ===========================================
-    op.create_table(
+    safe_create_table(
         "memory_operations",
         sa.Column("id", UUID(as_uuid=True), primary_key=True),
         sa.Column("session_id", sa.String(64), nullable=False, index=True),
@@ -376,7 +415,7 @@ def upgrade() -> None:
     # ===========================================
     # EPISODE SUMMARIES (Daily/Weekly)
     # ===========================================
-    op.create_table(
+    safe_create_table(
         "memory_episodes",
         sa.Column("id", UUID(as_uuid=True), primary_key=True),
         sa.Column("session_id", sa.String(64), index=True),
@@ -408,7 +447,7 @@ def upgrade() -> None:
     # ===========================================
     # PROCEDURAL MEMORY (Learned skills)
     # ===========================================
-    op.create_table(
+    safe_create_table(
         "memory_procedures",
         sa.Column("id", UUID(as_uuid=True), primary_key=True),
         sa.Column("session_id", sa.String(64), index=True),
@@ -441,7 +480,7 @@ def upgrade() -> None:
     # ===========================================
     # META-MEMORY (Self-knowledge)
     # ===========================================
-    op.create_table(
+    safe_create_table(
         "memory_meta",
         sa.Column("id", UUID(as_uuid=True), primary_key=True),
         sa.Column("session_id", sa.String(64), index=True),
@@ -468,96 +507,96 @@ def upgrade() -> None:
     # ===========================================
 
     # memory_facts indexes
-    op.create_index("idx_facts_session_type", "memory_facts", ["session_id", "fact_type"])
-    op.create_index("idx_facts_valid", "memory_facts", ["valid_from", "valid_to"])
-    op.create_index("idx_facts_heat", "memory_facts", ["heat_score"])
-    op.create_index("idx_facts_source_id", "memory_facts", ["source_id"])
-    op.create_index("idx_facts_last_accessed", "memory_facts", ["last_accessed"])
-    op.create_index("idx_facts_created_at", "memory_facts", ["created_at"])
-    op.create_index("idx_facts_updated_at", "memory_facts", ["updated_at"])
+    safe_create_index("idx_facts_session_type", "memory_facts", ["session_id", "fact_type"])
+    safe_create_index("idx_facts_valid", "memory_facts", ["valid_from", "valid_to"])
+    safe_create_index("idx_facts_heat", "memory_facts", ["heat_score"])
+    safe_create_index("idx_facts_source_id", "memory_facts", ["source_id"])
+    safe_create_index("idx_facts_last_accessed", "memory_facts", ["last_accessed"])
+    safe_create_index("idx_facts_created_at", "memory_facts", ["created_at"])
+    safe_create_index("idx_facts_updated_at", "memory_facts", ["updated_at"])
 
     # memory_experiences indexes
-    op.create_index("idx_experiences_agent_id", "memory_experiences", ["agent_id"])
-    op.create_index("idx_experiences_procedure_id", "memory_experiences", ["procedure_id"])
-    op.create_index("idx_experiences_occurred_at", "memory_experiences", ["occurred_at"])
-    op.create_index("idx_experiences_created_at", "memory_experiences", ["created_at"])
-    op.create_index("idx_experiences_session_type", "memory_experiences", ["session_id", "experience_type"])
+    safe_create_index("idx_experiences_agent_id", "memory_experiences", ["agent_id"])
+    safe_create_index("idx_experiences_procedure_id", "memory_experiences", ["procedure_id"])
+    safe_create_index("idx_experiences_occurred_at", "memory_experiences", ["occurred_at"])
+    safe_create_index("idx_experiences_created_at", "memory_experiences", ["created_at"])
+    safe_create_index("idx_experiences_session_type", "memory_experiences", ["session_id", "experience_type"])
 
     # memory_entities indexes
-    op.create_index("idx_entities_type", "memory_entities", ["entity_type"])
-    op.create_index("idx_entities_name", "memory_entities", ["canonical_name"])
-    op.create_index("idx_entities_last_seen", "memory_entities", ["last_seen"])
-    op.create_index("idx_entities_last_updated", "memory_entities", ["last_updated"])
-    op.create_index("idx_entities_created_at", "memory_entities", ["created_at"])
-    op.create_index("idx_entities_session_type", "memory_entities", ["session_id", "entity_type"])
+    safe_create_index("idx_entities_type", "memory_entities", ["entity_type"])
+    safe_create_index("idx_entities_name", "memory_entities", ["canonical_name"])
+    safe_create_index("idx_entities_last_seen", "memory_entities", ["last_seen"])
+    safe_create_index("idx_entities_last_updated", "memory_entities", ["last_updated"])
+    safe_create_index("idx_entities_created_at", "memory_entities", ["created_at"])
+    safe_create_index("idx_entities_session_type", "memory_entities", ["session_id", "entity_type"])
 
     # memory_relationships indexes
-    op.create_index("idx_relationships_source", "memory_relationships", ["source_id"])
-    op.create_index("idx_relationships_target", "memory_relationships", ["target_id"])
-    op.create_index("idx_relationships_valid", "memory_relationships", ["valid_from", "valid_to"])
-    op.create_index("idx_relationships_created_at", "memory_relationships", ["created_at"])
-    op.create_index("idx_relationships_updated_at", "memory_relationships", ["updated_at"])
-    op.create_index("idx_relationships_session_type", "memory_relationships", ["session_id", "relation_type"])
+    safe_create_index("idx_relationships_source", "memory_relationships", ["source_id"])
+    safe_create_index("idx_relationships_target", "memory_relationships", ["target_id"])
+    safe_create_index("idx_relationships_valid", "memory_relationships", ["valid_from", "valid_to"])
+    safe_create_index("idx_relationships_created_at", "memory_relationships", ["created_at"])
+    safe_create_index("idx_relationships_updated_at", "memory_relationships", ["updated_at"])
+    safe_create_index("idx_relationships_session_type", "memory_relationships", ["session_id", "relation_type"])
 
     # memory_beliefs indexes
-    op.create_index("idx_beliefs_confidence", "memory_beliefs", ["confidence"])
-    op.create_index("idx_beliefs_status", "memory_beliefs", ["status"])
-    op.create_index("idx_beliefs_superseded_by", "memory_beliefs", ["superseded_by"])
-    op.create_index("idx_beliefs_created_at", "memory_beliefs", ["created_at"])
-    op.create_index("idx_beliefs_updated_at", "memory_beliefs", ["updated_at"])
-    op.create_index("idx_beliefs_session_status", "memory_beliefs", ["session_id", "status"])
+    safe_create_index("idx_beliefs_confidence", "memory_beliefs", ["confidence"])
+    safe_create_index("idx_beliefs_status", "memory_beliefs", ["status"])
+    safe_create_index("idx_beliefs_superseded_by", "memory_beliefs", ["superseded_by"])
+    safe_create_index("idx_beliefs_created_at", "memory_beliefs", ["created_at"])
+    safe_create_index("idx_beliefs_updated_at", "memory_beliefs", ["updated_at"])
+    safe_create_index("idx_beliefs_session_status", "memory_beliefs", ["session_id", "status"])
 
     # memory_topics indexes
-    op.create_index("idx_topics_topic", "memory_topics", ["topic"])
-    op.create_index("idx_topics_created_at", "memory_topics", ["created_at"])
-    op.create_index("idx_topics_updated_at", "memory_topics", ["updated_at"])
-    op.create_index("idx_topics_last_discussed", "memory_topics", ["last_discussed"])
+    safe_create_index("idx_topics_topic", "memory_topics", ["topic"])
+    safe_create_index("idx_topics_created_at", "memory_topics", ["created_at"])
+    safe_create_index("idx_topics_updated_at", "memory_topics", ["updated_at"])
+    safe_create_index("idx_topics_last_discussed", "memory_topics", ["last_discussed"])
 
     # memory_keyword_index indexes
-    op.create_index("idx_keyword_keyword", "memory_keyword_index", ["keyword"])
-    op.create_index("idx_keyword_created_at", "memory_keyword_index", ["created_at"])
-    op.create_index("idx_keyword_session_keyword", "memory_keyword_index", ["session_id", "keyword"])
+    safe_create_index("idx_keyword_keyword", "memory_keyword_index", ["keyword"])
+    safe_create_index("idx_keyword_created_at", "memory_keyword_index", ["created_at"])
+    safe_create_index("idx_keyword_session_keyword", "memory_keyword_index", ["session_id", "keyword"])
 
     # memory_cubes indexes (critical for lookups)
-    op.create_index("idx_cubes_heat", "memory_cubes", ["heat_score"])
-    op.create_index("idx_cubes_memory_lookup", "memory_cubes", ["memory_type", "memory_id"])
-    op.create_index("idx_cubes_memory_id", "memory_cubes", ["memory_id"])
-    op.create_index("idx_cubes_migrated_from", "memory_cubes", ["migrated_from"])
-    op.create_index("idx_cubes_migrated_to", "memory_cubes", ["migrated_to"])
-    op.create_index("idx_cubes_created_at", "memory_cubes", ["created_at"])
-    op.create_index("idx_cubes_updated_at", "memory_cubes", ["updated_at"])
-    op.create_index("idx_cubes_session_type", "memory_cubes", ["session_id", "memory_type"])
+    safe_create_index("idx_cubes_heat", "memory_cubes", ["heat_score"])
+    safe_create_index("idx_cubes_memory_lookup", "memory_cubes", ["memory_type", "memory_id"])
+    safe_create_index("idx_cubes_memory_id", "memory_cubes", ["memory_id"])
+    safe_create_index("idx_cubes_migrated_from", "memory_cubes", ["migrated_from"])
+    safe_create_index("idx_cubes_migrated_to", "memory_cubes", ["migrated_to"])
+    safe_create_index("idx_cubes_created_at", "memory_cubes", ["created_at"])
+    safe_create_index("idx_cubes_updated_at", "memory_cubes", ["updated_at"])
+    safe_create_index("idx_cubes_session_type", "memory_cubes", ["session_id", "memory_type"])
 
     # memory_links indexes
-    op.create_index("idx_links_source", "memory_links", ["source_type", "source_id"])
-    op.create_index("idx_links_target", "memory_links", ["target_type", "target_id"])
-    op.create_index("idx_links_created_at", "memory_links", ["created_at"])
+    safe_create_index("idx_links_source", "memory_links", ["source_type", "source_id"])
+    safe_create_index("idx_links_target", "memory_links", ["target_type", "target_id"])
+    safe_create_index("idx_links_created_at", "memory_links", ["created_at"])
 
     # memory_operations indexes
-    op.create_index("idx_operations_memory_id", "memory_operations", ["memory_id"])
-    op.create_index("idx_operations_trigger_id", "memory_operations", ["trigger_id"])
-    op.create_index("idx_operations_created_at", "memory_operations", ["created_at"])
-    op.create_index("idx_operations_session_op", "memory_operations", ["session_id", "operation"])
+    safe_create_index("idx_operations_memory_id", "memory_operations", ["memory_id"])
+    safe_create_index("idx_operations_trigger_id", "memory_operations", ["trigger_id"])
+    safe_create_index("idx_operations_created_at", "memory_operations", ["created_at"])
+    safe_create_index("idx_operations_session_op", "memory_operations", ["session_id", "operation"])
 
     # memory_episodes indexes
-    op.create_index("idx_episodes_created_at", "memory_episodes", ["created_at"])
-    op.create_index("idx_episodes_period_start", "memory_episodes", ["period_start"])
-    op.create_index("idx_episodes_period_end", "memory_episodes", ["period_end"])
-    op.create_index("idx_episodes_session_type", "memory_episodes", ["session_id", "episode_type"])
+    safe_create_index("idx_episodes_created_at", "memory_episodes", ["created_at"])
+    safe_create_index("idx_episodes_period_start", "memory_episodes", ["period_start"])
+    safe_create_index("idx_episodes_period_end", "memory_episodes", ["period_end"])
+    safe_create_index("idx_episodes_session_type", "memory_episodes", ["session_id", "episode_type"])
 
     # memory_procedures indexes
-    op.create_index("idx_procedures_parent_id", "memory_procedures", ["parent_id"])
-    op.create_index("idx_procedures_agent_id", "memory_procedures", ["learned_from_agent_id"])
-    op.create_index("idx_procedures_last_used", "memory_procedures", ["last_used"])
-    op.create_index("idx_procedures_created_at", "memory_procedures", ["created_at"])
-    op.create_index("idx_procedures_updated_at", "memory_procedures", ["updated_at"])
-    op.create_index("idx_procedures_session_type", "memory_procedures", ["session_id", "procedure_type"])
+    safe_create_index("idx_procedures_parent_id", "memory_procedures", ["parent_id"])
+    safe_create_index("idx_procedures_agent_id", "memory_procedures", ["learned_from_agent_id"])
+    safe_create_index("idx_procedures_last_used", "memory_procedures", ["last_used"])
+    safe_create_index("idx_procedures_created_at", "memory_procedures", ["created_at"])
+    safe_create_index("idx_procedures_updated_at", "memory_procedures", ["updated_at"])
+    safe_create_index("idx_procedures_session_type", "memory_procedures", ["session_id", "procedure_type"])
 
     # memory_meta indexes
-    op.create_index("idx_meta_domain", "memory_meta", ["domain"])
-    op.create_index("idx_meta_last_updated", "memory_meta", ["last_updated"])
-    op.create_index("idx_meta_created_at", "memory_meta", ["created_at"])
-    op.create_index("idx_meta_session_domain", "memory_meta", ["session_id", "domain"])
+    safe_create_index("idx_meta_domain", "memory_meta", ["domain"])
+    safe_create_index("idx_meta_last_updated", "memory_meta", ["last_updated"])
+    safe_create_index("idx_meta_created_at", "memory_meta", ["created_at"])
+    safe_create_index("idx_meta_session_domain", "memory_meta", ["session_id", "domain"])
 
 
 def downgrade() -> None:
