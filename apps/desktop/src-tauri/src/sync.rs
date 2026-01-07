@@ -10,7 +10,7 @@ use tokio::sync::Mutex;
 const SYNC_INTERVAL_SECS: u64 = 30;
 
 /// Get server URL from environment, config file, or default to production
-fn get_server_url() -> String {
+pub fn get_server_url() -> String {
     // 1. Environment variable
     if let Ok(url) = std::env::var("OBSERVER_SERVER_URL") {
         return url;
@@ -29,6 +29,28 @@ fn get_server_url() -> String {
 
     // 3. Default to Railway production
     "https://server-production-20d71.up.railway.app".to_string()
+}
+
+/// Get dashboard URL from environment, config file, or default to production
+pub fn get_dashboard_url() -> String {
+    // 1. Environment variable
+    if let Ok(url) = std::env::var("OBSERVER_DASHBOARD_URL") {
+        return url;
+    }
+
+    // 2. Config file
+    if let Some(config_dir) = dirs::config_dir() {
+        let config_file = config_dir.join("observer").join("dashboard.txt");
+        if let Ok(url) = std::fs::read_to_string(&config_file) {
+            let url = url.trim();
+            if !url.is_empty() {
+                return url.to_string();
+            }
+        }
+    }
+
+    // 3. Default to Railway production
+    "https://web-production-20d71.up.railway.app".to_string()
 }
 
 pub async fn start_sync_service(state: Arc<Mutex<AppState>>) {
