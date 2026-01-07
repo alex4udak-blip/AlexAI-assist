@@ -33,7 +33,7 @@ export default function Settings() {
   };
 
   return (
-    <div className="space-y-6 max-w-2xl">
+    <div className="space-y-6 max-w-2xl mx-auto">
       <div>
         <h1 className="text-2xl font-bold text-text-primary">Настройки</h1>
         <p className="text-text-tertiary mt-1">
