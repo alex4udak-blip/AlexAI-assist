@@ -55,6 +55,11 @@ export default {
           online: '#22c55e',
           offline: '#6b7280',
         },
+        // Accent colors (alias for hud-cyan based theme)
+        accent: {
+          primary: '#06b6d4',
+          muted: 'rgba(6, 182, 212, 0.15)',
+        },
       },
       fontFamily: {
         sans: ['Inter', '-apple-system', 'BlinkMacSystemFont', 'system-ui', 'sans-serif'],
@@ -88,6 +93,7 @@ export default {
         'inner-glow': 'inset 0 0 20px rgba(6, 182, 212, 0.1)',
       },
       backgroundImage: {
+        'accent-gradient': 'linear-gradient(135deg, #06b6d4 0%, #3b82f6 100%)',
         'hud-gradient': 'linear-gradient(135deg, rgba(6, 182, 212, 0.1) 0%, rgba(59, 130, 246, 0.05) 100%)',
         'hud-radial': 'radial-gradient(ellipse at center, rgba(6, 182, 212, 0.15) 0%, transparent 70%)',
         'card-gradient': 'linear-gradient(135deg, rgba(6, 182, 212, 0.08) 0%, rgba(6, 182, 212, 0.02) 100%)',
