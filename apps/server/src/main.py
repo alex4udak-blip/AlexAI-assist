@@ -4,10 +4,9 @@ import logging
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, Request, Response, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, Request, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
 
 from src.api.routes import (
     agents,
@@ -24,48 +23,6 @@ from src.db.session import engine
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
-
-
-class CORSDebugMiddleware(BaseHTTPMiddleware):
-    """Debug middleware to log CORS issues and validate origins."""
-
-    async def dispatch(
-        self, request: Request, call_next: RequestResponseEndpoint
-    ) -> Response:
-        origin = request.headers.get("origin", "")
-        logger.info(f"Request: {request.method} {request.url.path} from origin: {origin}")
-
-        # Validate origin against allowed origins
-        allowed = settings.allowed_origins
-        is_allowed = origin in allowed if origin else False
-
-        # Handle preflight
-        if request.method == "OPTIONS":
-            logger.info(f"Handling OPTIONS preflight for {request.url.path}")
-            response = JSONResponse(content={"status": "ok"}, status_code=200)
-            if is_allowed:
-                response.headers["Access-Control-Allow-Origin"] = origin
-                response.headers["Access-Control-Allow-Credentials"] = "true"
-            response.headers["Access-Control-Allow-Methods"] = (
-                "GET, POST, PUT, DELETE, OPTIONS, PATCH"
-            )
-            response.headers["Access-Control-Allow-Headers"] = (
-                "Content-Type, Authorization, X-Requested-With"
-            )
-            return response
-
-        try:
-            return await call_next(request)
-        except Exception as e:
-            logger.error(f"Error in request: {e}")
-            error_response = JSONResponse(
-                content={"detail": "Internal server error"},
-                status_code=500
-            )
-            if is_allowed:
-                error_response.headers["Access-Control-Allow-Origin"] = origin
-                error_response.headers["Access-Control-Allow-Credentials"] = "true"
-            return error_response
 
 
 @asynccontextmanager
@@ -89,10 +46,7 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# Add custom CORS debug middleware first (processed last)
-app.add_middleware(CORSDebugMiddleware)
-
-# CORS middleware - use configured origins in production
+# CORS middleware - handles all CORS including preflight OPTIONS
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.allowed_origins,
