@@ -40,7 +40,8 @@ class AgentManagerService:
             status="draft",
         )
         self.db.add(agent)
-        await self.db.flush()
+        await self.db.commit()
+        await self.db.refresh(agent)
         return agent
 
     async def get_agents(
@@ -82,7 +83,8 @@ class AgentManagerService:
                 setattr(agent, key, value)
 
         agent.updated_at = datetime.now(UTC)
-        await self.db.flush()
+        await self.db.commit()
+        await self.db.refresh(agent)
         return agent
 
     async def delete_agent(self, agent_id: UUID) -> bool:
@@ -92,7 +94,7 @@ class AgentManagerService:
             return False
 
         await self.db.delete(agent)
-        await self.db.flush()
+        await self.db.commit()
         return True
 
     async def enable_agent(self, agent_id: UUID) -> Agent | None:
@@ -125,7 +127,7 @@ class AgentManagerService:
             agent.error_count += 1
             agent.last_error = error
 
-        await self.db.flush()
+        await self.db.commit()
 
     async def add_log(
         self,
@@ -142,7 +144,8 @@ class AgentManagerService:
             data=data,
         )
         self.db.add(log)
-        await self.db.flush()
+        await self.db.commit()
+        await self.db.refresh(log)
         return log
 
     async def get_logs(
@@ -189,6 +192,6 @@ class AgentManagerService:
 
         suggestion.status = "accepted"
         suggestion.accepted_at = datetime.now(UTC)
-        await self.db.flush()
+        await self.db.commit()
 
         return agent

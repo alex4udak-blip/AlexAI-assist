@@ -20,7 +20,9 @@ export function ChatWindow() {
   }, [messages]);
 
   useEffect(() => {
-    api.getChatHistory().then(setMessages).catch(() => {});
+    api.getChatHistory().then(setMessages).catch((err) => {
+      console.error('Failed to load chat history:', err);
+    });
   }, []);
 
   const handleSend = async () => {
@@ -94,6 +96,7 @@ export function ChatWindow() {
                     onClick={() => {
                       setInput(prompt);
                     }}
+                    aria-label={`Использовать подсказку: ${prompt}`}
                     className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl
                                border border-border-subtle bg-white/[0.02]
                                text-sm text-text-secondary whitespace-nowrap
