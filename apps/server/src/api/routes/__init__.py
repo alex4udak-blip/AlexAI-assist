@@ -6,6 +6,7 @@ from src.api.routes import (
     chat,
     events,
     health,
+    memory,
     patterns,
     suggestions,
 )
@@ -16,6 +17,7 @@ __all__ = [
     "chat",
     "events",
     "health",
+    "memory",
     "patterns",
     "suggestions",
 ]

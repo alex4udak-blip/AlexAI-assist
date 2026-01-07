@@ -1,3 +1,4 @@
+# Core
 fastapi>=0.109.0
 uvicorn[standard]>=0.27.0
 sqlalchemy[asyncio]>=2.0.25
@@ -12,3 +13,8 @@ passlib[bcrypt]>=1.7.4
 python-multipart>=0.0.6
 websockets>=12.0
 apscheduler>=3.10.0
+
+# Memory System 2026 - AI/ML
+sentence-transformers>=2.2.0
+numpy>=1.24.0
+pgvector>=0.2.0
