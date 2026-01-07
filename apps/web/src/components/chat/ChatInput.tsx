@@ -18,9 +18,8 @@ export function ChatInput({ value, onChange, onSend, disabled }: ChatInputProps)
   return (
     <div className="p-4 border-t border-border-subtle">
       <div className="max-w-3xl mx-auto">
-        <div className="flex items-center gap-3 p-3 rounded-xl border border-border-subtle
-                        bg-white/[0.03] focus-within:border-accent-primary/50
-                        focus-within:bg-white/[0.05] transition-all duration-200">
+        <div className="flex items-center gap-3 p-3 rounded-xl
+                        bg-bg-secondary focus-within:bg-bg-tertiary transition-all duration-200">
           <textarea
             value={value}
             onChange={(e) => onChange(e.target.value)}
@@ -36,13 +35,14 @@ export function ChatInput({ value, onChange, onSend, disabled }: ChatInputProps)
           <button
             onClick={onSend}
             disabled={disabled || !value.trim()}
-            className={`p-2 rounded-lg transition-all duration-150 shrink-0
+            aria-label="Отправить сообщение"
+            className={`p-2.5 rounded-full transition-all duration-150 shrink-0
                        ${value.trim()
-                         ? 'bg-accent-primary text-white hover:bg-accent-primary/90 hover:shadow-glow-sm'
+                         ? 'bg-hud-cyan text-white hover:bg-hud-cyan/90 hover:shadow-glow-cyan'
                          : 'bg-white/[0.05] text-text-muted cursor-not-allowed'
                        }`}
           >
-            <Send className="w-4 h-4" />
+            <Send className="w-4 h-4 -rotate-45" />
           </button>
         </div>
         <p className="text-xs text-text-muted mt-2 text-center">
