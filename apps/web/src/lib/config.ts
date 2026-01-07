@@ -23,12 +23,7 @@ function getApiUrl(): string {
     const hostname = window.location.hostname;
 
     if (hostname.includes('.up.railway.app')) {
-      // Replace 'web-' with 'server-' in hostname
-      // Note: This only works if web and server have same project ID suffix
-      const serverHostname = hostname.replace(/^web-/, 'server-');
-      const url = `${window.location.protocol}//${serverHostname}`;
-      console.log('[Config] Derived API URL:', url);
-      return url;
+      return 'https://server-production-0b14.up.railway.app';
     }
   }
 
@@ -50,10 +45,7 @@ function getWsUrl(): string {
     const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
 
     if (hostname.includes('.up.railway.app')) {
-      const serverHostname = hostname.replace(/^web-/, 'server-');
-      const url = `${wsProtocol}//${serverHostname}`;
-      console.log('[Config] Derived WS URL:', url);
-      return url;
+      return 'wss://server-production-0b14.up.railway.app';
     }
   }
 
