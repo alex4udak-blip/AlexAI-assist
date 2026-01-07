@@ -170,14 +170,15 @@ class AnalyzerService:
         """Get activity trends over time."""
         start_date = datetime.utcnow() - timedelta(days=days)
 
+        date_trunc_expr = func.date_trunc("day", Event.timestamp)
         query = (
             select(
-                func.date_trunc("day", Event.timestamp).label("date"),
+                date_trunc_expr.label("date"),
                 func.count(Event.id).label("count"),
             )
             .where(Event.timestamp >= start_date)
-            .group_by(func.date_trunc("day", Event.timestamp))
-            .order_by(func.date_trunc("day", Event.timestamp))
+            .group_by(date_trunc_expr)
+            .order_by(date_trunc_expr)
         )
 
         if device_id:
