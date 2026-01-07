@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion';
-import { Plus, Pause, Play, FileText, Bot, Settings, RefreshCw } from 'lucide-react';
+import { Plus, Pause, Play, FileText, Bot, Settings } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 interface QuickAction {

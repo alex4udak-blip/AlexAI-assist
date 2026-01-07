@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion';
-import { Bot, Play, Pause, AlertTriangle, CheckCircle, Clock, Zap } from 'lucide-react';
+import { Bot, Play, Pause, AlertTriangle, CheckCircle, Zap } from 'lucide-react';
 import type { Agent } from '../../lib/api';
 
 interface AgentGridProps {

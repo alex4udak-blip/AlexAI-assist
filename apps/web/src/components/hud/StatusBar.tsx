@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion';
-import { Activity, Bot, Shield, Wifi, WifiOff } from 'lucide-react';
+import { Activity, Shield, Wifi, WifiOff } from 'lucide-react';
 import { useWebSocket } from '../../hooks/useWebSocket';
 
 interface StatusBarProps {
@@ -15,7 +15,7 @@ export function StatusBar({
   totalAgents = 0,
   systemHealth = 'healthy',
 }: StatusBarProps) {
-  const { connected } = useWebSocket();
+  const { isConnected } = useWebSocket();
 
   const formatFocusTime = (minutes: number) => {
     const hours = Math.floor(minutes / 60);
@@ -102,7 +102,7 @@ export function StatusBar({
 
       {/* Connection Status */}
       <div className="flex items-center gap-2">
-        {connected ? (
+        {isConnected ? (
           <>
             <Wifi className="w-4 h-4 text-status-success" />
             <span className="text-xs text-status-success font-mono">CONNECTED</span>

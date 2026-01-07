@@ -18,7 +18,7 @@ interface RingProps {
   delay: number;
 }
 
-function Ring({ value, maxValue, radius, strokeWidth, color, glowColor, label, displayValue, delay }: RingProps) {
+function Ring({ value, maxValue, radius, strokeWidth, color, glowColor, delay }: Omit<RingProps, 'label' | 'displayValue'>) {
   const circumference = 2 * Math.PI * radius;
   const progress = Math.min(value / maxValue, 1);
   const offset = circumference - progress * circumference;

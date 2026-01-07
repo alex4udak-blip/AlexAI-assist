@@ -9,11 +9,41 @@
 
   html {
     @apply scroll-smooth;
+    /* Enable smooth scrolling on iOS */
+    -webkit-overflow-scrolling: touch;
   }
 
   body {
     @apply bg-bg-primary text-text-primary font-sans antialiased;
     font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
+    /* Prevent pull-to-refresh on mobile */
+    overscroll-behavior-y: contain;
+    /* OLED-friendly true black background */
+    background-color: #000000;
+  }
+
+  /* Safe area support for notch/home indicator */
+  .safe-area-top {
+    padding-top: env(safe-area-inset-top, 0px);
+  }
+
+  .safe-area-bottom {
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+
+  .safe-area-left {
+    padding-left: env(safe-area-inset-left, 0px);
+  }
+
+  .safe-area-right {
+    padding-right: env(safe-area-inset-right, 0px);
+  }
+
+  .safe-area-inset {
+    padding-top: env(safe-area-inset-top, 0px);
+    padding-right: env(safe-area-inset-right, 0px);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+    padding-left: env(safe-area-inset-left, 0px);
   }
 
   /* Custom scrollbar - thin and subtle */
@@ -421,5 +451,111 @@
     50% {
       box-shadow: 0 0 20px rgba(6, 182, 212, 0.6);
     }
+  }
+
+  /* Mobile Touch Optimization */
+  .touch-manipulation {
+    touch-action: manipulation;
+  }
+
+  .touch-pan-y {
+    touch-action: pan-y;
+  }
+
+  .touch-pan-x {
+    touch-action: pan-x;
+  }
+
+  .touch-none {
+    touch-action: none;
+  }
+
+  /* Minimum touch target size (44px as per Apple HIG) */
+  .touch-target {
+    min-width: 44px;
+    min-height: 44px;
+  }
+
+  /* Prevent text selection on touch */
+  .select-none-touch {
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    user-select: none;
+  }
+
+  /* GPU-accelerated transforms for smoother animations */
+  .gpu-accelerated {
+    transform: translateZ(0);
+    will-change: transform;
+  }
+
+  /* Reduce motion for accessibility */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+
+    .pulse-glow,
+    .animate-pulse,
+    .hud-scan::after,
+    .hud-border-glow::before,
+    .data-stream::before {
+      animation: none !important;
+    }
+  }
+
+  /* Mobile-specific optimizations */
+  @media (max-width: 768px) {
+    /* Remove heavy glow effects on mobile */
+    .shadow-hud,
+    .shadow-hud-sm,
+    .shadow-hud-lg,
+    .shadow-glow,
+    .shadow-glow-sm {
+      box-shadow: none !important;
+    }
+
+    /* Simpler border instead of glow */
+    .hud-card,
+    .hud-panel {
+      box-shadow: none;
+    }
+
+    /* Disable scan line on mobile for performance */
+    .hud-scan::after {
+      display: none;
+    }
+
+    /* Disable data stream on mobile */
+    .data-stream::before {
+      display: none;
+    }
+
+    /* Faster transitions on mobile */
+    .transition-all {
+      transition-duration: 150ms !important;
+    }
+  }
+
+  /* Haptic feedback indicator (visual only, actual haptic requires JS) */
+  .haptic-tap:active {
+    transform: scale(0.97);
+    transition: transform 50ms ease-out;
+  }
+
+  /* Pull to refresh indicator */
+  .pull-indicator {
+    @apply fixed top-0 left-1/2 -translate-x-1/2 z-50;
+    @apply w-10 h-1 rounded-full bg-hud-cyan/50;
+    @apply opacity-0 transition-opacity;
+  }
+
+  .pull-indicator.visible {
+    @apply opacity-100;
   }
 }
