@@ -4,10 +4,10 @@ import logging
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, Request, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, Request, Response, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
 
 from src.api.routes import (
     agents,
@@ -29,7 +29,9 @@ logger = logging.getLogger(__name__)
 class CORSDebugMiddleware(BaseHTTPMiddleware):
     """Debug middleware to log CORS issues and validate origins."""
 
-    async def dispatch(self, request: Request, call_next):
+    async def dispatch(
+        self, request: Request, call_next: RequestResponseEndpoint
+    ) -> Response:
         origin = request.headers.get("origin", "")
         logger.info(f"Request: {request.method} {request.url.path} from origin: {origin}")
 
@@ -112,7 +114,7 @@ app.include_router(chat.router, prefix="/api/v1/chat", tags=["Chat"])
 
 
 @app.exception_handler(Exception)
-async def global_exception_handler(request, exc: Exception) -> JSONResponse:
+async def global_exception_handler(request: Request, exc: Exception) -> JSONResponse:
     """Global exception handler."""
     logger.error(f"Unhandled exception: {exc}")
     return JSONResponse(
@@ -129,7 +131,7 @@ async def root() -> dict[str, str]:
 
 
 @app.get("/test-db")
-async def test_db():
+async def test_db() -> dict[str, str]:
     """Test database connection (internal use only)."""
     from sqlalchemy import text
 
@@ -149,7 +151,7 @@ active_connections: set[WebSocket] = set()
 
 
 @app.websocket("/ws")
-async def websocket_endpoint(websocket: WebSocket):
+async def websocket_endpoint(websocket: WebSocket) -> None:
     """WebSocket endpoint for real-time updates."""
     await websocket.accept()
     active_connections.add(websocket)

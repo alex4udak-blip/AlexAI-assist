@@ -21,7 +21,7 @@ class PatternDetectorService:
         self,
         device_id: str | None = None,
         min_occurrences: int = 3,
-    ) -> list[dict[str, Any]]:
+    ) -> dict[str, Any]:
         """Detect repeating patterns in user behavior."""
         # Get recent events
         start_date = datetime.now(UTC) - timedelta(days=7)
@@ -32,7 +32,7 @@ class PatternDetectorService:
 
         query = query.order_by(Event.timestamp)
         result = await self.db.execute(query)
-        events = result.scalars().all()
+        events = list(result.scalars().all())
 
         # Detect app sequence patterns
         app_sequences = self._detect_app_sequences(events, min_occurrences)
@@ -55,7 +55,7 @@ class PatternDetectorService:
         min_occurrences: int,
     ) -> list[dict[str, Any]]:
         """Detect repeating app usage sequences."""
-        sequences: dict[tuple, int] = defaultdict(int)
+        sequences: dict[tuple[str, ...], int] = defaultdict(int)
         window_size = 3
 
         apps = [e.app_name for e in events if e.app_name]
@@ -64,7 +64,7 @@ class PatternDetectorService:
             seq = tuple(apps[i : i + window_size])
             sequences[seq] += 1
 
-        patterns = []
+        patterns: list[dict[str, Any]] = []
         for seq, count in sequences.items():
             if count >= min_occurrences:
                 patterns.append({
@@ -74,7 +74,7 @@ class PatternDetectorService:
                     "automatable": len(set(seq)) > 1,
                 })
 
-        return sorted(patterns, key=lambda x: x["occurrences"], reverse=True)[:10]
+        return sorted(patterns, key=lambda x: int(x["occurrences"]), reverse=True)[:10]
 
     def _detect_time_patterns(
         self,
