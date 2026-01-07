@@ -162,12 +162,12 @@ export function ChatWindow() {
         </div>
       </div>
 
-      {/* Input */}
+      {/* Input - disabled while loading history or sending */}
       <ChatInput
         value={input}
         onChange={setInput}
         onSend={handleSend}
-        disabled={loading}
+        disabled={loading || !historyLoaded}
       />
     </div>
   );
