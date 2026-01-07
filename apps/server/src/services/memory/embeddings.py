@@ -133,6 +133,15 @@ class EmbeddingService:
         """
         return "[" + ",".join(str(x) for x in embedding) + "]"
 
+    # Whitelist of allowed tables for embedding storage
+    ALLOWED_TABLES = frozenset({
+        "memory_facts",
+        "memory_experiences",
+        "memory_entities",
+        "memory_beliefs",
+        "memory_topics",
+    })
+
     async def embed_and_store(
         self,
         text: str,
@@ -145,25 +154,36 @@ class EmbeddingService:
 
         Args:
             text: Text to embed
-            table_name: Table to update
+            table_name: Table to update (must be in ALLOWED_TABLES)
             record_id: Record ID to update
             db_session: Database session
 
         Returns:
             True if successful
         """
+        # Validate table name against whitelist
+        if table_name not in self.ALLOWED_TABLES:
+            logger.error(f"Invalid table name for embedding: {table_name}")
+            return False
+
         embedding = self.embed(text)
         if embedding is None:
             return False
 
         try:
+            from sqlalchemy import text as sql_text
+
             vector_str = self.to_pgvector_str(embedding)
+            # Use parameterized query - table name is safe (whitelisted)
+            # record_id and vector_str are parameterized
             await db_session.execute(
-                f"""
-                UPDATE {table_name}
-                SET embedding_vector = '{vector_str}'::vector
-                WHERE id = '{record_id}'
-                """
+                sql_text(
+                    f"""
+                    UPDATE {table_name}
+                    SET embedding_vector = :vector::vector
+                    WHERE id = :record_id::uuid
+                    """
+                ).bindparams(vector=vector_str, record_id=record_id)
             )
             return True
         except Exception as e:

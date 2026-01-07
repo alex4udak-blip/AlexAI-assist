@@ -1,7 +1,7 @@
 mod accessibility;
 mod apps;
 
-pub use accessibility::*;
+pub use accessibility::macos::*;
 
 use crate::AppState;
 use chrono::{DateTime, Utc};
@@ -10,6 +10,15 @@ use std::sync::Arc;
 use tauri::AppHandle;
 use tokio::sync::Mutex;
 use uuid::Uuid;
+
+/// Focus information including app, window, and optional selected text
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct FocusInfo {
+    pub app_name: String,
+    pub window_title: String,
+    pub selected_text: Option<String>,
+    pub url: Option<String>,
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Event {
@@ -68,9 +77,45 @@ fn get_device_id() -> String {
     new_id
 }
 
+/// Get the currently focused application and window information
+pub fn get_current_focus() -> Option<FocusInfo> {
+    // First try accessibility API for detailed info
+    if has_accessibility_permission() {
+        if let Some((app_name, window_title)) = get_focused_element_info() {
+            let selected_text = get_selected_text();
+            let url = get_browser_url();
+
+            return Some(FocusInfo {
+                app_name,
+                window_title,
+                selected_text,
+                url,
+            });
+        }
+    }
+
+    // Fallback to basic window info
+    let (app_name, window_title) = apps::get_active_window();
+    if let Some(app) = app_name {
+        return Some(FocusInfo {
+            app_name: app,
+            window_title: window_title.unwrap_or_default(),
+            selected_text: None,
+            url: None,
+        });
+    }
+
+    None
+}
+
 pub async fn start_collector(state: Arc<Mutex<AppState>>, _app_handle: AppHandle) {
     let mut last_app: Option<String> = None;
     let mut last_title: Option<String> = None;
+
+    // Check accessibility permission on start
+    if !has_accessibility_permission() {
+        eprintln!("Warning: Accessibility permission not granted. Some features will be limited.");
+    }
 
     loop {
         // Check if collection is enabled
@@ -82,18 +127,39 @@ pub async fn start_collector(state: Arc<Mutex<AppState>>, _app_handle: AppHandle
             }
         }
 
-        // Get current active app and window
-        let (current_app, current_title) = apps::get_active_window();
+        // Get current focus using accessibility API when available
+        let focus_info = get_current_focus();
+
+        let (current_app, current_title) = if let Some(ref info) = focus_info {
+            (Some(info.app_name.clone()), Some(info.window_title.clone()))
+        } else {
+            // Fallback to basic window info
+            apps::get_active_window()
+        };
 
         // Check if there's a change
         if current_app != last_app || current_title != last_title {
             if let Some(app_name) = &current_app {
-                let event = Event::new(
+                let mut event = Event::new(
                     "app_focus",
                     current_app.clone(),
                     current_title.clone(),
                 )
                 .with_category(categorize_app(app_name));
+
+                // Add URL if available from accessibility API
+                if let Some(ref info) = focus_info {
+                    event.url = info.url.clone();
+
+                    // Add selected text to event data if available
+                    if let Some(ref selected) = info.selected_text {
+                        if !selected.is_empty() {
+                            event.data = serde_json::json!({
+                                "selected_text": selected
+                            });
+                        }
+                    }
+                }
 
                 // Add to buffer
                 let mut state = state.lock().await;

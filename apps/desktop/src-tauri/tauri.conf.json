@@ -46,9 +46,16 @@
     "macOS": {
       "entitlements": "entitlements.plist",
       "minimumSystemVersion": "10.15",
-      "frameworks": [],
+      "frameworks": [
+        "ApplicationServices.framework"
+      ],
       "signingIdentity": null,
-      "providerShortName": null
+      "providerShortName": null,
+      "infoPlist": {
+        "NSAccessibilityUsageDescription": "Observer needs Accessibility access to track which applications you use and help analyze your work patterns.",
+        "NSAppleEventsUsageDescription": "Observer uses Apple Events to communicate with other applications.",
+        "LSUIElement": true
+      }
     }
   },
   "plugins": {
