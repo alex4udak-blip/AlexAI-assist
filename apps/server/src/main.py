@@ -7,7 +7,8 @@ from fastapi import FastAPI, Request, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from src.api.middleware import RateLimiterMiddleware, RequestLoggingMiddleware, get_rate_limiter
+from src.api.middleware import RateLimiterMiddleware, RequestLoggingMiddleware
+from src.api.middleware.rate_limiter import RateLimiter
 from src.api.routes import (
     agents,
     analytics,
@@ -29,6 +30,9 @@ setup_logging(
 )
 logger = get_logger(__name__)
 
+# Create rate limiter at module level (starts with in-memory, upgrades to Redis in lifespan)
+_rate_limiter = RateLimiter(None)
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
@@ -44,14 +48,19 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     )
     logger.info(f"CORS origins: {settings.allowed_origins}")
 
-    # Add request logging middleware
-    app.add_middleware(RequestLoggingMiddleware)
-    logger.info("Request logging middleware initialized")
-
-    # Initialize rate limiter
-    rate_limiter = await get_rate_limiter()
-    app.add_middleware(RateLimiterMiddleware, rate_limiter=rate_limiter)
-    logger.info("Rate limiter initialized")
+    # Try to upgrade rate limiter to Redis (optional)
+    try:
+        import redis.asyncio as redis
+        redis_client = redis.from_url(
+            settings.redis_url,
+            encoding="utf-8",
+            decode_responses=False,
+        )
+        await redis_client.ping()
+        _rate_limiter.redis_client = redis_client
+        logger.info("Rate limiter upgraded to Redis backend")
+    except Exception as e:
+        logger.warning(f"Redis not available, using in-memory rate limiting: {e}")
 
     # Start background scheduler
     from src.core.scheduler import start_scheduler, stop_scheduler
@@ -84,6 +93,12 @@ app.add_middleware(
     allow_headers=["*"],
     expose_headers=["*"],
 )
+
+# Rate limiter middleware (uses in-memory, upgrades to Redis in lifespan)
+app.add_middleware(RateLimiterMiddleware, rate_limiter=_rate_limiter)
+
+# Request logging middleware
+app.add_middleware(RequestLoggingMiddleware)
 
 # Include routers
 app.include_router(health.router, tags=["Health"])
