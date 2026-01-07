@@ -1,6 +1,6 @@
 """Observer API Server - Main Entry Point"""
 
-import asyncio
+import logging
 from contextlib import asynccontextmanager
 from typing import AsyncGenerator
 
@@ -20,13 +20,22 @@ from src.api.routes import (
 from src.core.config import settings
 from src.db.session import engine
 
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     """Application lifespan handler."""
     # Startup
+    logger.info("Starting Observer API Server...")
+    logger.info(f"Environment: {settings.environment}")
+    logger.info(f"Debug: {settings.debug}")
+    logger.info(f"CORS origins: {settings.allowed_origins}")
     yield
     # Shutdown
+    logger.info("Shutting down Observer API Server...")
     await engine.dispose()
 
 
@@ -59,7 +68,14 @@ app.include_router(chat.router, prefix="/api/v1/chat", tags=["Chat"])
 @app.exception_handler(Exception)
 async def global_exception_handler(request, exc: Exception) -> JSONResponse:
     """Global exception handler."""
+    logger.error(f"Unhandled exception: {exc}")
     return JSONResponse(
         status_code=500,
         content={"detail": "Internal server error"},
     )
+
+
+@app.get("/")
+async def root() -> dict[str, str]:
+    """Root endpoint for basic connectivity check."""
+    return {"status": "ok", "service": "observer-api"}
