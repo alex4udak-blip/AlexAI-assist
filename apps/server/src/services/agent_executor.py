@@ -2,6 +2,8 @@
 
 import asyncio
 import json
+import operator
+from collections.abc import Callable
 from datetime import UTC, datetime
 from typing import Any
 from urllib.parse import urlparse
@@ -255,8 +257,6 @@ class AgentExecutorService:
 
         Supports: ==, !=, >, <, >=, <=, 'in', 'not in', 'and', 'or'
         """
-        import operator
-
         condition = condition.strip()
 
         # Handle 'and' / 'or' by splitting and recursing
@@ -271,15 +271,21 @@ class AgentExecutorService:
                    self._safe_eval_condition(parts[1], context)
 
         # Parse comparison operators
-        operators_map = {
+        def contains(a: Any, b: Any) -> bool:
+            return a in b
+
+        def not_contains(a: Any, b: Any) -> bool:
+            return a not in b
+
+        operators_map: dict[str, Callable[[Any, Any], bool]] = {
             "==": operator.eq,
             "!=": operator.ne,
             ">=": operator.ge,
             "<=": operator.le,
             ">": operator.gt,
             "<": operator.lt,
-            " in ": lambda a, b: a in b,
-            " not in ": lambda a, b: a not in b,
+            " in ": contains,
+            " not in ": not_contains,
         }
 
         for op_str, op_func in operators_map.items():
