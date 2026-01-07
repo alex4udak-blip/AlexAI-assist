@@ -35,7 +35,7 @@ export default function History() {
   });
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 max-w-7xl mx-auto">
       <div>
         <h1 className="text-2xl font-bold text-text-primary">История</h1>
         <p className="text-text-tertiary mt-1">
