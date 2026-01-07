@@ -132,13 +132,64 @@ class AgentExecutorService:
         action: dict[str, Any],
         context: dict[str, Any],
     ) -> dict[str, Any]:
-        """Make an HTTP request."""
+        """Make an HTTP request with SSRF protection."""
         import httpx
+        from urllib.parse import urlparse
 
         url = self._render_template(action.get("url", ""), context)
         method = action.get("method", "GET").upper()
         headers = action.get("headers", {})
         body = action.get("body")
+
+        # SSRF Protection: validate URL
+        try:
+            parsed = urlparse(url)
+
+            # Only allow http/https
+            if parsed.scheme not in ("http", "https"):
+                return {
+                    "success": False,
+                    "error": f"Invalid URL scheme: {parsed.scheme}. Only http/https allowed.",
+                    "type": "http",
+                }
+
+            # Block internal/private networks
+            blocked_hosts = [
+                "localhost", "127.0.0.1", "0.0.0.0",
+                "169.254.169.254",  # AWS metadata
+                "metadata.google.internal",  # GCP metadata
+            ]
+            blocked_patterns = [
+                ".internal", ".local", ".railway.internal",
+                "10.", "172.16.", "172.17.", "172.18.", "172.19.",
+                "172.20.", "172.21.", "172.22.", "172.23.",
+                "172.24.", "172.25.", "172.26.", "172.27.",
+                "172.28.", "172.29.", "172.30.", "172.31.",
+                "192.168.",
+            ]
+
+            hostname = parsed.hostname or ""
+            if hostname in blocked_hosts:
+                return {
+                    "success": False,
+                    "error": "URL points to blocked host",
+                    "type": "http",
+                }
+
+            for pattern in blocked_patterns:
+                if hostname.startswith(pattern) or hostname.endswith(pattern):
+                    return {
+                        "success": False,
+                        "error": "URL points to internal/private network",
+                        "type": "http",
+                    }
+
+        except Exception as e:
+            return {
+                "success": False,
+                "error": f"Invalid URL: {e}",
+                "type": "http",
+            }
 
         if body:
             body = self._render_template(json.dumps(body), context)
@@ -178,11 +229,12 @@ class AgentExecutorService:
         action: dict[str, Any],
         context: dict[str, Any],
     ) -> dict[str, Any]:
-        """Evaluate a condition."""
+        """Evaluate a condition safely."""
         condition = action.get("condition", "")
-        # Simple condition evaluation (in production, use safer eval)
+
+        # Safe condition evaluation using simple comparison parsing
         try:
-            result = eval(condition, {"__builtins__": {}}, context)
+            result = self._safe_eval_condition(condition, context)
             return {
                 "success": True,
                 "result": bool(result),
@@ -193,6 +245,75 @@ class AgentExecutorService:
                 "success": False,
                 "error": f"Condition evaluation failed: {e}",
             }
+
+    def _safe_eval_condition(
+        self,
+        condition: str,
+        context: dict[str, Any],
+    ) -> bool:
+        """Safely evaluate simple conditions without eval().
+
+        Supports: ==, !=, >, <, >=, <=, 'in', 'not in', 'and', 'or'
+        """
+        import operator
+
+        condition = condition.strip()
+
+        # Handle 'and' / 'or' by splitting and recursing
+        if " and " in condition:
+            parts = condition.split(" and ", 1)
+            return self._safe_eval_condition(parts[0], context) and \
+                   self._safe_eval_condition(parts[1], context)
+
+        if " or " in condition:
+            parts = condition.split(" or ", 1)
+            return self._safe_eval_condition(parts[0], context) or \
+                   self._safe_eval_condition(parts[1], context)
+
+        # Parse comparison operators
+        operators_map = {
+            "==": operator.eq,
+            "!=": operator.ne,
+            ">=": operator.ge,
+            "<=": operator.le,
+            ">": operator.gt,
+            "<": operator.lt,
+            " in ": lambda a, b: a in b,
+            " not in ": lambda a, b: a not in b,
+        }
+
+        for op_str, op_func in operators_map.items():
+            if op_str in condition:
+                parts = condition.split(op_str, 1)
+                if len(parts) == 2:
+                    left = self._resolve_value(parts[0].strip(), context)
+                    right = self._resolve_value(parts[1].strip(), context)
+                    return op_func(left, right)
+
+        # If no operator, treat as boolean context lookup
+        return bool(self._resolve_value(condition, context))
+
+    def _resolve_value(self, value: str, context: dict[str, Any]) -> Any:
+        """Resolve a value from context or parse as literal."""
+        value = value.strip()
+
+        # Check if it's a context variable
+        if value in context:
+            return context[value]
+
+        # Try to parse as JSON literal (handles strings, numbers, booleans, null)
+        try:
+            return json.loads(value)
+        except json.JSONDecodeError:
+            pass
+
+        # Try as quoted string
+        if (value.startswith("'") and value.endswith("'")) or \
+           (value.startswith('"') and value.endswith('"')):
+            return value[1:-1]
+
+        # Return as-is (string)
+        return value
 
     async def _action_log(
         self,

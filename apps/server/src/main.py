@@ -27,22 +27,29 @@ logger = logging.getLogger(__name__)
 
 
 class CORSDebugMiddleware(BaseHTTPMiddleware):
-    """Debug middleware to log CORS issues and ensure headers are always set."""
+    """Debug middleware to log CORS issues and validate origins."""
 
     async def dispatch(self, request: Request, call_next):
         origin = request.headers.get("origin", "")
         logger.info(f"Request: {request.method} {request.url.path} from origin: {origin}")
 
+        # Validate origin against allowed origins
+        allowed = settings.allowed_origins
+        is_allowed = origin in allowed if origin else False
+
         # Handle preflight
         if request.method == "OPTIONS":
             logger.info(f"Handling OPTIONS preflight for {request.url.path}")
             response = JSONResponse(content={"status": "ok"}, status_code=200)
-            response.headers["Access-Control-Allow-Origin"] = origin or "*"
+            if is_allowed:
+                response.headers["Access-Control-Allow-Origin"] = origin
+                response.headers["Access-Control-Allow-Credentials"] = "true"
             response.headers["Access-Control-Allow-Methods"] = (
                 "GET, POST, PUT, DELETE, OPTIONS, PATCH"
             )
-            response.headers["Access-Control-Allow-Headers"] = "*"
-            response.headers["Access-Control-Allow-Credentials"] = "true"
+            response.headers["Access-Control-Allow-Headers"] = (
+                "Content-Type, Authorization, X-Requested-With"
+            )
             return response
 
         try:
@@ -54,7 +61,7 @@ class CORSDebugMiddleware(BaseHTTPMiddleware):
                 content={"detail": "Internal server error"},
                 status_code=500
             )
-            if origin:
+            if is_allowed:
                 response.headers["Access-Control-Allow-Origin"] = origin
                 response.headers["Access-Control-Allow-Credentials"] = "true"
             return response
@@ -84,10 +91,10 @@ app = FastAPI(
 # Add custom CORS debug middleware first (processed last)
 app.add_middleware(CORSDebugMiddleware)
 
-# CORS middleware
+# CORS middleware - use configured origins in production
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Allow all for debugging
+    allow_origins=settings.allowed_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -123,7 +130,7 @@ async def root() -> dict[str, str]:
 
 @app.get("/test-db")
 async def test_db():
-    """Test database connection."""
+    """Test database connection (internal use only)."""
     from sqlalchemy import text
 
     from src.db.session import engine
@@ -132,8 +139,9 @@ async def test_db():
             await conn.execute(text("SELECT 1"))
             return {"status": "ok", "db": "connected"}
     except Exception as e:
+        # Log full error but don't expose details to client
         logger.error(f"DB connection error: {e}")
-        return {"status": "error", "error": str(e)}
+        return {"status": "error", "detail": "Database connection failed"}
 
 
 # WebSocket connections store
