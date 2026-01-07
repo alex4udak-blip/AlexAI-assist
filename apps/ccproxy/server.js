@@ -1,30 +1,34 @@
-import Anthropic from '@anthropic-ai/sdk';
 import express from 'express';
 
 const app = express();
 app.use(express.json());
 
-const client = new Anthropic({
-  apiKey: process.env.CLAUDE_OAUTH_TOKEN
-});
+const CLAUDE_TOKEN = process.env.CLAUDE_OAUTH_TOKEN;
+const API_URL = 'https://api.anthropic.com/v1/messages';
 
 app.post('/v1/messages', async (req, res) => {
   try {
-    const { model, max_tokens, system, messages } = req.body;
-
-    const response = await client.messages.create({
-      model: model || 'claude-sonnet-4-20250514',
-      max_tokens: max_tokens || 4096,
-      system: system,
-      messages: messages
+    const response = await fetch(API_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${CLAUDE_TOKEN}`,
+        'anthropic-version': '2023-06-01'
+      },
+      body: JSON.stringify(req.body)
     });
 
-    res.json(response);
+    const data = await response.json();
+
+    if (!response.ok) {
+      console.error('Claude API error:', data);
+      return res.status(response.status).json(data);
+    }
+
+    res.json(data);
   } catch (error) {
-    console.error('Claude API error:', error);
-    res.status(error.status || 500).json({
-      error: { message: error.message }
-    });
+    console.error('Proxy error:', error);
+    res.status(500).json({ error: { message: error.message } });
   }
 });
 
