@@ -115,4 +115,19 @@ async def global_exception_handler(request, exc: Exception) -> JSONResponse:
 @app.get("/")
 async def root() -> dict[str, str]:
     """Root endpoint for basic connectivity check."""
+    logger.info("Root endpoint called")
     return {"status": "ok", "service": "observer-api"}
+
+
+@app.get("/test-db")
+async def test_db():
+    """Test database connection."""
+    from sqlalchemy import text
+    from src.db.session import engine
+    try:
+        async with engine.connect() as conn:
+            await conn.execute(text("SELECT 1"))
+            return {"status": "ok", "db": "connected"}
+    except Exception as e:
+        logger.error(f"DB connection error: {e}")
+        return {"status": "error", "error": str(e)}
