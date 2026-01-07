@@ -1,25 +1,63 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Save, Trash2, RefreshCw } from 'lucide-react';
 import { config } from '../lib/config';
+import { secureStorage, StorageValidator } from '../lib/secureStorage';
 import { Card, CardHeader, CardTitle, CardContent } from '../components/ui/Card';
 import { Input } from '../components/ui/Input';
 import { Switch } from '../components/ui/Switch';
 import { Select } from '../components/ui/Select';
 import { Button } from '../components/ui/Button';
 
+interface SettingsData {
+  notifications: boolean;
+  autoStart: boolean;
+  syncInterval: string;
+  theme: string;
+  dataRetention: string;
+}
+
+const DEFAULT_SETTINGS: SettingsData = {
+  notifications: true,
+  autoStart: true,
+  syncInterval: '30',
+  theme: 'dark',
+  dataRetention: '30',
+};
+
 export default function Settings() {
-  const [settings, setSettings] = useState({
-    notifications: true,
-    autoStart: true,
-    syncInterval: '30',
-    theme: 'dark',
-    dataRetention: '30',
-  });
+  const [settings, setSettings] = useState<SettingsData>(DEFAULT_SETTINGS);
+
+  // Load settings on mount
+  useEffect(() => {
+    try {
+      const stored = secureStorage.getItem<SettingsData>('observer-settings');
+
+      if (stored && StorageValidator.validateSettings(stored)) {
+        setSettings(stored);
+      } else {
+        // If validation fails, clear invalid data
+        secureStorage.removeItem('observer-settings');
+      }
+    } catch (err) {
+      console.error('Failed to load settings:', err);
+    }
+  }, []);
 
   const handleSave = () => {
-    // Save settings to localStorage or API
     try {
-      localStorage.setItem('observer-settings', JSON.stringify(settings));
+      // Validate before saving
+      if (!StorageValidator.validateSettings(settings)) {
+        console.error('Invalid settings data');
+        return;
+      }
+
+      // Save using secure storage (not encrypted as it's non-sensitive preference data)
+      secureStorage.setItem('observer-settings', settings, {
+        type: 'local',
+        encrypt: false
+      });
+
+      // TODO: Also sync to API for cross-device settings
     } catch (err) {
       console.error('Failed to save settings:', err);
     }
@@ -32,9 +70,11 @@ export default function Settings() {
       )
     ) {
       try {
-        localStorage.clear();
+        // Clear both local and session storage
+        secureStorage.clear('local');
+        secureStorage.clear('session');
       } catch (err) {
-        console.error('Failed to clear localStorage:', err);
+        console.error('Failed to clear storage:', err);
       }
       window.location.reload();
     }

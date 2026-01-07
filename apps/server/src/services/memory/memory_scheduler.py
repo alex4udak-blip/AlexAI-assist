@@ -11,7 +11,9 @@ from uuid import UUID, uuid4
 from sqlalchemy import and_, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from src.core.security import validate_session_id
 from src.db.models.memory import MemoryCube, MemoryFact
+from .confidence_utils import calculate_time_decay
 
 logger = logging.getLogger(__name__)
 
@@ -26,14 +28,51 @@ class MemScheduler:
     - Decay and archival
     """
 
-    # Decay rates per day
-    DECAY_RATE_FAST = 0.1  # For low-importance memories
-    DECAY_RATE_NORMAL = 0.05  # For normal memories
-    DECAY_RATE_SLOW = 0.01  # For important memories
+    # Decay rates per day (used for time-based exponential decay)
+    # These correspond to different half-lives in the exponential decay formula
+    DECAY_RATE_FAST = 0.1  # For low-importance memories (short-term, ~1 week half-life)
+    DECAY_RATE_NORMAL = 0.05  # For normal memories (medium-term, ~2 weeks half-life)
+    DECAY_RATE_SLOW = 0.01  # For important memories (long-term, ~4 weeks half-life)
 
     def __init__(self, db: AsyncSession, session_id: str = "default"):
         self.db = db
-        self.session_id = session_id
+        # Validate session_id to prevent session forgery
+        self.session_id = validate_session_id(session_id)
+
+    def get_decay_rate_for_type(self, memory_type: str, importance: float = 1.0) -> float:
+        """
+        Get the appropriate decay rate for a memory type and importance.
+
+        Args:
+            memory_type: Type of memory (fact, belief, experience, entity)
+            importance: Importance score (0.0 to 2.0)
+
+        Returns:
+            Decay rate per day
+        """
+        # Beliefs decay slowest (long-term knowledge)
+        if memory_type == "belief":
+            return self.DECAY_RATE_SLOW
+
+        # Facts decay based on importance
+        elif memory_type == "fact":
+            if importance >= 1.5:
+                return self.DECAY_RATE_SLOW
+            elif importance >= 0.8:
+                return self.DECAY_RATE_NORMAL
+            else:
+                return self.DECAY_RATE_FAST
+
+        # Experiences decay normally
+        elif memory_type == "experience":
+            return self.DECAY_RATE_NORMAL
+
+        # Entities decay slowly (represent persistent knowledge)
+        elif memory_type == "entity":
+            return self.DECAY_RATE_SLOW
+
+        # Default to normal decay
+        return self.DECAY_RATE_NORMAL
 
     async def calculate_heat_score(
         self,
@@ -73,7 +112,13 @@ class MemScheduler:
         self,
         operations: list[dict[str, Any]],
     ) -> None:
-        """Update heat scores based on recent operations."""
+        """
+        Update heat scores based on recent operations.
+        Applies time-based decay first, then adds boost for current access.
+        """
+        # Group operations by table for batch processing
+        updates_by_table: dict[str, list[str]] = {}
+
         for op in operations:
             memory_id = op.get("memory_id")
             memory_type = op.get("memory_type")
@@ -85,16 +130,36 @@ class MemScheduler:
             table = self._get_table_for_type(memory_type)
             # Extra safety: verify table is in whitelist
             if table and table in self.ALLOWED_TABLES:
+                if table not in updates_by_table:
+                    updates_by_table[table] = []
+                updates_by_table[table].append(str(memory_id))
+
+        # Batch update each table
+        for table, memory_ids in updates_by_table.items():
+            if memory_ids:
+                # Apply decay based on time since last access, then boost
                 await self.db.execute(
                     text(
                         f"""
                         UPDATE {table}
-                        SET heat_score = LEAST(2.0, heat_score + 0.2),
-                            access_count = access_count + 1,
-                            last_accessed = NOW()
-                        WHERE id = :memory_id
+                        SET heat_score = LEAST(2.0, GREATEST(0.0,
+                            -- Apply exponential decay based on time since last access
+                            CASE
+                                WHEN last_accessed IS NOT NULL THEN
+                                    heat_score * EXP(-EXTRACT(EPOCH FROM (NOW() - last_accessed)) / (168.0 * 3600.0))
+                                WHEN created_at IS NOT NULL THEN
+                                    heat_score * EXP(-EXTRACT(EPOCH FROM (NOW() - created_at)) / (168.0 * 3600.0))
+                                ELSE
+                                    heat_score
+                            END
+                            -- Add boost for current access
+                            + 0.2
+                        )),
+                        access_count = COALESCE(access_count, 0) + 1,
+                        last_accessed = NOW()
+                        WHERE id = ANY(:memory_ids)
                         """
-                    ).bindparams(memory_id=str(memory_id))
+                    ).bindparams(memory_ids=memory_ids)
                 )
 
     # Whitelist of allowed memory types and their corresponding tables
@@ -179,33 +244,47 @@ class MemScheduler:
         """
         Apply time-based decay to all memories.
         Returns counts of decayed memories per type.
+
+        Uses exponential decay based on time since last access.
+        Different memory types use different decay rates from class constants.
+
+        Note: This uses SQL for batch operations for performance.
+        For individual calculations, use calculate_time_decay from confidence_utils.
         """
         decay_counts = {}
 
-        # Decay facts
+        # Decay facts - uses decay_rate column from database (per-memory rate)
+        # Apply exponential decay: heat_score * exp(-time_hours / 168)
         result = await self.db.execute(
             text(
                 """
                 UPDATE memory_facts
-                SET heat_score = GREATEST(0.0, heat_score - decay_rate)
+                SET heat_score = GREATEST(0.0,
+                    heat_score * EXP(-EXTRACT(EPOCH FROM (NOW() - COALESCE(last_accessed, created_at))) / (168.0 * 3600.0))
+                )
                 WHERE session_id = :session_id
                     AND heat_score > 0.0
+                    AND (last_accessed < NOW() - INTERVAL '1 hour' OR last_accessed IS NULL)
                 RETURNING id
                 """
             ).bindparams(session_id=self.session_id)
         )
         decay_counts["facts"] = len(result.fetchall())
 
-        # Decay beliefs (slower decay for high confidence)
+        # Decay beliefs - slower decay rate
+        # Only decay beliefs not recently reinforced (older than 7 days)
+        # Use DECAY_RATE_SLOW constant value
         result = await self.db.execute(
             text(
                 """
                 UPDATE memory_beliefs
-                SET confidence = GREATEST(0.1, confidence - (0.01 * (1 - confidence)))
+                SET confidence = GREATEST(0.1,
+                    confidence * EXP(-EXTRACT(EPOCH FROM (NOW() - COALESCE(last_reinforced, formed_at))) / (672.0 * 3600.0))
+                )
                 WHERE session_id = :session_id
                     AND status = 'active'
                     AND confidence > 0.1
-                    AND last_reinforced < NOW() - INTERVAL '7 days'
+                    AND COALESCE(last_reinforced, formed_at) < NOW() - INTERVAL '7 days'
                 RETURNING id
                 """
             ).bindparams(session_id=self.session_id)
@@ -214,6 +293,58 @@ class MemScheduler:
 
         logger.info(f"Applied decay: {decay_counts}")
         return decay_counts
+
+    async def calculate_memory_decay(
+        self,
+        memory_type: str,
+        memory_id: UUID,
+    ) -> float | None:
+        """
+        Calculate decay for a specific memory using unified confidence calculation.
+        Returns the new confidence/heat value, or None if memory not found.
+
+        This method demonstrates using the unified confidence_utils for individual calculations.
+        Use apply_decay() for batch operations instead.
+        """
+        if memory_type == "fact":
+            from src.db.models.memory import MemoryFact
+            result = await self.db.execute(
+                select(MemoryFact).where(MemoryFact.id == memory_id)
+            )
+            fact = result.scalar_one_or_none()
+            if not fact or not fact.last_accessed:
+                return None
+
+            # Use unified time decay calculation
+            new_confidence = calculate_time_decay(
+                current_confidence=fact.confidence,
+                last_reinforced=fact.last_accessed,
+                now=datetime.utcnow(),
+                decay_rate=self.DECAY_RATE_NORMAL,
+                min_confidence=0.1,
+            )
+            return new_confidence
+
+        elif memory_type == "belief":
+            from src.db.models.memory import MemoryBelief
+            result = await self.db.execute(
+                select(MemoryBelief).where(MemoryBelief.id == memory_id)
+            )
+            belief = result.scalar_one_or_none()
+            if not belief or not belief.last_reinforced:
+                return None
+
+            # Use unified time decay calculation
+            new_confidence = calculate_time_decay(
+                current_confidence=belief.confidence,
+                last_reinforced=belief.last_reinforced,
+                now=datetime.utcnow(),
+                decay_rate=self.DECAY_RATE_SLOW,  # Beliefs decay slower
+                min_confidence=0.1,
+            )
+            return new_confidence
+
+        return None
 
     async def get_hot_memories(
         self,
@@ -291,18 +422,31 @@ class MemScheduler:
         """
         cold = await self.get_cold_memories(threshold, max_archive)
 
-        archived = 0
-        for mem in cold:
-            # Get or create MemCube
-            result = await self.db.execute(
-                select(MemoryCube).where(
-                    and_(
-                        MemoryCube.memory_type == mem["type"],
-                        MemoryCube.memory_id == UUID(mem["id"]),
-                    )
+        if not cold:
+            return 0
+
+        # Extract memory IDs and types for bulk fetch
+        memory_data = [(mem["type"], UUID(mem["id"])) for mem in cold]
+        memory_ids = [UUID(mem["id"]) for mem in cold]
+
+        # Bulk fetch existing MemCubes
+        result = await self.db.execute(
+            select(MemoryCube).where(
+                and_(
+                    MemoryCube.memory_type == cold[0]["type"],  # All are 'fact' type
+                    MemoryCube.memory_id.in_(memory_ids),
                 )
             )
-            cube = result.scalar_one_or_none()
+        )
+        existing_cubes = result.scalars().all()
+
+        # Create a map of existing cubes by memory_id
+        cubes_by_id = {cube.memory_id: cube for cube in existing_cubes}
+
+        archived = 0
+        for mem in cold:
+            mem_id = UUID(mem["id"])
+            cube = cubes_by_id.get(mem_id)
 
             if cube:
                 cube.retention_policy = "archived"
@@ -312,7 +456,7 @@ class MemScheduler:
                     id=uuid4(),
                     session_id=self.session_id,
                     memory_type=mem["type"],
-                    memory_id=UUID(mem["id"]),
+                    memory_id=mem_id,
                     retention_policy="archived",
                     heat_score=mem["heat_score"],
                 )

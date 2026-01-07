@@ -11,11 +11,15 @@ from uuid import UUID, uuid4
 from sqlalchemy import and_, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from src.core.security import validate_session_id
 from src.db.models.memory import (
     MemoryFact,
     MemoryKeywordIndex,
     MemoryTopic,
 )
+
+# Import sanitization function to prevent prompt injection
+from src.services.memory.memory_operations import sanitize_user_input
 
 logger = logging.getLogger(__name__)
 
@@ -31,7 +35,8 @@ class PersonaMemory:
 
     def __init__(self, db: AsyncSession, session_id: str = "default"):
         self.db = db
-        self.session_id = session_id
+        # Validate session_id to prevent session forgery
+        self.session_id = validate_session_id(session_id)
 
     # ==========================================
     # PERSONA PROFILE (Pa + Pf)
@@ -101,8 +106,15 @@ class PersonaMemory:
         """Generate a natural language summary of the user profile."""
         from src.core.claude import claude_client
 
-        attrs_text = "\n".join(f"- {a.content} ({a.category})" for a in attributes[:10])
-        events_text = "\n".join(f"- {e.content}" for e in events[:5])
+        # Sanitize attribute and event content before embedding in prompt
+        attrs_text = "\n".join(
+            f"- {sanitize_user_input(a.content, max_length=200)} ({a.category})"
+            for a in attributes[:10]
+        )
+        events_text = "\n".join(
+            f"- {sanitize_user_input(e.content, max_length=200)}"
+            for e in events[:5]
+        )
 
         prompt = f"""Create a brief (2-3 sentences) user profile summary from these facts:
 
@@ -177,8 +189,11 @@ Return ONLY the summary, written in third person ("The user...")."""
         """Identify the main topic of text."""
         from src.core.claude import claude_client
 
+        # Sanitize text before embedding in prompt
+        sanitized_text = sanitize_user_input(text, max_length=500)
+
         prompt = f"""Identify the main topic of this text in 1-3 words:
-"{text[:500]}"
+"{sanitized_text}"
 
 Return ONLY the topic (e.g., "python programming", "project planning", "health").
 Return "general" if no specific topic."""
@@ -236,7 +251,7 @@ Return "general" if no specific topic."""
         if message_id:
             message_ids = topic.message_ids or []
             message_ids.append(message_id)
-            topic.message_ids = message_ids[-100]  # Keep last 100
+            topic.message_ids = message_ids[-100:]  # Keep last 100
 
     async def get_topic_context(
         self,
@@ -305,9 +320,15 @@ Return "general" if no specific topic."""
         if len(messages) < 3:
             return
 
-        conversation = "\n".join(f"{m.role}: {m.content[:200]}" for m in messages)
+        # Sanitize message content before embedding in prompt
+        conversation = "\n".join(
+            f"{m.role}: {sanitize_user_input(m.content, max_length=200)}"
+            for m in messages
+        )
+        # Sanitize topic name as it may come from user input
+        sanitized_topic = sanitize_user_input(topic_name, max_length=100)
 
-        prompt = f"""Summarize the key points discussed about "{topic_name}":
+        prompt = f"""Summarize the key points discussed about "{sanitized_topic}":
 
 {conversation}
 
@@ -378,7 +399,7 @@ Key points:
                 if message_id:
                     msg_ids = index.message_ids or []
                     msg_ids.append(message_id)
-                    index.message_ids = msg_ids[-50]  # Keep last 50
+                    index.message_ids = msg_ids[-50:]  # Keep last 50
             else:
                 index = MemoryKeywordIndex(
                     id=uuid4(),
@@ -461,11 +482,15 @@ Key points:
         """Update persona memory from an interaction."""
         from src.core.claude import claude_client
 
+        # Sanitize user inputs to prevent prompt injection
+        sanitized_user_msg = sanitize_user_input(user_message, max_length=500)
+        sanitized_assistant_resp = sanitize_user_input(assistant_response, max_length=500)
+
         # Extract potential persona updates
         prompt = f"""Analyze this interaction for user profile updates:
 
-User: {user_message[:500]}
-Assistant: {assistant_response[:500]}
+User: {sanitized_user_msg}
+Assistant: {sanitized_assistant_resp}
 
 What can we learn about the user? Return JSON:
 {{

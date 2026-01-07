@@ -1,6 +1,5 @@
 """Observer API Server - Main Entry Point"""
 
-import logging
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 
@@ -8,6 +7,7 @@ from fastapi import FastAPI, Request, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
+from src.api.middleware import RateLimiterMiddleware, RequestLoggingMiddleware, get_rate_limiter
 from src.api.routes import (
     agents,
     analytics,
@@ -19,21 +19,39 @@ from src.api.routes import (
     suggestions,
 )
 from src.core.config import settings
+from src.core.logging import get_logger, log_error, setup_logging
 from src.db.session import engine
 
-# Configure logging
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+# Configure structured logging
+setup_logging(
+    level="DEBUG" if settings.debug else "INFO",
+    json_logs=settings.environment == "production",
+)
+logger = get_logger(__name__)
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     """Application lifespan handler."""
     # Startup
-    logger.info("Starting Observer API Server...")
-    logger.info(f"Environment: {settings.environment}")
-    logger.info(f"Debug: {settings.debug}")
+    logger.info(
+        "Starting Observer API Server",
+        extra={
+            "event_type": "startup",
+            "environment": settings.environment,
+            "debug": settings.debug,
+        },
+    )
     logger.info(f"CORS origins: {settings.allowed_origins}")
+
+    # Add request logging middleware
+    app.add_middleware(RequestLoggingMiddleware)
+    logger.info("Request logging middleware initialized")
+
+    # Initialize rate limiter
+    rate_limiter = await get_rate_limiter()
+    app.add_middleware(RateLimiterMiddleware, rate_limiter=rate_limiter)
+    logger.info("Rate limiter initialized")
 
     # Start background scheduler
     from src.core.scheduler import start_scheduler, stop_scheduler
@@ -42,7 +60,10 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     yield
 
     # Shutdown
-    logger.info("Shutting down Observer API Server...")
+    logger.info(
+        "Shutting down Observer API Server",
+        extra={"event_type": "shutdown"},
+    )
     stop_scheduler()
     await engine.dispose()
 
@@ -77,8 +98,17 @@ app.include_router(memory.router, prefix="/api/v1/memory", tags=["Memory"])
 
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception) -> JSONResponse:
-    """Global exception handler."""
-    logger.error(f"Unhandled exception: {exc}")
+    """Global exception handler with full error logging."""
+    log_error(
+        logger,
+        "Unhandled exception",
+        error=exc,
+        extra={
+            "path": request.url.path,
+            "method": request.method,
+            "client_ip": request.client.host if request.client else "unknown",
+        },
+    )
     return JSONResponse(
         status_code=500,
         content={"detail": "Internal server error"},
@@ -88,7 +118,6 @@ async def global_exception_handler(request: Request, exc: Exception) -> JSONResp
 @app.get("/")
 async def root() -> dict[str, str]:
     """Root endpoint for basic connectivity check."""
-    logger.info("Root endpoint called")
     return {"status": "ok", "service": "observer-api"}
 
 
@@ -101,10 +130,16 @@ async def test_db() -> dict[str, str]:
     try:
         async with engine.connect() as conn:
             await conn.execute(text("SELECT 1"))
+            logger.info("Database connection test successful")
             return {"status": "ok", "db": "connected"}
     except Exception as e:
         # Log full error but don't expose details to client
-        logger.error(f"DB connection error: {e}")
+        log_error(
+            logger,
+            "Database connection test failed",
+            error=e,
+            extra={"event_type": "db_error"},
+        )
         return {"status": "error", "detail": "Database connection failed"}
 
 
@@ -117,18 +152,38 @@ async def websocket_endpoint(websocket: WebSocket) -> None:
     """WebSocket endpoint for real-time updates."""
     await websocket.accept()
     active_connections.add(websocket)
-    logger.info(f"WebSocket connected. Total connections: {len(active_connections)}")
+    logger.info(
+        "WebSocket connected",
+        extra={
+            "event_type": "websocket_connected",
+            "total_connections": len(active_connections),
+        },
+    )
 
     try:
         while True:
             # Keep connection alive and receive messages
             data = await websocket.receive_text()
-            logger.info(f"WebSocket received: {data}")
+            logger.debug(
+                "WebSocket message received",
+                extra={"event_type": "websocket_message", "data_length": len(data)},
+            )
             # Echo back for now
             await websocket.send_json({"type": "echo", "data": data})
     except WebSocketDisconnect:
         active_connections.discard(websocket)
-        logger.info(f"WebSocket disconnected. Total connections: {len(active_connections)}")
+        logger.info(
+            "WebSocket disconnected",
+            extra={
+                "event_type": "websocket_disconnected",
+                "total_connections": len(active_connections),
+            },
+        )
     except Exception as e:
-        logger.error(f"WebSocket error: {e}")
+        log_error(
+            logger,
+            "WebSocket error",
+            error=e,
+            extra={"event_type": "websocket_error"},
+        )
         active_connections.discard(websocket)

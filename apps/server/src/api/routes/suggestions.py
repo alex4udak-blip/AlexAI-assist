@@ -5,7 +5,7 @@ from typing import Any
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -38,21 +38,67 @@ class SuggestionResponse(BaseModel):
 class SuggestionCreate(BaseModel):
     """Suggestion creation schema."""
 
-    title: str
-    description: str | None = None
-    pattern_id: UUID | None = None
-    agent_type: str
-    agent_config: dict[str, Any]
-    confidence: float = 0.5
-    impact: str = "medium"
-    time_saved_minutes: float = 0
+    title: str = Field(
+        ...,
+        min_length=1,
+        max_length=255,
+        description="Suggestion title",
+    )
+    description: str | None = Field(
+        default=None,
+        max_length=1000,
+        description="Suggestion description",
+    )
+    pattern_id: UUID | None = Field(
+        default=None,
+        description="Associated pattern ID",
+    )
+    agent_type: str = Field(
+        ...,
+        min_length=1,
+        max_length=100,
+        description="Type of agent to create",
+    )
+    agent_config: dict[str, Any] = Field(
+        ...,
+        description="Agent configuration",
+    )
+    confidence: float = Field(
+        default=0.5,
+        ge=0.0,
+        le=1.0,
+        description="Confidence score",
+    )
+    impact: str = Field(
+        default="medium",
+        pattern="^(low|medium|high)$",
+        description="Expected impact",
+    )
+    time_saved_minutes: float = Field(
+        default=0,
+        ge=0,
+        description="Estimated time saved in minutes",
+    )
 
 
 @router.get("", response_model=list[SuggestionResponse])
 async def get_suggestions(
-    status: str | None = Query(None),
-    impact: str | None = None,
-    limit: int = Query(50, le=100),
+    status: str | None = Query(
+        default=None,
+        pattern="^(pending|accepted|dismissed)$",
+        description="Filter by status",
+    ),
+    impact: str | None = Query(
+        default=None,
+        pattern="^(low|medium|high)$",
+        description="Filter by impact level",
+    ),
+    limit: int = Query(
+        default=50,
+        ge=1,
+        le=100,
+        description="Maximum number of suggestions to return",
+    ),
     db: AsyncSession = Depends(get_db_session),
 ) -> list[Suggestion]:
     """Get automation suggestions."""

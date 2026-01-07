@@ -5,7 +5,7 @@ from typing import Any
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.api.deps import get_db_session
@@ -19,25 +19,80 @@ router = APIRouter()
 class AgentCreate(BaseModel):
     """Agent creation schema."""
 
-    name: str
-    description: str | None = None
-    agent_type: str
-    trigger_config: dict[str, Any]
-    actions: list[dict[str, Any]]
-    settings: dict[str, Any] | None = None
-    code: str | None = None
+    name: str = Field(
+        ...,
+        min_length=1,
+        max_length=255,
+        description="Agent name",
+    )
+    description: str | None = Field(
+        default=None,
+        max_length=1000,
+        description="Agent description",
+    )
+    agent_type: str = Field(
+        ...,
+        min_length=1,
+        max_length=100,
+        description="Type of agent (e.g., scheduled, event-triggered)",
+    )
+    trigger_config: dict[str, Any] = Field(
+        ...,
+        description="Configuration for when the agent should trigger",
+    )
+    actions: list[dict[str, Any]] = Field(
+        ...,
+        min_length=1,
+        description="List of actions the agent should perform",
+    )
+    settings: dict[str, Any] | None = Field(
+        default=None,
+        description="Additional agent settings",
+    )
+    code: str | None = Field(
+        default=None,
+        max_length=50000,
+        description="Custom code for the agent",
+    )
 
 
 class AgentUpdate(BaseModel):
     """Agent update schema."""
 
-    name: str | None = None
-    description: str | None = None
-    trigger_config: dict[str, Any] | None = None
-    actions: list[dict[str, Any]] | None = None
-    settings: dict[str, Any] | None = None
-    code: str | None = None
-    status: str | None = None
+    name: str | None = Field(
+        default=None,
+        min_length=1,
+        max_length=255,
+        description="Agent name",
+    )
+    description: str | None = Field(
+        default=None,
+        max_length=1000,
+        description="Agent description",
+    )
+    trigger_config: dict[str, Any] | None = Field(
+        default=None,
+        description="Configuration for when the agent should trigger",
+    )
+    actions: list[dict[str, Any]] | None = Field(
+        default=None,
+        min_length=1,
+        description="List of actions the agent should perform",
+    )
+    settings: dict[str, Any] | None = Field(
+        default=None,
+        description="Additional agent settings",
+    )
+    code: str | None = Field(
+        default=None,
+        max_length=50000,
+        description="Custom code for the agent",
+    )
+    status: str | None = Field(
+        default=None,
+        pattern="^(active|inactive|error)$",
+        description="Agent status",
+    )
 
 
 class AgentResponse(BaseModel):
@@ -81,9 +136,22 @@ class AgentLogResponse(BaseModel):
 
 @router.get("", response_model=list[AgentResponse])
 async def get_agents(
-    status: str | None = None,
-    agent_type: str | None = None,
-    limit: int = Query(50, le=100),
+    status: str | None = Query(
+        default=None,
+        pattern="^(active|inactive|error)$",
+        description="Filter by agent status",
+    ),
+    agent_type: str | None = Query(
+        default=None,
+        max_length=100,
+        description="Filter by agent type",
+    ),
+    limit: int = Query(
+        default=50,
+        ge=1,
+        le=100,
+        description="Maximum number of agents to return",
+    ),
     db: AsyncSession = Depends(get_db_session),
 ) -> list[Agent]:
     """Get all agents."""
@@ -156,10 +224,19 @@ async def delete_agent(
     return {"message": "Agent deleted"}
 
 
+class AgentRunRequest(BaseModel):
+    """Agent run request schema."""
+
+    context: dict[str, Any] | None = Field(
+        default=None,
+        description="Context data for the agent execution",
+    )
+
+
 @router.post("/{agent_id}/run")
 async def run_agent(
     agent_id: UUID,
-    context: dict[str, Any] | None = None,
+    data: AgentRunRequest = AgentRunRequest(),
     db: AsyncSession = Depends(get_db_session),
 ) -> dict[str, Any]:
     """Manually run an agent."""
@@ -169,7 +246,7 @@ async def run_agent(
     if not agent:
         raise HTTPException(status_code=404, detail="Agent not found")
 
-    result = await agent_executor.execute(agent, context)
+    result = await agent_executor.execute(agent, data.context)
 
     # Record the run
     await service.record_run(
@@ -218,8 +295,17 @@ async def disable_agent(
 @router.get("/{agent_id}/logs", response_model=list[AgentLogResponse])
 async def get_agent_logs(
     agent_id: UUID,
-    level: str | None = None,
-    limit: int = Query(100, le=500),
+    level: str | None = Query(
+        default=None,
+        pattern="^(debug|info|warning|error|critical)$",
+        description="Filter by log level",
+    ),
+    limit: int = Query(
+        default=100,
+        ge=1,
+        le=500,
+        description="Maximum number of logs to return",
+    ),
     db: AsyncSession = Depends(get_db_session),
 ) -> list[AgentLog]:
     """Get logs for an agent."""

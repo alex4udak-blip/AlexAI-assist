@@ -36,9 +36,21 @@ class PatternResponse(BaseModel):
 
 @router.get("", response_model=list[PatternResponse])
 async def get_patterns(
-    status: str | None = None,
-    automatable: bool | None = None,
-    limit: int = Query(50, le=100),
+    status: str | None = Query(
+        default=None,
+        pattern="^(active|inactive|archived)$",
+        description="Filter by pattern status",
+    ),
+    automatable: bool | None = Query(
+        default=None,
+        description="Filter by whether pattern is automatable",
+    ),
+    limit: int = Query(
+        default=50,
+        ge=1,
+        le=100,
+        description="Maximum number of patterns to return",
+    ),
     db: AsyncSession = Depends(get_db_session),
 ) -> list[Pattern]:
     """Get detected patterns."""
@@ -51,10 +63,32 @@ async def get_patterns(
     return patterns
 
 
-@router.get("/detect")
+class PatternDetectionResult(BaseModel):
+    """Pattern detection result."""
+
+    patterns_found: int = Field(
+        ...,
+        description="Number of patterns detected",
+    )
+    patterns: list[PatternResponse] = Field(
+        default_factory=list,
+        description="List of detected patterns",
+    )
+
+
+@router.get("/detect", response_model=PatternDetectionResult)
 async def detect_patterns(
-    device_id: str | None = None,
-    min_occurrences: int = Query(3, ge=1),
+    device_id: str | None = Query(
+        default=None,
+        max_length=255,
+        description="Filter by device ID",
+    ),
+    min_occurrences: int = Query(
+        default=3,
+        ge=1,
+        le=100,
+        description="Minimum number of occurrences to detect pattern",
+    ),
     db: AsyncSession = Depends(get_db_session),
 ) -> dict[str, Any]:
     """Run pattern detection on recent events."""

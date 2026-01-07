@@ -12,7 +12,9 @@ from uuid import UUID, uuid4
 from sqlalchemy import and_, func, or_, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from src.core.security import validate_session_id
 from src.db.models.memory import MemoryEntity, MemoryRelationship
+from .confidence_utils import calculate_weighted_average
 from .embeddings import embedding_service
 
 logger = logging.getLogger(__name__)
@@ -28,9 +30,16 @@ class ObservationNetwork:
     - Relationship strength tracking
     """
 
+    # Allowed entity types for validation
+    ALLOWED_ENTITY_TYPES = frozenset({
+        "person", "app", "project", "concept", "location",
+        "org", "tool", "website", "file", "event",
+    })
+
     def __init__(self, db: AsyncSession, session_id: str = "default"):
         self.db = db
-        self.session_id = session_id
+        # Validate session_id to prevent session forgery
+        self.session_id = validate_session_id(session_id)
 
     async def add_entity(
         self,
@@ -52,7 +61,48 @@ class ObservationNetwork:
 
         Returns:
             Created/updated MemoryEntity
+
+        Raises:
+            ValueError: If validation fails
         """
+        # Validate required string fields
+        if not name or not name.strip():
+            raise ValueError("name is required and cannot be empty")
+
+        name = name.strip()
+
+        # Validate string length
+        if len(name) > 500:
+            raise ValueError(f"name exceeds maximum length of 500 characters (got {len(name)})")
+
+        # Validate entity_type
+        if entity_type not in self.ALLOWED_ENTITY_TYPES:
+            raise ValueError(
+                f"Invalid entity_type: {entity_type}. "
+                f"Allowed values: {', '.join(sorted(self.ALLOWED_ENTITY_TYPES))}"
+            )
+
+        # Validate summary length if provided
+        if summary is not None:
+            summary = summary.strip()
+            if len(summary) > 2000:
+                raise ValueError(f"summary exceeds maximum length of 2000 characters (got {len(summary)})")
+
+        # Validate key_facts list
+        if key_facts is not None:
+            if not isinstance(key_facts, list):
+                raise ValueError("key_facts must be a list")
+            if len(key_facts) > 100:
+                raise ValueError(f"key_facts list exceeds maximum of 100 items (got {len(key_facts)})")
+            for fact in key_facts:
+                if not isinstance(fact, str) or len(fact) > 500:
+                    raise ValueError("each key_fact must be a string with max length 500")
+
+        # Validate attributes dict
+        if attributes is not None:
+            if not isinstance(attributes, dict):
+                raise ValueError("attributes must be a dictionary")
+
         canonical = self._canonicalize(name)
 
         # Check if entity exists
@@ -102,12 +152,12 @@ class ObservationNetwork:
             vector_str = embedding_service.to_pgvector_str(embedding)
             await self.db.execute(
                 text(
-                    f"""
+                    """
                     UPDATE memory_entities
-                    SET embedding_vector = '{vector_str}'::vector
+                    SET embedding_vector = :vector::vector
                     WHERE id = :entity_id
                     """
-                ).bindparams(entity_id=str(entity.id))
+                ).bindparams(vector=vector_str, entity_id=str(entity.id))
             )
 
         logger.info(f"Added entity: {name} (type={entity_type})")
@@ -139,12 +189,6 @@ class ObservationNetwork:
             select(MemoryEntity).where(MemoryEntity.id == entity_id)
         )
         return result.scalar_one_or_none()
-
-    # Allowed entity types for validation
-    ALLOWED_ENTITY_TYPES = frozenset({
-        "person", "app", "project", "concept", "location",
-        "org", "tool", "website", "file", "event",
-    })
 
     async def search_entities(
         self,
@@ -321,7 +365,10 @@ class ObservationNetwork:
         if existing:
             # Reinforce existing relationship
             existing.strength = min(1.0, existing.strength + 0.1)
-            existing.confidence = (existing.confidence + confidence) / 2
+            # Use unified weighted average for confidence merge
+            existing.confidence = calculate_weighted_average(
+                existing.confidence, confidence, old_weight=0.5
+            )
             existing.updated_at = datetime.utcnow()
             return existing
 
@@ -463,19 +510,101 @@ class ObservationNetwork:
         entity_names: list[str],
     ) -> list[dict[str, Any]]:
         """Get context for multiple entities."""
-        context = []
+        if not entity_names:
+            return []
 
-        for name in entity_names[:5]:  # Limit to 5 entities
-            entity = await self.get_entity(name)
-            if entity:
-                relationships = await self.get_entity_relationships(entity.id)
-                context.append({
-                    "name": entity.name,
-                    "type": entity.entity_type,
-                    "summary": entity.summary,
-                    "key_facts": entity.key_facts or [],
-                    "relationships": relationships[:5],
-                })
+        # Canonicalize names for lookup
+        canonical_names = [self._canonicalize(name) for name in entity_names[:5]]
+
+        # Bulk fetch all entities at once
+        result = await self.db.execute(
+            select(MemoryEntity).where(
+                and_(
+                    MemoryEntity.session_id == self.session_id,
+                    MemoryEntity.canonical_name.in_(canonical_names),
+                )
+            )
+        )
+        entities = result.scalars().all()
+
+        if not entities:
+            return []
+
+        # Get all entity IDs for bulk relationship fetch
+        entity_ids = [entity.id for entity in entities]
+
+        # Bulk fetch outgoing relationships
+        outgoing_result = await self.db.execute(
+            select(MemoryRelationship, MemoryEntity)
+            .join(MemoryEntity, MemoryRelationship.target_id == MemoryEntity.id)
+            .where(
+                and_(
+                    MemoryRelationship.source_id.in_(entity_ids),
+                    or_(
+                        MemoryRelationship.valid_to.is_(None),
+                        MemoryRelationship.valid_to > datetime.utcnow(),
+                    ),
+                )
+            )
+        )
+        outgoing_rels = outgoing_result.fetchall()
+
+        # Bulk fetch incoming relationships
+        incoming_result = await self.db.execute(
+            select(MemoryRelationship, MemoryEntity)
+            .join(MemoryEntity, MemoryRelationship.source_id == MemoryEntity.id)
+            .where(
+                and_(
+                    MemoryRelationship.target_id.in_(entity_ids),
+                    or_(
+                        MemoryRelationship.valid_to.is_(None),
+                        MemoryRelationship.valid_to > datetime.utcnow(),
+                    ),
+                )
+            )
+        )
+        incoming_rels = incoming_result.fetchall()
+
+        # Group relationships by entity ID
+        relationships_by_entity: dict[UUID, list[dict[str, Any]]] = {
+            entity_id: [] for entity_id in entity_ids
+        }
+
+        for rel, target in outgoing_rels:
+            relationships_by_entity[rel.source_id].append({
+                "id": str(rel.id),
+                "direction": "outgoing",
+                "relation_type": rel.relation_type,
+                "target_name": target.name,
+                "target_type": target.entity_type,
+                "target_id": str(target.id),
+                "strength": rel.strength,
+                "confidence": rel.confidence,
+            })
+
+        for rel, source in incoming_rels:
+            relationships_by_entity[rel.target_id].append({
+                "id": str(rel.id),
+                "direction": "incoming",
+                "relation_type": rel.relation_type,
+                "source_name": source.name,
+                "source_type": source.entity_type,
+                "source_id": str(source.id),
+                "strength": rel.strength,
+                "confidence": rel.confidence,
+            })
+
+        # Build context
+        context = []
+        for entity in entities:
+            relationships = relationships_by_entity.get(entity.id, [])
+            context.append({
+                "name": entity.name,
+                "type": entity.entity_type,
+                "summary": entity.summary,
+                "key_facts": entity.key_facts or [],
+                "relationships": relationships[:5],
+            })
 
         return context
 
@@ -503,11 +632,66 @@ class ObservationNetwork:
         )
         entities = result.scalars().all()
 
+        if not entities:
+            return 0
+
+        # Get all entity IDs for bulk relationship fetch
+        entity_ids = [entity.id for entity in entities]
+
+        # Bulk fetch all outgoing relationships
+        outgoing_result = await self.db.execute(
+            select(MemoryRelationship, MemoryEntity)
+            .join(MemoryEntity, MemoryRelationship.target_id == MemoryEntity.id)
+            .where(
+                and_(
+                    MemoryRelationship.source_id.in_(entity_ids),
+                    or_(
+                        MemoryRelationship.valid_to.is_(None),
+                        MemoryRelationship.valid_to > datetime.utcnow(),
+                    ),
+                )
+            )
+        )
+        outgoing_rels = outgoing_result.fetchall()
+
+        # Bulk fetch all incoming relationships
+        incoming_result = await self.db.execute(
+            select(MemoryRelationship, MemoryEntity)
+            .join(MemoryEntity, MemoryRelationship.source_id == MemoryEntity.id)
+            .where(
+                and_(
+                    MemoryRelationship.target_id.in_(entity_ids),
+                    or_(
+                        MemoryRelationship.valid_to.is_(None),
+                        MemoryRelationship.valid_to > datetime.utcnow(),
+                    ),
+                )
+            )
+        )
+        incoming_rels = incoming_result.fetchall()
+
+        # Group relationships by entity ID
+        relationships_by_entity: dict[UUID, list[dict[str, Any]]] = {
+            entity_id: [] for entity_id in entity_ids
+        }
+
+        for rel, target in outgoing_rels:
+            relationships_by_entity[rel.source_id].append({
+                "relation_type": rel.relation_type,
+                "target_name": target.name,
+            })
+
+        for rel, source in incoming_rels:
+            relationships_by_entity[rel.target_id].append({
+                "relation_type": rel.relation_type,
+                "source_name": source.name,
+            })
+
         updated = 0
         for entity in entities:
             try:
-                # Get relationships for context
-                relationships = await self.get_entity_relationships(entity.id)
+                # Get relationships from pre-loaded data
+                relationships = relationships_by_entity.get(entity.id, [])
                 rel_text = ", ".join(
                     f"{r['relation_type']} {r.get('target_name', r.get('source_name', ''))}"
                     for r in relationships[:5]

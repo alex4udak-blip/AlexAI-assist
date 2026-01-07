@@ -19,20 +19,57 @@ router = APIRouter()
 class EventCreate(BaseModel):
     """Event creation schema."""
 
-    device_id: str
-    event_type: str
-    timestamp: datetime
-    app_name: str | None = None
-    window_title: str | None = None
-    url: str | None = None
-    data: dict[str, Any] = Field(default_factory=dict)
-    category: str | None = None
+    device_id: str = Field(
+        ...,
+        min_length=1,
+        max_length=255,
+        description="Device identifier",
+    )
+    event_type: str = Field(
+        ...,
+        min_length=1,
+        max_length=100,
+        description="Type of event (e.g., app_focus, window_change)",
+    )
+    timestamp: datetime = Field(
+        ...,
+        description="Event timestamp",
+    )
+    app_name: str | None = Field(
+        default=None,
+        max_length=255,
+        description="Application name",
+    )
+    window_title: str | None = Field(
+        default=None,
+        max_length=500,
+        description="Window title",
+    )
+    url: str | None = Field(
+        default=None,
+        max_length=2000,
+        description="URL if applicable",
+    )
+    data: dict[str, Any] = Field(
+        default_factory=dict,
+        description="Additional event data",
+    )
+    category: str | None = Field(
+        default=None,
+        max_length=100,
+        description="Event category",
+    )
 
 
 class EventBatch(BaseModel):
     """Batch of events to create."""
 
-    events: list[EventCreate]
+    events: list[EventCreate] = Field(
+        ...,
+        min_length=1,
+        max_length=1000,
+        description="List of events to create",
+    )
 
 
 class EventResponse(BaseModel):
@@ -103,13 +140,40 @@ async def create_events(
 
 @router.get("", response_model=list[EventResponse])
 async def get_events(
-    device_id: str | None = None,
-    event_type: str | None = None,
-    category: str | None = None,
-    start: datetime | None = None,
-    end: datetime | None = None,
-    limit: int = Query(100, le=1000),
-    offset: int = 0,
+    device_id: str | None = Query(
+        default=None,
+        max_length=255,
+        description="Filter by device ID",
+    ),
+    event_type: str | None = Query(
+        default=None,
+        max_length=100,
+        description="Filter by event type",
+    ),
+    category: str | None = Query(
+        default=None,
+        max_length=100,
+        description="Filter by category",
+    ),
+    start: datetime | None = Query(
+        default=None,
+        description="Start datetime for filtering",
+    ),
+    end: datetime | None = Query(
+        default=None,
+        description="End datetime for filtering",
+    ),
+    limit: int = Query(
+        default=100,
+        ge=1,
+        le=1000,
+        description="Maximum number of events to return",
+    ),
+    offset: int = Query(
+        default=0,
+        ge=0,
+        description="Offset for pagination",
+    ),
     db: AsyncSession = Depends(get_db_session),
 ) -> list[Event]:
     """Query events with filters."""
@@ -132,8 +196,17 @@ async def get_events(
 
 @router.get("/timeline", response_model=list[EventResponse])
 async def get_timeline(
-    device_id: str | None = None,
-    hours: int = Query(24, le=168),
+    device_id: str | None = Query(
+        default=None,
+        max_length=255,
+        description="Filter by device ID",
+    ),
+    hours: int = Query(
+        default=24,
+        ge=1,
+        le=168,
+        description="Number of hours to look back",
+    ),
     db: AsyncSession = Depends(get_db_session),
 ) -> list[Event]:
     """Get activity timeline for recent hours."""

@@ -1,7 +1,7 @@
 use crate::collector::{
     get_current_focus, has_accessibility_permission, request_accessibility_permission, FocusInfo,
 };
-use crate::sync::get_dashboard_url;
+use crate::sync::{get_dashboard_url, validate_url};
 use crate::AppState;
 use serde::Serialize;
 use std::sync::Arc;
@@ -15,6 +15,10 @@ pub struct Stats {
     #[serde(rename = "lastSync")]
     pub last_sync: String,
     pub status: String,
+    #[serde(rename = "bufferSize")]
+    pub buffer_size: usize,
+    #[serde(rename = "bufferCapacity")]
+    pub buffer_capacity: usize,
 }
 
 #[derive(Serialize)]
@@ -28,6 +32,12 @@ pub struct DetailedStats {
     pub top_apps: Vec<AppUsage>,
     #[serde(rename = "activeTime")]
     pub active_time: u32,
+    #[serde(rename = "bufferSize")]
+    pub buffer_size: usize,
+    #[serde(rename = "bufferCapacity")]
+    pub buffer_capacity: usize,
+    #[serde(rename = "bufferUtilization")]
+    pub buffer_utilization: f32,
 }
 
 #[derive(Serialize)]
@@ -47,6 +57,8 @@ pub async fn get_stats(state: State<'_, Arc<Mutex<AppState>>>) -> Result<Stats, 
         } else {
             "paused".to_string()
         },
+        buffer_size: state.events_buffer.len(),
+        buffer_capacity: crate::MAX_BUFFER_SIZE,
     })
 }
 
@@ -71,6 +83,14 @@ pub async fn get_detailed_stats(
     top_apps.sort_by(|a, b| b.count.cmp(&a.count));
     top_apps.truncate(10);
 
+    let buffer_size = state.events_buffer.len();
+    let buffer_capacity = crate::MAX_BUFFER_SIZE;
+    let buffer_utilization = if buffer_capacity > 0 {
+        (buffer_size as f32 / buffer_capacity as f32) * 100.0
+    } else {
+        0.0
+    };
+
     Ok(DetailedStats {
         events_today: state.events_today,
         last_sync: state.last_sync.clone(),
@@ -81,6 +101,9 @@ pub async fn get_detailed_stats(
         },
         top_apps,
         active_time: (state.events_today * 2).min(480), // Rough estimate
+        buffer_size,
+        buffer_capacity,
+        buffer_utilization,
     })
 }
 
@@ -104,7 +127,13 @@ pub async fn sync_now(state: State<'_, Arc<Mutex<AppState>>>) -> Result<(), Stri
 
 #[tauri::command]
 pub async fn open_dashboard() -> Result<(), String> {
-    open::that(get_dashboard_url()).map_err(|e| e.to_string())
+    let dashboard_url = get_dashboard_url();
+
+    // Validate URL before opening to prevent opening malicious URLs
+    validate_url(&dashboard_url)?;
+
+    // Open the validated URL
+    open::that(dashboard_url).map_err(|e| e.to_string())
 }
 
 /// Check if the app has accessibility permission (macOS)

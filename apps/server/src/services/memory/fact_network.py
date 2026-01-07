@@ -11,8 +11,12 @@ from uuid import UUID, uuid4
 from sqlalchemy import and_, func, or_, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from src.core.security import validate_session_id
 from src.db.models.memory import MemoryFact, MemoryLink
+from .confidence_utils import calculate_reinforcement, calculate_weighted_average
 from .embeddings import embedding_service
+# Import sanitization function to prevent prompt injection
+from .memory_operations import sanitize_user_input
 
 logger = logging.getLogger(__name__)
 
@@ -27,9 +31,26 @@ class FactNetwork:
     - Vector similarity search
     """
 
+    # Allowed fact types for validation
+    ALLOWED_FACT_TYPES = frozenset({
+        "fact", "preference", "habit", "goal", "demographic",
+        "skill", "opinion", "world_fact", "persona_attribute", "persona_event",
+    })
+
+    # Allowed categories for validation
+    ALLOWED_CATEGORIES = frozenset({
+        "work", "personal", "health", "finance", "learning", "other",
+    })
+
+    # Allowed sources for validation
+    ALLOWED_SOURCES = frozenset({
+        "chat", "pattern", "agent", "manual", "inferred",
+    })
+
     def __init__(self, db: AsyncSession, session_id: str = "default"):
         self.db = db
-        self.session_id = session_id
+        # Validate session_id to prevent session forgery
+        self.session_id = validate_session_id(session_id)
 
     async def add(
         self,
@@ -63,7 +84,65 @@ class FactNetwork:
 
         Returns:
             Created MemoryFact
+
+        Raises:
+            ValueError: If validation fails
         """
+        # Validate required string fields
+        if not content or not content.strip():
+            raise ValueError("content is required and cannot be empty")
+
+        content = content.strip()
+
+        # Validate string length
+        if len(content) > 5000:
+            raise ValueError(f"content exceeds maximum length of 5000 characters (got {len(content)})")
+
+        # Validate fact_type
+        if fact_type not in self.ALLOWED_FACT_TYPES:
+            raise ValueError(
+                f"Invalid fact_type: {fact_type}. "
+                f"Allowed values: {', '.join(sorted(self.ALLOWED_FACT_TYPES))}"
+            )
+
+        # Validate category if provided
+        if category is not None and category not in self.ALLOWED_CATEGORIES:
+            raise ValueError(
+                f"Invalid category: {category}. "
+                f"Allowed values: {', '.join(sorted(self.ALLOWED_CATEGORIES))}"
+            )
+
+        # Validate source
+        if source not in self.ALLOWED_SOURCES:
+            raise ValueError(
+                f"Invalid source: {source}. "
+                f"Allowed values: {', '.join(sorted(self.ALLOWED_SOURCES))}"
+            )
+
+        # Validate confidence range
+        if not 0.0 <= confidence <= 1.0:
+            raise ValueError(f"confidence must be between 0 and 1 (got {confidence})")
+
+        # Validate keywords list
+        if keywords is not None:
+            if not isinstance(keywords, list):
+                raise ValueError("keywords must be a list")
+            if len(keywords) > 50:
+                raise ValueError(f"keywords list exceeds maximum of 50 items (got {len(keywords)})")
+            for keyword in keywords:
+                if not isinstance(keyword, str) or len(keyword) > 100:
+                    raise ValueError("each keyword must be a string with max length 100")
+
+        # Validate tags list
+        if tags is not None:
+            if not isinstance(tags, list):
+                raise ValueError("tags must be a list")
+            if len(tags) > 50:
+                raise ValueError(f"tags list exceeds maximum of 50 items (got {len(tags)})")
+            for tag in tags:
+                if not isinstance(tag, str) or len(tag) > 100:
+                    raise ValueError("each tag must be a string with max length 100")
+
         # Check for duplicates
         existing = await self._find_similar(content, threshold=0.9)
         if existing:
@@ -103,27 +182,16 @@ class FactNetwork:
             vector_str = embedding_service.to_pgvector_str(embedding)
             await self.db.execute(
                 text(
-                    f"""
+                    """
                     UPDATE memory_facts
-                    SET embedding_vector = '{vector_str}'::vector
+                    SET embedding_vector = :vector::vector
                     WHERE id = :fact_id
                     """
-                ).bindparams(fact_id=str(fact.id))
+                ).bindparams(vector=vector_str, fact_id=str(fact.id))
             )
 
         logger.info(f"Added fact: {content[:50]}... (type={fact_type}, confidence={confidence})")
         return fact
-
-    # Allowed fact types for validation
-    ALLOWED_FACT_TYPES = frozenset({
-        "fact", "preference", "habit", "goal", "demographic",
-        "skill", "opinion", "world_fact", "persona_attribute", "persona_event",
-    })
-
-    # Allowed categories for validation
-    ALLOWED_CATEGORIES = frozenset({
-        "work", "personal", "health", "finance", "learning", "other",
-    })
 
     async def search(
         self,
@@ -223,9 +291,11 @@ class FactNetwork:
 
         rows = result.fetchall()
         facts = []
+        fact_ids = []
         for row in rows:
+            fact_id = str(row[0])
             facts.append({
-                "id": str(row[0]),
+                "id": fact_id,
                 "content": row[1],
                 "fact_type": row[2],
                 "category": row[3],
@@ -235,10 +305,21 @@ class FactNetwork:
                 "valid_to": row[7].isoformat() if row[7] else None,
                 "score": float(row[8]) if row[8] else 0.0,
             })
+            fact_ids.append(fact_id)
 
-        # Update heat scores for accessed facts
-        for fact in facts:
-            await self._record_access(UUID(fact["id"]))
+        # Batch update heat scores for all accessed facts
+        if fact_ids:
+            await self.db.execute(
+                text(
+                    """
+                    UPDATE memory_facts
+                    SET access_count = access_count + 1,
+                        last_accessed = NOW(),
+                        heat_score = LEAST(2.0, heat_score + 0.1)
+                    WHERE id = ANY(:fact_ids)
+                    """
+                ).bindparams(fact_ids=fact_ids)
+            )
 
         return facts
 
@@ -296,8 +377,12 @@ class FactNetwork:
         )
         fact = result.scalar_one_or_none()
         if fact:
-            # Increase confidence (weighted average)
-            fact.confidence = min(1.0, (fact.confidence + new_confidence) / 2 + 0.1)
+            # Use unified confidence calculation with weighted average
+            weighted_confidence = calculate_weighted_average(
+                fact.confidence, new_confidence, old_weight=0.6
+            )
+            # Then apply reinforcement for the merge
+            fact.confidence = calculate_reinforcement(weighted_confidence, reinforcement_strength=0.15)
             fact.heat_score = min(2.0, fact.heat_score + 0.2)
             fact.access_count += 1
             fact.last_accessed = datetime.utcnow()
@@ -396,12 +481,12 @@ class FactNetwork:
                 vector_str = embedding_service.to_pgvector_str(embedding)
                 await self.db.execute(
                     text(
-                        f"""
+                        """
                         UPDATE memory_facts
-                        SET embedding_vector = '{vector_str}'::vector
+                        SET embedding_vector = :vector::vector
                         WHERE id = :fact_id
                         """
-                    ).bindparams(fact_id=str(fact_id))
+                    ).bindparams(vector=vector_str, fact_id=str(fact_id))
                 )
 
         if new_confidence is not None:
@@ -523,9 +608,10 @@ class FactNetwork:
         if not messages:
             return []
 
-        # Build conversation text
+        # Build conversation text with sanitization to prevent prompt injection
         conversation = "\n".join(
-            f"{m.role}: {m.content}" for m in reversed(messages)
+            f"{m.role}: {sanitize_user_input(m.content, max_length=500)}"
+            for m in reversed(messages)
         )
 
         # Ask Claude to extract facts

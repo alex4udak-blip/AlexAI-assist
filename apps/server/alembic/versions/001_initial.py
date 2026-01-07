@@ -35,6 +35,8 @@ def upgrade() -> None:
             server_default=sa.text("now()"),
         ),
     )
+    op.create_index("idx_devices_last_seen_at", "devices", ["last_seen_at"])
+    op.create_index("idx_devices_created_at", "devices", ["created_at"])
 
     # Events table
     op.create_table(
@@ -48,7 +50,7 @@ def upgrade() -> None:
         sa.Column(
             "device_id",
             sa.String(64),
-            sa.ForeignKey("devices.id"),
+            sa.ForeignKey("devices.id", ondelete="CASCADE"),
             nullable=False,
         ),
         sa.Column("event_type", sa.String(50), nullable=False),
@@ -106,6 +108,12 @@ def upgrade() -> None:
             server_default=sa.text("now()"),
         ),
     )
+    op.create_index("idx_patterns_type", "patterns", ["pattern_type"])
+    op.create_index("idx_patterns_status", "patterns", ["status"])
+    op.create_index("idx_patterns_first_seen", "patterns", ["first_seen_at"])
+    op.create_index("idx_patterns_last_seen", "patterns", ["last_seen_at"])
+    op.create_index("idx_patterns_created_at", "patterns", ["created_at"])
+    op.create_index("idx_patterns_updated_at", "patterns", ["updated_at"])
 
     # Suggestions table
     op.create_table(
@@ -121,7 +129,7 @@ def upgrade() -> None:
         sa.Column(
             "pattern_id",
             postgresql.UUID(as_uuid=True),
-            sa.ForeignKey("patterns.id"),
+            sa.ForeignKey("patterns.id", ondelete="CASCADE"),
         ),
         sa.Column("agent_type", sa.String(50), nullable=False),
         sa.Column("agent_config", postgresql.JSONB, nullable=False),
@@ -137,6 +145,12 @@ def upgrade() -> None:
             server_default=sa.text("now()"),
         ),
     )
+    op.create_index("idx_suggestions_pattern_id", "suggestions", ["pattern_id"])
+    op.create_index("idx_suggestions_agent_type", "suggestions", ["agent_type"])
+    op.create_index("idx_suggestions_status", "suggestions", ["status"])
+    op.create_index("idx_suggestions_created_at", "suggestions", ["created_at"])
+    op.create_index("idx_suggestions_dismissed_at", "suggestions", ["dismissed_at"])
+    op.create_index("idx_suggestions_accepted_at", "suggestions", ["accepted_at"])
 
     # Agents table
     op.create_table(
@@ -168,7 +182,7 @@ def upgrade() -> None:
         sa.Column(
             "suggestion_id",
             postgresql.UUID(as_uuid=True),
-            sa.ForeignKey("suggestions.id"),
+            sa.ForeignKey("suggestions.id", ondelete="CASCADE"),
         ),
         sa.Column(
             "created_at",
@@ -181,6 +195,12 @@ def upgrade() -> None:
             server_default=sa.text("now()"),
         ),
     )
+    op.create_index("idx_agents_agent_type", "agents", ["agent_type"])
+    op.create_index("idx_agents_status", "agents", ["status"])
+    op.create_index("idx_agents_suggestion_id", "agents", ["suggestion_id"])
+    op.create_index("idx_agents_last_run_at", "agents", ["last_run_at"])
+    op.create_index("idx_agents_created_at", "agents", ["created_at"])
+    op.create_index("idx_agents_updated_at", "agents", ["updated_at"])
 
     # Agent logs table
     op.create_table(
@@ -207,6 +227,7 @@ def upgrade() -> None:
         ),
     )
     op.create_index("idx_agent_logs_agent", "agent_logs", ["agent_id", "created_at"])
+    op.create_index("idx_agent_logs_level", "agent_logs", ["level"])
 
 
 def downgrade() -> None:

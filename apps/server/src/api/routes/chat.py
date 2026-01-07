@@ -1,13 +1,12 @@
 """Chat endpoints with PostgreSQL storage, Redis caching, and Memory integration."""
 
 import json
-import logging
 from datetime import datetime, timedelta
 from typing import Any
 from uuid import uuid4
 
 import redis.asyncio as redis
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -15,11 +14,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from src.api.deps import get_db_session
 from src.core.claude import claude_client
 from src.core.config import settings
+from src.core.logging import get_logger, log_error
+from src.core.security import validate_session_id
 from src.db.models import ChatMessage
 from src.services.analyzer import AnalyzerService
 from src.services.memory import MemoryManager
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 router = APIRouter()
 
@@ -38,7 +39,14 @@ async def get_redis() -> redis.Redis | None:
                 decode_responses=True,
             )
             await redis_client.ping()
-        except Exception:
+            logger.info("Redis connection established")
+        except Exception as e:
+            log_error(
+                logger,
+                "Failed to connect to Redis",
+                error=e,
+                extra={"event_type": "redis_connection_error"},
+            )
             redis_client = None
     return redis_client
 
@@ -46,8 +54,16 @@ async def get_redis() -> redis.Redis | None:
 class ChatMessageInput(BaseModel):
     """Chat message input schema."""
 
-    message: str
-    context: dict[str, Any] = Field(default_factory=dict)
+    message: str = Field(
+        ...,
+        min_length=1,
+        max_length=10000,
+        description="User message content",
+    )
+    context: dict[str, Any] = Field(
+        default_factory=dict,
+        description="Additional context for the message",
+    )
 
 
 class ChatResponse(BaseModel):
@@ -76,6 +92,10 @@ async def chat(
     """Chat with Observer AI with Memory integration."""
     message_id = str(uuid4())
     session_id = data.context.get("session_id", "default")
+
+    # Validate session_id to prevent session forgery
+    session_id = validate_session_id(session_id)
+
     # Use naive datetime for PostgreSQL TIMESTAMP WITHOUT TIME ZONE column
     timestamp = datetime.utcnow()
 
@@ -92,7 +112,15 @@ async def chat(
         memory_context = await memory_manager.build_context_for_query(data.message)
         memory_prompt_section = await memory_manager.format_context_for_prompt(memory_context)
     except Exception as e:
-        logger.warning(f"Failed to get memory context: {e}")
+        log_error(
+            logger,
+            "Failed to get memory context",
+            error=e,
+            extra={
+                "event_type": "memory_context_error",
+                "session_id": session_id,
+            },
+        )
 
     # Build system prompt with activity and memory context
     system_prompt = (
@@ -137,7 +165,24 @@ async def chat(
             messages=messages,
             system=system_prompt,
         )
+        logger.info(
+            "Claude response generated",
+            extra={
+                "event_type": "claude_response",
+                "session_id": session_id,
+                "response_length": len(response),
+            },
+        )
     except Exception as e:
+        log_error(
+            logger,
+            "Failed to get Claude response",
+            error=e,
+            extra={
+                "event_type": "claude_error",
+                "session_id": session_id,
+            },
+        )
         response = f"Извините, произошла ошибка при подключении к AI. Ошибка: {str(e)}"
 
     # Store user message in database
@@ -163,9 +208,24 @@ async def chat(
 
     try:
         await db.commit()
-        logger.info(f"Chat messages saved for session {session_id}")
+        logger.info(
+            "Chat messages saved",
+            extra={
+                "event_type": "chat_saved",
+                "session_id": session_id,
+                "message_count": 2,
+            },
+        )
     except Exception as e:
-        logger.error(f"Failed to save chat messages: {e}")
+        log_error(
+            logger,
+            "Failed to save chat messages",
+            error=e,
+            extra={
+                "event_type": "chat_save_error",
+                "session_id": session_id,
+            },
+        )
         await db.rollback()
         raise HTTPException(status_code=500, detail="Failed to save chat messages")
 
@@ -174,8 +234,17 @@ async def chat(
     if r:
         try:
             await r.delete(f"chat_history:{session_id}")
-        except Exception:
-            pass
+            logger.debug(
+                "Cache invalidated",
+                extra={"event_type": "cache_invalidated", "session_id": session_id},
+            )
+        except Exception as e:
+            log_error(
+                logger,
+                "Failed to invalidate cache",
+                error=e,
+                extra={"event_type": "cache_error", "session_id": session_id},
+            )
 
     # Process interaction for memory (async, non-blocking)
     try:
@@ -185,8 +254,17 @@ async def chat(
             message_id=user_msg.id,
             context=memory_context,
         )
+        logger.debug(
+            "Memory processed",
+            extra={"event_type": "memory_processed", "session_id": session_id},
+        )
     except Exception as e:
-        logger.warning(f"Error processing memory: {e}")
+        log_error(
+            logger,
+            "Error processing memory",
+            error=e,
+            extra={"event_type": "memory_processing_error", "session_id": session_id},
+        )
         # Don't fail the chat request if memory processing fails
 
     return ChatResponse(
@@ -199,11 +277,24 @@ async def chat(
 
 @router.get("/history")
 async def get_chat_history(
-    session_id: str = "default",
-    limit: int = 50,
+    session_id: str = Query(
+        default="default",
+        min_length=1,
+        max_length=255,
+        description="Session identifier",
+    ),
+    limit: int = Query(
+        default=50,
+        ge=1,
+        le=500,
+        description="Maximum number of messages to return",
+    ),
     db: AsyncSession = Depends(get_db_session),
 ) -> list[ChatMessageOutput]:
     """Get chat history from database with Redis caching."""
+    # Validate session_id to prevent session forgery
+    session_id = validate_session_id(session_id)
+
     cache_key = f"chat_history:{session_id}"
 
     # Try to get from Redis cache first
@@ -212,9 +303,18 @@ async def get_chat_history(
         try:
             cached = await r.get(cache_key)
             if cached:
+                logger.debug(
+                    "Cache hit for chat history",
+                    extra={"event_type": "cache_hit", "session_id": session_id},
+                )
                 return json.loads(cached)
-        except Exception:
-            pass
+        except Exception as e:
+            log_error(
+                logger,
+                "Cache read error",
+                error=e,
+                extra={"event_type": "cache_read_error", "session_id": session_id},
+            )
 
     # Get from database
     query = (
@@ -245,31 +345,66 @@ async def get_chat_history(
                 300,  # 5 minutes TTL
                 json.dumps([h.model_dump() for h in history]),
             )
-        except Exception:
-            pass
+            logger.debug(
+                "Chat history cached",
+                extra={
+                    "event_type": "cache_write",
+                    "session_id": session_id,
+                    "message_count": len(history),
+                },
+            )
+        except Exception as e:
+            log_error(
+                logger,
+                "Cache write error",
+                error=e,
+                extra={"event_type": "cache_write_error", "session_id": session_id},
+            )
 
     return history
 
 
 @router.delete("/history")
 async def clear_chat_history(
-    session_id: str = "default",
+    session_id: str = Query(
+        default="default",
+        min_length=1,
+        max_length=255,
+        description="Session identifier",
+    ),
     db: AsyncSession = Depends(get_db_session),
 ) -> dict[str, str]:
     """Clear chat history from database."""
     from sqlalchemy import delete
 
+    # Validate session_id to prevent session forgery
+    session_id = validate_session_id(session_id)
+
     # Delete from database
     stmt = delete(ChatMessage).where(ChatMessage.session_id == session_id)
-    await db.execute(stmt)
+    result = await db.execute(stmt)
     await db.commit()
+
+    logger.info(
+        "Chat history cleared",
+        extra={
+            "event_type": "chat_history_cleared",
+            "session_id": session_id,
+            "rows_deleted": result.rowcount,
+        },
+    )
 
     # Clear cache
     r = await get_redis()
     if r:
         try:
             await r.delete(f"chat_history:{session_id}")
-        except Exception:
-            pass
+        except Exception as e:
+            log_error(
+                logger,
+                "Failed to clear cache",
+                error=e,
+                extra={"event_type": "cache_clear_error", "session_id": session_id},
+            )
 
     return {"message": "Chat history cleared"}

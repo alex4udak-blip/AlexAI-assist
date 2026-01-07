@@ -38,8 +38,8 @@ def upgrade() -> None:
         sa.Column("is_persona_attribute", sa.Boolean, default=False),  # Pa in O-Mem
         sa.Column("is_persona_event", sa.Boolean, default=False),  # Pf in O-Mem
         # A-MEM Zettelkasten metadata
-        sa.Column("keywords", ARRAY(sa.String), server_default="{}"),
-        sa.Column("tags", ARRAY(sa.String), server_default="{}"),
+        sa.Column("keywords", ARRAY(sa.String), server_default="'{}'"),
+        sa.Column("tags", ARRAY(sa.String), server_default="'{}'"),
         sa.Column("context", sa.Text),  # LLM-generated context
         # Hindsight temporal model
         sa.Column("valid_from", sa.DateTime, default=datetime.utcnow),
@@ -50,7 +50,7 @@ def upgrade() -> None:
         sa.Column("confidence", sa.Float, default=1.0),  # 0-1
         sa.Column("source", sa.String(50)),  # chat, pattern, agent, manual, inferred
         sa.Column("source_id", UUID(as_uuid=True), nullable=True),
-        sa.Column("evidence_ids", ARRAY(UUID(as_uuid=True)), server_default="{}"),  # supporting facts
+        sa.Column("evidence_ids", ARRAY(UUID(as_uuid=True)), server_default="'{}'"),  # supporting facts
         # MemOS scheduling metadata
         sa.Column("heat_score", sa.Float, default=1.0),  # for retrieval priority
         sa.Column("access_count", sa.Integer, default=0),
@@ -86,7 +86,7 @@ def upgrade() -> None:
         # What happened
         sa.Column("action_taken", sa.Text),
         sa.Column("outcome", sa.String(50)),  # success, failure, partial, unknown
-        sa.Column("outcome_details", JSONB, server_default="{}"),
+        sa.Column("outcome_details", JSONB, server_default="'{}'"),
         # Learning
         sa.Column("lesson_learned", sa.Text),  # what we learned from this
         sa.Column("should_repeat", sa.Boolean),  # should we do this again?
@@ -95,8 +95,8 @@ def upgrade() -> None:
         sa.Column("duration_seconds", sa.Integer),
         # References
         sa.Column("agent_id", UUID(as_uuid=True), nullable=True),
-        sa.Column("related_facts", ARRAY(UUID(as_uuid=True)), server_default="{}"),
-        sa.Column("related_entities", ARRAY(UUID(as_uuid=True)), server_default="{}"),
+        sa.Column("related_facts", ARRAY(UUID(as_uuid=True)), server_default="'{}'"),
+        sa.Column("related_entities", ARRAY(UUID(as_uuid=True)), server_default="'{}'"),
         # Procedural learning (Mem-alpha style)
         sa.Column("is_procedural", sa.Boolean, default=False),
         sa.Column("procedure_id", UUID(as_uuid=True), nullable=True),
@@ -131,8 +131,8 @@ def upgrade() -> None:
         sa.Column("entity_type", sa.String(50), nullable=False),  # person, app, project, concept, location, org
         # Synthesized profile (Hindsight observation network)
         sa.Column("summary", sa.Text),  # LLM-generated summary
-        sa.Column("key_facts", ARRAY(sa.String), server_default="{}"),
-        sa.Column("attributes", JSONB, server_default="{}"),
+        sa.Column("key_facts", ARRAY(sa.String), server_default="'{}'"),
+        sa.Column("attributes", JSONB, server_default="'{}'"),
         # Usage statistics
         sa.Column("mention_count", sa.Integer, default=1),
         sa.Column("interaction_count", sa.Integer, default=0),
@@ -176,7 +176,7 @@ def upgrade() -> None:
         sa.Column("strength", sa.Float, default=1.0),
         sa.Column("confidence", sa.Float, default=1.0),
         # Evidence
-        sa.Column("evidence", ARRAY(UUID(as_uuid=True)), server_default="{}"),
+        sa.Column("evidence", ARRAY(UUID(as_uuid=True)), server_default="'{}'"),
         # Timestamps
         sa.Column("created_at", sa.DateTime, default=datetime.utcnow),
         sa.Column("updated_at", sa.DateTime),
@@ -196,8 +196,8 @@ def upgrade() -> None:
         sa.Column("confidence", sa.Float, default=0.5),  # starts uncertain
         sa.Column("confidence_history", JSONB, server_default="[]"),  # [{timestamp, value, reason}]
         # Supporting/contradicting evidence
-        sa.Column("supporting_facts", ARRAY(UUID(as_uuid=True)), server_default="{}"),
-        sa.Column("contradicting_facts", ARRAY(UUID(as_uuid=True)), server_default="{}"),
+        sa.Column("supporting_facts", ARRAY(UUID(as_uuid=True)), server_default="'{}'"),
+        sa.Column("contradicting_facts", ARRAY(UUID(as_uuid=True)), server_default="'{}'"),
         # Evolution
         sa.Column("formed_at", sa.DateTime, default=datetime.utcnow),
         sa.Column("last_reinforced", sa.DateTime),
@@ -223,14 +223,14 @@ def upgrade() -> None:
         sa.Column("topic", sa.String(255), nullable=False),
         sa.Column("description", sa.Text),
         # Messages in this topic
-        sa.Column("message_ids", ARRAY(UUID(as_uuid=True)), server_default="{}"),
+        sa.Column("message_ids", ARRAY(UUID(as_uuid=True)), server_default="'{}'"),
         sa.Column("message_count", sa.Integer, default=0),
         # Temporal
         sa.Column("first_discussed", sa.DateTime),
         sa.Column("last_discussed", sa.DateTime),
         # Summary
         sa.Column("summary", sa.Text),
-        sa.Column("key_points", ARRAY(sa.String), server_default="{}"),
+        sa.Column("key_points", ARRAY(sa.String), server_default="'{}'"),
         # Timestamps
         sa.Column("created_at", sa.DateTime, default=datetime.utcnow),
         sa.Column("updated_at", sa.DateTime),
@@ -242,8 +242,8 @@ def upgrade() -> None:
         sa.Column("id", UUID(as_uuid=True), primary_key=True),
         sa.Column("session_id", sa.String(64), nullable=False, index=True),
         sa.Column("keyword", sa.String(100), nullable=False),
-        sa.Column("message_ids", ARRAY(UUID(as_uuid=True)), server_default="{}"),
-        sa.Column("fact_ids", ARRAY(UUID(as_uuid=True)), server_default="{}"),
+        sa.Column("message_ids", ARRAY(UUID(as_uuid=True)), server_default="'{}'"),
+        sa.Column("fact_ids", ARRAY(UUID(as_uuid=True)), server_default="'{}'"),
         sa.Column("occurrence_count", sa.Integer, default=1),
         sa.Column("created_at", sa.DateTime, default=datetime.utcnow),
     )
@@ -260,7 +260,7 @@ def upgrade() -> None:
         sa.Column("memory_id", UUID(as_uuid=True), nullable=False),
         # MemOS metadata
         sa.Column("version", sa.Integer, default=1),
-        sa.Column("provenance", JSONB, server_default="{}"),  # {source, timestamp, confidence}
+        sa.Column("provenance", JSONB, server_default="'{}'"),  # {source, timestamp, confidence}
         # Governance
         sa.Column("access_level", sa.String(20), default="private"),
         sa.Column("retention_policy", sa.String(50)),  # keep_forever, decay, archive_after
@@ -336,17 +336,17 @@ def upgrade() -> None:
         # Content
         sa.Column("title", sa.String(255)),
         sa.Column("summary", sa.Text, nullable=False),
-        sa.Column("key_points", ARRAY(sa.String), server_default="{}"),
+        sa.Column("key_points", ARRAY(sa.String), server_default="'{}'"),
         sa.Column("highlights", JSONB, server_default="[]"),
         # Metrics
-        sa.Column("metrics", JSONB, server_default="{}"),
+        sa.Column("metrics", JSONB, server_default="'{}'"),
         # Extracted knowledge
-        sa.Column("facts_extracted", ARRAY(UUID(as_uuid=True)), server_default="{}"),
-        sa.Column("beliefs_formed", ARRAY(UUID(as_uuid=True)), server_default="{}"),
-        sa.Column("entities_mentioned", ARRAY(UUID(as_uuid=True)), server_default="{}"),
+        sa.Column("facts_extracted", ARRAY(UUID(as_uuid=True)), server_default="'{}'"),
+        sa.Column("beliefs_formed", ARRAY(UUID(as_uuid=True)), server_default="'{}'"),
+        sa.Column("entities_mentioned", ARRAY(UUID(as_uuid=True)), server_default="'{}'"),
         # Sources
-        sa.Column("source_messages", ARRAY(UUID(as_uuid=True)), server_default="{}"),
-        sa.Column("source_events", ARRAY(UUID(as_uuid=True)), server_default="{}"),
+        sa.Column("source_messages", ARRAY(UUID(as_uuid=True)), server_default="'{}'"),
+        sa.Column("source_events", ARRAY(UUID(as_uuid=True)), server_default="'{}'"),
         # Timestamps
         sa.Column("created_at", sa.DateTime, default=datetime.utcnow),
     )
@@ -368,7 +368,7 @@ def upgrade() -> None:
         sa.Column("description", sa.Text),
         sa.Column("procedure_type", sa.String(50)),  # automation, workflow, optimization
         # The procedure
-        sa.Column("trigger_conditions", JSONB, server_default="{}"),
+        sa.Column("trigger_conditions", JSONB, server_default="'{}'"),
         sa.Column("steps", JSONB, server_default="[]"),
         sa.Column("expected_outcome", sa.Text),
         # Learning from execution (Mem-alpha style)
@@ -382,7 +382,7 @@ def upgrade() -> None:
         sa.Column("improvement_notes", sa.Text),
         # Agent link
         sa.Column("learned_from_agent_id", UUID(as_uuid=True), nullable=True),
-        sa.Column("experience_ids", ARRAY(UUID(as_uuid=True)), server_default="{}"),
+        sa.Column("experience_ids", ARRAY(UUID(as_uuid=True)), server_default="'{}'"),
         # Timestamps
         sa.Column("last_used", sa.DateTime),
         sa.Column("created_at", sa.DateTime, default=datetime.utcnow),
@@ -407,8 +407,8 @@ def upgrade() -> None:
         sa.Column("beliefs_count", sa.Integer, default=0),
         sa.Column("experiences_count", sa.Integer, default=0),
         # Knowledge gaps
-        sa.Column("unknown_areas", ARRAY(sa.String), server_default="{}"),
-        sa.Column("questions_to_explore", ARRAY(sa.String), server_default="{}"),
+        sa.Column("unknown_areas", ARRAY(sa.String), server_default="'{}'"),
+        sa.Column("questions_to_explore", ARRAY(sa.String), server_default="'{}'"),
         # Timestamps
         sa.Column("last_updated", sa.DateTime),
         sa.Column("created_at", sa.DateTime, default=datetime.utcnow),
@@ -417,26 +417,98 @@ def upgrade() -> None:
     # ===========================================
     # ADDITIONAL INDEXES
     # ===========================================
+
+    # memory_facts indexes
     op.create_index("idx_facts_session_type", "memory_facts", ["session_id", "fact_type"])
     op.create_index("idx_facts_valid", "memory_facts", ["valid_from", "valid_to"])
     op.create_index("idx_facts_heat", "memory_facts", ["heat_score"])
+    op.create_index("idx_facts_source_id", "memory_facts", ["source_id"])
+    op.create_index("idx_facts_last_accessed", "memory_facts", ["last_accessed"])
+    op.create_index("idx_facts_created_at", "memory_facts", ["created_at"])
+    op.create_index("idx_facts_updated_at", "memory_facts", ["updated_at"])
 
+    # memory_experiences indexes
+    op.create_index("idx_experiences_agent_id", "memory_experiences", ["agent_id"])
+    op.create_index("idx_experiences_procedure_id", "memory_experiences", ["procedure_id"])
+    op.create_index("idx_experiences_occurred_at", "memory_experiences", ["occurred_at"])
+    op.create_index("idx_experiences_created_at", "memory_experiences", ["created_at"])
+    op.create_index("idx_experiences_session_type", "memory_experiences", ["session_id", "experience_type"])
+
+    # memory_entities indexes
     op.create_index("idx_entities_type", "memory_entities", ["entity_type"])
     op.create_index("idx_entities_name", "memory_entities", ["canonical_name"])
+    op.create_index("idx_entities_last_seen", "memory_entities", ["last_seen"])
+    op.create_index("idx_entities_last_updated", "memory_entities", ["last_updated"])
+    op.create_index("idx_entities_created_at", "memory_entities", ["created_at"])
+    op.create_index("idx_entities_session_type", "memory_entities", ["session_id", "entity_type"])
 
+    # memory_relationships indexes
     op.create_index("idx_relationships_source", "memory_relationships", ["source_id"])
     op.create_index("idx_relationships_target", "memory_relationships", ["target_id"])
     op.create_index("idx_relationships_valid", "memory_relationships", ["valid_from", "valid_to"])
+    op.create_index("idx_relationships_created_at", "memory_relationships", ["created_at"])
+    op.create_index("idx_relationships_updated_at", "memory_relationships", ["updated_at"])
+    op.create_index("idx_relationships_session_type", "memory_relationships", ["session_id", "relation_type"])
 
+    # memory_beliefs indexes
     op.create_index("idx_beliefs_confidence", "memory_beliefs", ["confidence"])
     op.create_index("idx_beliefs_status", "memory_beliefs", ["status"])
+    op.create_index("idx_beliefs_superseded_by", "memory_beliefs", ["superseded_by"])
+    op.create_index("idx_beliefs_created_at", "memory_beliefs", ["created_at"])
+    op.create_index("idx_beliefs_updated_at", "memory_beliefs", ["updated_at"])
+    op.create_index("idx_beliefs_session_status", "memory_beliefs", ["session_id", "status"])
 
+    # memory_topics indexes
+    op.create_index("idx_topics_topic", "memory_topics", ["topic"])
+    op.create_index("idx_topics_created_at", "memory_topics", ["created_at"])
+    op.create_index("idx_topics_updated_at", "memory_topics", ["updated_at"])
+    op.create_index("idx_topics_last_discussed", "memory_topics", ["last_discussed"])
+
+    # memory_keyword_index indexes
+    op.create_index("idx_keyword_keyword", "memory_keyword_index", ["keyword"])
+    op.create_index("idx_keyword_created_at", "memory_keyword_index", ["created_at"])
+    op.create_index("idx_keyword_session_keyword", "memory_keyword_index", ["session_id", "keyword"])
+
+    # memory_cubes indexes (critical for lookups)
     op.create_index("idx_cubes_heat", "memory_cubes", ["heat_score"])
+    op.create_index("idx_cubes_memory_lookup", "memory_cubes", ["memory_type", "memory_id"])
+    op.create_index("idx_cubes_memory_id", "memory_cubes", ["memory_id"])
+    op.create_index("idx_cubes_migrated_from", "memory_cubes", ["migrated_from"])
+    op.create_index("idx_cubes_migrated_to", "memory_cubes", ["migrated_to"])
+    op.create_index("idx_cubes_created_at", "memory_cubes", ["created_at"])
+    op.create_index("idx_cubes_updated_at", "memory_cubes", ["updated_at"])
+    op.create_index("idx_cubes_session_type", "memory_cubes", ["session_id", "memory_type"])
+
+    # memory_links indexes
     op.create_index("idx_links_source", "memory_links", ["source_type", "source_id"])
     op.create_index("idx_links_target", "memory_links", ["target_type", "target_id"])
+    op.create_index("idx_links_created_at", "memory_links", ["created_at"])
 
-    op.create_index("idx_keyword_keyword", "memory_keyword_index", ["keyword"])
-    op.create_index("idx_topics_topic", "memory_topics", ["topic"])
+    # memory_operations indexes
+    op.create_index("idx_operations_memory_id", "memory_operations", ["memory_id"])
+    op.create_index("idx_operations_trigger_id", "memory_operations", ["trigger_id"])
+    op.create_index("idx_operations_created_at", "memory_operations", ["created_at"])
+    op.create_index("idx_operations_session_op", "memory_operations", ["session_id", "operation"])
+
+    # memory_episodes indexes
+    op.create_index("idx_episodes_created_at", "memory_episodes", ["created_at"])
+    op.create_index("idx_episodes_period_start", "memory_episodes", ["period_start"])
+    op.create_index("idx_episodes_period_end", "memory_episodes", ["period_end"])
+    op.create_index("idx_episodes_session_type", "memory_episodes", ["session_id", "episode_type"])
+
+    # memory_procedures indexes
+    op.create_index("idx_procedures_parent_id", "memory_procedures", ["parent_id"])
+    op.create_index("idx_procedures_agent_id", "memory_procedures", ["learned_from_agent_id"])
+    op.create_index("idx_procedures_last_used", "memory_procedures", ["last_used"])
+    op.create_index("idx_procedures_created_at", "memory_procedures", ["created_at"])
+    op.create_index("idx_procedures_updated_at", "memory_procedures", ["updated_at"])
+    op.create_index("idx_procedures_session_type", "memory_procedures", ["session_id", "procedure_type"])
+
+    # memory_meta indexes
+    op.create_index("idx_meta_domain", "memory_meta", ["domain"])
+    op.create_index("idx_meta_last_updated", "memory_meta", ["last_updated"])
+    op.create_index("idx_meta_created_at", "memory_meta", ["created_at"])
+    op.create_index("idx_meta_session_domain", "memory_meta", ["session_id", "domain"])
 
 
 def downgrade() -> None:
