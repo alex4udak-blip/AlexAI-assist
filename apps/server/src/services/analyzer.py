@@ -147,13 +147,22 @@ class AnalyzerService:
         events = result.scalars().all()
 
         # Calculate productivity metrics
+        # High productivity categories (full weight)
         productive_categories = {"coding", "writing", "design", "research"}
+        # Semi-productive categories (half weight)
+        semi_productive = {"browsing", "reading"}
+
         productive_count = sum(
             1 for e in events if e.category in productive_categories
         )
+        semi_productive_count = sum(
+            1 for e in events if e.category in semi_productive
+        )
+        # Weighted score: full for productive, 0.5 for semi-productive
+        weighted_count = productive_count + (semi_productive_count * 0.5)
         total_count = len(events) or 1
 
-        score = int((productive_count / total_count) * 100)
+        score = int((weighted_count / total_count) * 100)
 
         return {
             "score": min(score, 100),

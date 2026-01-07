@@ -224,22 +224,32 @@ app.post('/v1/messages', authMiddleware, async (req, res) => {
       return res.status(400).json({ error: { message: 'messages array required' } });
     }
 
-    const userMessage = messages.find(m => m.role === 'user')?.content || '';
-
-    if (!userMessage) {
+    // Get all user messages (for validation)
+    const userMessages = messages.filter(m => m.role === 'user');
+    if (userMessages.length === 0) {
       return res.status(400).json({ error: { message: 'user message required' } });
     }
 
-    // Limit message size
-    if (userMessage.length > 100000) {
-      return res.status(400).json({ error: { message: 'message too long (max 100KB)' } });
+    // Build full conversation prompt with history
+    let fullPrompt = '';
+
+    // Add system prompt first
+    if (system) {
+      fullPrompt += `${system}\n\n`;
     }
 
-    const fullPrompt = system
-      ? `${system}\n\nUser: ${userMessage}`
-      : userMessage;
+    // Add all messages in order (conversation history)
+    for (const msg of messages) {
+      const role = msg.role === 'user' ? 'User' : 'Assistant';
+      fullPrompt += `${role}: ${msg.content}\n\n`;
+    }
 
-    console.log('Sending to persistent session:', userMessage.substring(0, 50) + '...');
+    // Limit total prompt size
+    if (fullPrompt.length > 200000) {
+      return res.status(400).json({ error: { message: 'conversation too long (max 200KB)' } });
+    }
+
+    console.log(`Sending to persistent session: ${messages.length} messages, ${fullPrompt.length} chars`);
 
     const result = await sendMessage(fullPrompt);
 

@@ -10,6 +10,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.api.deps import get_db_session
+from src.core.websocket import broadcast_event
 from src.db.models import Device, Event
 
 router = APIRouter()
@@ -90,6 +91,13 @@ async def create_events(
         db.add(event)
 
     await db.commit()
+
+    # Broadcast new events to WebSocket clients
+    await broadcast_event("events_created", {
+        "count": len(batch.events),
+        "device_ids": list(device_ids),
+    })
+
     return {"created": len(batch.events)}
 
 

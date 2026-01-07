@@ -33,9 +33,16 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     logger.info(f"Environment: {settings.environment}")
     logger.info(f"Debug: {settings.debug}")
     logger.info(f"CORS origins: {settings.allowed_origins}")
+
+    # Start background scheduler
+    from src.core.scheduler import start_scheduler, stop_scheduler
+    start_scheduler()
+
     yield
+
     # Shutdown
     logger.info("Shutting down Observer API Server...")
+    stop_scheduler()
     await engine.dispose()
 
 
@@ -99,8 +106,8 @@ async def test_db() -> dict[str, str]:
         return {"status": "error", "detail": "Database connection failed"}
 
 
-# WebSocket connections store
-active_connections: set[WebSocket] = set()
+# Import shared WebSocket connections
+from src.core.websocket import active_connections
 
 
 @app.websocket("/ws")
