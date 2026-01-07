@@ -103,7 +103,7 @@ export function ChatWindow() {
                                hover:bg-white/[0.05] hover:border-border-default
                                transition-all duration-150 w-full sm:w-auto"
                   >
-                    <Sparkles className="w-4 h-4 text-accent-primary shrink-0" />
+                    <Sparkles className="w-4 h-4 text-hud-cyan shrink-0" />
                     {prompt}
                   </button>
                 ))}
@@ -130,10 +130,10 @@ export function ChatWindow() {
               </div>
               <div className="flex items-center gap-2 px-4 py-3 rounded-2xl rounded-tl-md bg-white/[0.05]">
                 <div className="flex gap-1">
-                  <span className="w-2 h-2 bg-accent-primary rounded-full animate-bounce" />
-                  <span className="w-2 h-2 bg-accent-primary rounded-full animate-bounce"
+                  <span className="w-2 h-2 bg-hud-cyan rounded-full animate-bounce" />
+                  <span className="w-2 h-2 bg-hud-cyan rounded-full animate-bounce"
                         style={{ animationDelay: '0.1s' }} />
-                  <span className="w-2 h-2 bg-accent-primary rounded-full animate-bounce"
+                  <span className="w-2 h-2 bg-hud-cyan rounded-full animate-bounce"
                         style={{ animationDelay: '0.2s' }} />
                 </div>
                 <span className="text-sm text-text-tertiary ml-1">Observer думает...</span>

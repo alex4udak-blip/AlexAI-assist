@@ -33,7 +33,7 @@ export function Message({ message }: MessageProps) {
       <div className={`flex flex-col ${isUser ? 'items-end' : 'items-start'}`}>
         <div className={`px-4 py-3 rounded-2xl text-sm max-w-prose
                         ${isUser
-                          ? 'bg-accent-primary/20 text-text-primary rounded-tr-md'
+                          ? 'bg-hud-cyan/20 text-text-primary rounded-tr-md'
                           : 'bg-white/[0.05] text-text-secondary rounded-tl-md'
                         }`}>
           <p className="whitespace-pre-wrap leading-relaxed">{message.content}</p>
