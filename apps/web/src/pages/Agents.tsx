@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Plus, Bot, Filter } from 'lucide-react';
+import { Plus, Bot } from 'lucide-react';
 import { AgentCard } from '../components/agents/AgentCard';
 import { AgentDetail } from '../components/agents/AgentDetail';
 import { CreateAgentModal } from '../components/agents/CreateAgentModal';
