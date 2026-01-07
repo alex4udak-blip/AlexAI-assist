@@ -1,7 +1,6 @@
 """Application configuration."""
 
 from functools import lru_cache
-from typing import List
 
 from pydantic_settings import BaseSettings
 
@@ -32,13 +31,14 @@ class Settings(BaseSettings):
     allowed_origins_str: str = "http://localhost:5173,http://localhost:3000"
 
     @property
-    def allowed_origins(self) -> List[str]:
+    def allowed_origins(self) -> list[str]:
         """Parse allowed_origins from comma-separated string."""
         return [origin.strip() for origin in self.allowed_origins_str.split(",") if origin.strip()]
 
     # Claude API
     claude_oauth_token: str = ""
     claude_model: str = "claude-sonnet-4-20250514"
+    claude_proxy_url: str = "http://ccproxy.railway.internal:3001"
 
     # App settings
     debug: bool = False

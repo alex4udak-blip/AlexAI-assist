@@ -1,8 +1,8 @@
 """Chat endpoints."""
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
-from uuid import UUID, uuid4
+from uuid import uuid4
 
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel, Field
@@ -47,14 +47,16 @@ async def chat(
     activity_context = await analyzer.get_summary()
 
     # Build system prompt with context
-    system_prompt = f"""You are Observer, a personal AI assistant that helps users understand their work patterns and suggests automations.
-
-Current activity context:
-- Total events today: {activity_context.get('total_events', 0)}
-- Top apps: {', '.join([app[0] for app in activity_context.get('top_apps', [])[:5]])}
-- Categories: {activity_context.get('categories', {})}
-
-Be helpful, concise, and proactive in suggesting improvements. When appropriate, suggest creating automation agents for repetitive tasks."""
+    system_prompt = (
+        "You are Observer, a personal AI assistant that helps users "
+        "understand their work patterns and suggests automations.\n\n"
+        f"Current activity context:\n"
+        f"- Total events today: {activity_context.get('total_events', 0)}\n"
+        f"- Top apps: {', '.join([app[0] for app in activity_context.get('top_apps', [])[:5]])}\n"
+        f"- Categories: {activity_context.get('categories', {})}\n\n"
+        "Be helpful, concise, and proactive in suggesting improvements. "
+        "When appropriate, suggest creating automation agents."
+    )
 
     # Get response from Claude
     try:
@@ -70,7 +72,7 @@ Be helpful, concise, and proactive in suggesting improvements. When appropriate,
     if session_id not in chat_history:
         chat_history[session_id] = []
 
-    timestamp = datetime.now(timezone.utc)
+    timestamp = datetime.now(UTC)
     chat_history[session_id].append({
         "id": message_id,
         "role": "user",

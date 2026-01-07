@@ -1,11 +1,8 @@
 """Observer API Server - Main Entry Point"""
 
 import logging
+from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
-from typing import AsyncGenerator
-
-import asyncio
-from typing import Set
 
 from fastapi import FastAPI, Request, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
@@ -41,7 +38,9 @@ class CORSDebugMiddleware(BaseHTTPMiddleware):
             logger.info(f"Handling OPTIONS preflight for {request.url.path}")
             response = JSONResponse(content={"status": "ok"}, status_code=200)
             response.headers["Access-Control-Allow-Origin"] = origin or "*"
-            response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS, PATCH"
+            response.headers["Access-Control-Allow-Methods"] = (
+                "GET, POST, PUT, DELETE, OPTIONS, PATCH"
+            )
             response.headers["Access-Control-Allow-Headers"] = "*"
             response.headers["Access-Control-Allow-Credentials"] = "true"
             return response
@@ -126,6 +125,7 @@ async def root() -> dict[str, str]:
 async def test_db():
     """Test database connection."""
     from sqlalchemy import text
+
     from src.db.session import engine
     try:
         async with engine.connect() as conn:
@@ -137,7 +137,7 @@ async def test_db():
 
 
 # WebSocket connections store
-active_connections: Set[WebSocket] = set()
+active_connections: set[WebSocket] = set()
 
 
 @app.websocket("/ws")

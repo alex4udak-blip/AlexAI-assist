@@ -2,9 +2,8 @@
 
 import asyncio
 import json
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
-from uuid import UUID
 
 from src.core.claude import claude_client
 from src.db.models import Agent
@@ -54,7 +53,7 @@ class AgentExecutorService:
             "success": success,
             "error": error,
             "results": results,
-            "executed_at": datetime.now(timezone.utc).isoformat(),
+            "executed_at": datetime.now(UTC).isoformat(),
         }
 
     async def _execute_action(

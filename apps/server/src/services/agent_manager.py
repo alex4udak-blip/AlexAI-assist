@@ -1,6 +1,6 @@
 """Agent management service."""
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 from uuid import UUID
 
@@ -81,7 +81,7 @@ class AgentManagerService:
             if hasattr(agent, key) and value is not None:
                 setattr(agent, key, value)
 
-        agent.updated_at = datetime.now(timezone.utc)
+        agent.updated_at = datetime.now(UTC)
         await self.db.flush()
         return agent
 
@@ -116,7 +116,7 @@ class AgentManagerService:
             return
 
         agent.run_count += 1
-        agent.last_run_at = datetime.now(timezone.utc)
+        agent.last_run_at = datetime.now(UTC)
 
         if success:
             agent.success_count += 1
@@ -188,7 +188,7 @@ class AgentManagerService:
         )
 
         suggestion.status = "accepted"
-        suggestion.accepted_at = datetime.now(timezone.utc)
+        suggestion.accepted_at = datetime.now(UTC)
         await self.db.flush()
 
         return agent
