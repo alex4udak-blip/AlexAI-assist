@@ -51,11 +51,7 @@
       ],
       "signingIdentity": null,
       "providerShortName": null,
-      "infoPlist": {
-        "NSAccessibilityUsageDescription": "Observer needs Accessibility access to track which applications you use and help analyze your work patterns.",
-        "NSAppleEventsUsageDescription": "Observer uses Apple Events to communicate with other applications.",
-        "LSUIElement": true
-      }
+      "infoPlist": "Info.plist"
     }
   },
   "plugins": {
