@@ -1,11 +1,10 @@
 import { motion } from 'framer-motion';
-import { Activity, Bot, Sparkles, Clock, TrendingUp, TrendingDown } from 'lucide-react';
+import { Activity, Bot, Sparkles, Clock } from 'lucide-react';
 import { formatNumber } from '../../lib/utils';
 
 interface Stat {
   label: string;
   value: number | string;
-  change?: number;
   icon: typeof Activity;
   color: string;
   bgColor: string;
@@ -39,7 +38,6 @@ export function StatsGrid({ stats, loading }: StatsGridProps) {
     {
       label: 'Событий сегодня',
       value: stats?.totalEvents ?? 0,
-      change: 12,
       icon: Activity,
       color: 'text-violet-400',
       bgColor: 'from-violet-500/20 to-violet-500/5',
@@ -47,7 +45,6 @@ export function StatsGrid({ stats, loading }: StatsGridProps) {
     {
       label: 'Активных агентов',
       value: stats?.activeAgents ?? 0,
-      change: 0,
       icon: Bot,
       color: 'text-emerald-400',
       bgColor: 'from-emerald-500/20 to-emerald-500/5',
@@ -55,7 +52,6 @@ export function StatsGrid({ stats, loading }: StatsGridProps) {
     {
       label: 'Предложений',
       value: stats?.suggestions ?? 0,
-      change: 3,
       icon: Sparkles,
       color: 'text-amber-400',
       bgColor: 'from-amber-500/20 to-amber-500/5',
@@ -63,7 +59,6 @@ export function StatsGrid({ stats, loading }: StatsGridProps) {
     {
       label: 'Сэкономлено',
       value: stats?.timeSaved ? `${stats.timeSaved}м` : '0м',
-      change: 15,
       icon: Clock,
       color: 'text-blue-400',
       bgColor: 'from-blue-500/20 to-blue-500/5',
@@ -115,22 +110,9 @@ export function StatsGrid({ stats, loading }: StatsGridProps) {
           </div>
 
           {/* Label */}
-          <div className="relative text-sm text-text-tertiary mb-3">
+          <div className="relative text-sm text-text-tertiary">
             {stat.label}
           </div>
-
-          {/* Change indicator */}
-          {stat.change !== undefined && stat.change !== 0 && (
-            <div className={`absolute top-5 right-5 flex items-center gap-1 text-xs
-                            ${stat.change > 0 ? 'text-status-success' : 'text-status-error'}`}>
-              {stat.change > 0 ? (
-                <TrendingUp className="w-3 h-3" />
-              ) : (
-                <TrendingDown className="w-3 h-3" />
-              )}
-              <span>{stat.change > 0 ? '+' : ''}{stat.change}%</span>
-            </div>
-          )}
         </motion.div>
       ))}
     </motion.div>
