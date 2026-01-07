@@ -1,5 +1,6 @@
+import { motion } from 'framer-motion';
 import { User, Bot } from 'lucide-react';
-import { formatTime, cn } from '../../lib/utils';
+import { formatTime } from '../../lib/utils';
 import type { ChatMessage } from '../../lib/api';
 
 interface MessageProps {
@@ -10,44 +11,37 @@ export function Message({ message }: MessageProps) {
   const isUser = message.role === 'user';
 
   return (
-    <div
-      className={cn(
-        'flex gap-3 animate-in',
-        isUser ? 'flex-row-reverse' : ''
-      )}
+    <motion.div
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      className={`flex gap-4 max-w-3xl ${isUser ? 'ml-auto flex-row-reverse' : ''}`}
     >
-      <div
-        className={cn(
-          'w-8 h-8 rounded-lg flex items-center justify-center shrink-0',
-          isUser ? 'bg-accent-gradient' : 'bg-bg-tertiary'
-        )}
-      >
+      {/* Avatar */}
+      <div className={`w-8 h-8 rounded-full shrink-0 flex items-center justify-center
+                      ${isUser
+                        ? 'bg-white/10'
+                        : 'bg-gradient-to-br from-violet-500 to-blue-500'
+                      }`}>
         {isUser ? (
-          <User className="w-4 h-4 text-white" />
+          <User className="w-4 h-4 text-text-secondary" />
         ) : (
-          <Bot className="w-4 h-4 text-text-secondary" />
+          <Bot className="w-4 h-4 text-white" />
         )}
       </div>
-      <div
-        className={cn(
-          'flex-1 max-w-[80%]',
-          isUser ? 'text-right' : ''
-        )}
-      >
-        <div
-          className={cn(
-            'inline-block rounded-2xl px-4 py-2.5 text-sm',
-            isUser
-              ? 'bg-accent-primary text-white rounded-tr-sm'
-              : 'bg-bg-tertiary text-text-primary rounded-tl-sm'
-          )}
-        >
-          <p className="whitespace-pre-wrap">{message.content}</p>
+
+      {/* Message content */}
+      <div className={`flex flex-col ${isUser ? 'items-end' : 'items-start'}`}>
+        <div className={`px-4 py-3 rounded-2xl text-sm max-w-prose
+                        ${isUser
+                          ? 'bg-accent-primary/20 text-text-primary rounded-tr-md'
+                          : 'bg-white/[0.05] text-text-secondary rounded-tl-md'
+                        }`}>
+          <p className="whitespace-pre-wrap leading-relaxed">{message.content}</p>
         </div>
-        <p className="text-xs text-text-muted mt-1">
+        <span className="text-xs text-text-muted mt-1.5 px-1">
           {formatTime(message.timestamp)}
-        </p>
+        </span>
       </div>
-    </div>
+    </motion.div>
   );
 }

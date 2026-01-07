@@ -1,50 +1,62 @@
-import { useState } from 'react';
-import { Search, Bell, RefreshCw } from 'lucide-react';
+import { useLocation } from 'react-router-dom';
+import { Menu, Bell } from 'lucide-react';
 import { useWebSocket } from '../../hooks/useWebSocket';
-import { cn } from '../../lib/utils';
 
-export default function Header() {
+interface HeaderProps {
+  onMenuClick?: () => void;
+}
+
+const pageTitles: Record<string, string> = {
+  '/': 'Главная',
+  '/agents': 'Агенты',
+  '/analytics': 'Аналитика',
+  '/history': 'История',
+  '/chat': 'Чат',
+  '/settings': 'Настройки',
+  '/download': 'Скачать',
+};
+
+export default function Header({ onMenuClick }: HeaderProps) {
+  const location = useLocation();
   const { isConnected } = useWebSocket();
-  const [searchQuery, setSearchQuery] = useState('');
+  const title = pageTitles[location.pathname] || 'Observer';
 
   return (
-    <header className="h-16 border-b border-border-subtle bg-bg-secondary/50 backdrop-blur-sm sticky top-0 z-10">
-      <div className="h-full px-6 flex items-center justify-between">
-        <div className="flex-1 max-w-md">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-muted" />
-            <input
-              type="text"
-              placeholder="Поиск..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full bg-bg-tertiary border border-border-subtle rounded-lg pl-10 pr-4 py-2 text-sm text-text-primary placeholder:text-text-muted focus:border-accent-primary focus:outline-none transition-colors"
-            />
-          </div>
+    <header className="sticky top-0 h-14 flex items-center justify-between px-4 lg:px-6
+                       border-b border-border-subtle bg-bg-primary/80 backdrop-blur-xl z-30">
+      {/* Left side */}
+      <div className="flex items-center gap-3">
+        {/* Mobile menu button */}
+        <button
+          onClick={onMenuClick}
+          className="p-2 -ml-2 rounded-lg text-text-tertiary hover:text-text-primary
+                     hover:bg-white/[0.05] transition-colors lg:hidden"
+        >
+          <Menu className="w-5 h-5" />
+        </button>
+
+        {/* Page title */}
+        <h1 className="text-lg font-semibold text-text-primary tracking-tight">
+          {title}
+        </h1>
+      </div>
+
+      {/* Right side */}
+      <div className="flex items-center gap-3">
+        {/* Connection status */}
+        <div className="flex items-center gap-2 text-sm">
+          <div className={`w-2 h-2 rounded-full ${isConnected ? 'bg-status-success animate-pulse' : 'bg-text-muted'}`} />
+          <span className="text-text-tertiary hidden sm:inline">
+            {isConnected ? 'Подключено' : 'Отключено'}
+          </span>
         </div>
 
-        <div className="flex items-center gap-4">
-          <div className="flex items-center gap-2 text-sm">
-            <span
-              className={cn(
-                'w-2 h-2 rounded-full',
-                isConnected ? 'bg-status-success' : 'bg-status-error'
-              )}
-            />
-            <span className="text-text-tertiary">
-              {isConnected ? 'Подключено' : 'Отключено'}
-            </span>
-          </div>
-
-          <button className="p-2 text-text-secondary hover:text-text-primary hover:bg-bg-hover rounded-lg transition-colors">
-            <RefreshCw className="w-5 h-5" />
-          </button>
-
-          <button className="p-2 text-text-secondary hover:text-text-primary hover:bg-bg-hover rounded-lg transition-colors relative">
-            <Bell className="w-5 h-5" />
-            <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-accent-primary rounded-full" />
-          </button>
-        </div>
+        {/* Notifications */}
+        <button className="relative p-2 rounded-lg text-text-tertiary hover:text-text-primary
+                          hover:bg-white/[0.05] transition-colors">
+          <Bell className="w-5 h-5" />
+          <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-accent-primary rounded-full" />
+        </button>
       </div>
     </header>
   );
