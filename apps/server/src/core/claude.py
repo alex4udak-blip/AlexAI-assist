@@ -43,7 +43,7 @@ class ClaudeClient:
     ) -> str:
         """Generate a completion from Claude via proxy."""
         try:
-            async with httpx.AsyncClient(timeout=120) as client:
+            async with httpx.AsyncClient(timeout=180) as client:
                 response = await client.post(
                     f"{self.base_url}/v1/messages",
                     headers=self._get_headers(),
