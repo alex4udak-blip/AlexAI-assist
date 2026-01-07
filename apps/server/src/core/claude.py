@@ -1,10 +1,13 @@
 """Claude API client."""
 
+import logging
 from typing import Any
 
 import httpx
 
 from src.core.config import settings
+
+logger = logging.getLogger(__name__)
 
 
 class ClaudeClient:
@@ -13,6 +16,18 @@ class ClaudeClient:
     def __init__(self) -> None:
         self.base_url = "https://api.anthropic.com/v1"
         self.token = settings.claude_oauth_token
+
+        # Determine auth method based on token format
+        # OAuth tokens: sk-ant-oat... -> Authorization: Bearer
+        # API keys: sk-ant-api... -> x-api-key
+        if self.token and self.token.startswith("sk-ant-oat"):
+            self.auth_header = "Authorization"
+            self.auth_value = f"Bearer {self.token}"
+            logger.info("Using OAuth token authentication")
+        else:
+            self.auth_header = "x-api-key"
+            self.auth_value = self.token
+            logger.info("Using API key authentication")
 
     async def complete(
         self,
@@ -23,13 +38,13 @@ class ClaudeClient:
     ) -> str:
         """Generate a completion from Claude."""
         if not self.token:
-            raise ValueError("Claude OAuth token not configured")
+            raise ValueError("Claude token not configured")
 
         async with httpx.AsyncClient(timeout=60) as client:
             response = await client.post(
                 f"{self.base_url}/messages",
                 headers={
-                    "Authorization": f"Bearer {self.token}",
+                    self.auth_header: self.auth_value,
                     "Content-Type": "application/json",
                     "anthropic-version": "2023-06-01",
                 },
