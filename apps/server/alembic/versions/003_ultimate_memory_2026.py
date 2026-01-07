@@ -159,8 +159,8 @@ def upgrade() -> None:
         sa.Column("is_persona_attribute", sa.Boolean, default=False),  # Pa in O-Mem
         sa.Column("is_persona_event", sa.Boolean, default=False),  # Pf in O-Mem
         # A-MEM Zettelkasten metadata
-        sa.Column("keywords", ARRAY(sa.String), server_default="'{}'"),
-        sa.Column("tags", ARRAY(sa.String), server_default="'{}'"),
+        sa.Column("keywords", ARRAY(sa.String), server_default=sa.text("'{}'")),
+        sa.Column("tags", ARRAY(sa.String), server_default=sa.text("'{}'")),
         sa.Column("context", sa.Text),  # LLM-generated context
         # Hindsight temporal model
         sa.Column("valid_from", sa.DateTime, default=datetime.utcnow),
@@ -171,7 +171,7 @@ def upgrade() -> None:
         sa.Column("confidence", sa.Float, default=1.0),  # 0-1
         sa.Column("source", sa.String(50)),  # chat, pattern, agent, manual, inferred
         sa.Column("source_id", UUID(as_uuid=True), nullable=True),
-        sa.Column("evidence_ids", ARRAY(UUID(as_uuid=True)), server_default="'{}'"),  # supporting facts
+        sa.Column("evidence_ids", ARRAY(UUID(as_uuid=True)), server_default=sa.text("'{}'")),  # supporting facts
         # MemOS scheduling metadata
         sa.Column("heat_score", sa.Float, default=1.0),  # for retrieval priority
         sa.Column("access_count", sa.Integer, default=0),
@@ -199,7 +199,7 @@ def upgrade() -> None:
         # What happened
         sa.Column("action_taken", sa.Text),
         sa.Column("outcome", sa.String(50)),  # success, failure, partial, unknown
-        sa.Column("outcome_details", JSONB, server_default="'{}'"),
+        sa.Column("outcome_details", JSONB, server_default=sa.text("'{}'")),
         # Learning
         sa.Column("lesson_learned", sa.Text),  # what we learned from this
         sa.Column("should_repeat", sa.Boolean),  # should we do this again?
@@ -208,8 +208,8 @@ def upgrade() -> None:
         sa.Column("duration_seconds", sa.Integer),
         # References
         sa.Column("agent_id", UUID(as_uuid=True), nullable=True),
-        sa.Column("related_facts", ARRAY(UUID(as_uuid=True)), server_default="'{}'"),
-        sa.Column("related_entities", ARRAY(UUID(as_uuid=True)), server_default="'{}'"),
+        sa.Column("related_facts", ARRAY(UUID(as_uuid=True)), server_default=sa.text("'{}'")),
+        sa.Column("related_entities", ARRAY(UUID(as_uuid=True)), server_default=sa.text("'{}'")),
         # Procedural learning (Mem-alpha style)
         sa.Column("is_procedural", sa.Boolean, default=False),
         sa.Column("procedure_id", UUID(as_uuid=True), nullable=True),
@@ -236,8 +236,8 @@ def upgrade() -> None:
         sa.Column("entity_type", sa.String(50), nullable=False),  # person, app, project, concept, location, org
         # Synthesized profile (Hindsight observation network)
         sa.Column("summary", sa.Text),  # LLM-generated summary
-        sa.Column("key_facts", ARRAY(sa.String), server_default="'{}'"),
-        sa.Column("attributes", JSONB, server_default="'{}'"),
+        sa.Column("key_facts", ARRAY(sa.String), server_default=sa.text("'{}'")),
+        sa.Column("attributes", JSONB, server_default=sa.text("'{}'")),
         # Usage statistics
         sa.Column("mention_count", sa.Integer, default=1),
         sa.Column("interaction_count", sa.Integer, default=0),
@@ -273,7 +273,7 @@ def upgrade() -> None:
         sa.Column("strength", sa.Float, default=1.0),
         sa.Column("confidence", sa.Float, default=1.0),
         # Evidence
-        sa.Column("evidence", ARRAY(UUID(as_uuid=True)), server_default="'{}'"),
+        sa.Column("evidence", ARRAY(UUID(as_uuid=True)), server_default=sa.text("'{}'")),
         # Timestamps
         sa.Column("created_at", sa.DateTime, default=datetime.utcnow),
         sa.Column("updated_at", sa.DateTime),
@@ -291,10 +291,10 @@ def upgrade() -> None:
         sa.Column("belief_type", sa.String(50)),  # preference, opinion, inference, prediction
         # Hindsight confidence evolution
         sa.Column("confidence", sa.Float, default=0.5),  # starts uncertain
-        sa.Column("confidence_history", JSONB, server_default="[]"),  # [{timestamp, value, reason}]
+        sa.Column("confidence_history", JSONB, server_default=sa.text("'[]'")),  # [{timestamp, value, reason}]
         # Supporting/contradicting evidence
-        sa.Column("supporting_facts", ARRAY(UUID(as_uuid=True)), server_default="'{}'"),
-        sa.Column("contradicting_facts", ARRAY(UUID(as_uuid=True)), server_default="'{}'"),
+        sa.Column("supporting_facts", ARRAY(UUID(as_uuid=True)), server_default=sa.text("'{}'")),
+        sa.Column("contradicting_facts", ARRAY(UUID(as_uuid=True)), server_default=sa.text("'{}'")),
         # Evolution
         sa.Column("formed_at", sa.DateTime, default=datetime.utcnow),
         sa.Column("last_reinforced", sa.DateTime),
@@ -320,14 +320,14 @@ def upgrade() -> None:
         sa.Column("topic", sa.String(255), nullable=False),
         sa.Column("description", sa.Text),
         # Messages in this topic
-        sa.Column("message_ids", ARRAY(UUID(as_uuid=True)), server_default="'{}'"),
+        sa.Column("message_ids", ARRAY(UUID(as_uuid=True)), server_default=sa.text("'{}'")),
         sa.Column("message_count", sa.Integer, default=0),
         # Temporal
         sa.Column("first_discussed", sa.DateTime),
         sa.Column("last_discussed", sa.DateTime),
         # Summary
         sa.Column("summary", sa.Text),
-        sa.Column("key_points", ARRAY(sa.String), server_default="'{}'"),
+        sa.Column("key_points", ARRAY(sa.String), server_default=sa.text("'{}'")),
         # Timestamps
         sa.Column("created_at", sa.DateTime, default=datetime.utcnow),
         sa.Column("updated_at", sa.DateTime),
@@ -339,8 +339,8 @@ def upgrade() -> None:
         sa.Column("id", UUID(as_uuid=True), primary_key=True),
         sa.Column("session_id", sa.String(64), nullable=False, index=True),
         sa.Column("keyword", sa.String(100), nullable=False),
-        sa.Column("message_ids", ARRAY(UUID(as_uuid=True)), server_default="'{}'"),
-        sa.Column("fact_ids", ARRAY(UUID(as_uuid=True)), server_default="'{}'"),
+        sa.Column("message_ids", ARRAY(UUID(as_uuid=True)), server_default=sa.text("'{}'")),
+        sa.Column("fact_ids", ARRAY(UUID(as_uuid=True)), server_default=sa.text("'{}'")),
         sa.Column("occurrence_count", sa.Integer, default=1),
         sa.Column("created_at", sa.DateTime, default=datetime.utcnow),
     )
@@ -357,7 +357,7 @@ def upgrade() -> None:
         sa.Column("memory_id", UUID(as_uuid=True), nullable=False),
         # MemOS metadata
         sa.Column("version", sa.Integer, default=1),
-        sa.Column("provenance", JSONB, server_default="'{}'"),  # {source, timestamp, confidence}
+        sa.Column("provenance", JSONB, server_default=sa.text("'{}'")),  # {source, timestamp, confidence}
         # Governance
         sa.Column("access_level", sa.String(20), default="private"),
         sa.Column("retention_policy", sa.String(50)),  # keep_forever, decay, archive_after
@@ -433,17 +433,17 @@ def upgrade() -> None:
         # Content
         sa.Column("title", sa.String(255)),
         sa.Column("summary", sa.Text, nullable=False),
-        sa.Column("key_points", ARRAY(sa.String), server_default="'{}'"),
-        sa.Column("highlights", JSONB, server_default="[]"),
+        sa.Column("key_points", ARRAY(sa.String), server_default=sa.text("'{}'")),
+        sa.Column("highlights", JSONB, server_default=sa.text("'[]'")),
         # Metrics
-        sa.Column("metrics", JSONB, server_default="'{}'"),
+        sa.Column("metrics", JSONB, server_default=sa.text("'{}'")),
         # Extracted knowledge
-        sa.Column("facts_extracted", ARRAY(UUID(as_uuid=True)), server_default="'{}'"),
-        sa.Column("beliefs_formed", ARRAY(UUID(as_uuid=True)), server_default="'{}'"),
-        sa.Column("entities_mentioned", ARRAY(UUID(as_uuid=True)), server_default="'{}'"),
+        sa.Column("facts_extracted", ARRAY(UUID(as_uuid=True)), server_default=sa.text("'{}'")),
+        sa.Column("beliefs_formed", ARRAY(UUID(as_uuid=True)), server_default=sa.text("'{}'")),
+        sa.Column("entities_mentioned", ARRAY(UUID(as_uuid=True)), server_default=sa.text("'{}'")),
         # Sources
-        sa.Column("source_messages", ARRAY(UUID(as_uuid=True)), server_default="'{}'"),
-        sa.Column("source_events", ARRAY(UUID(as_uuid=True)), server_default="'{}'"),
+        sa.Column("source_messages", ARRAY(UUID(as_uuid=True)), server_default=sa.text("'{}'")),
+        sa.Column("source_events", ARRAY(UUID(as_uuid=True)), server_default=sa.text("'{}'")),
         # Timestamps
         sa.Column("created_at", sa.DateTime, default=datetime.utcnow),
     )
@@ -463,8 +463,8 @@ def upgrade() -> None:
         sa.Column("description", sa.Text),
         sa.Column("procedure_type", sa.String(50)),  # automation, workflow, optimization
         # The procedure
-        sa.Column("trigger_conditions", JSONB, server_default="'{}'"),
-        sa.Column("steps", JSONB, server_default="[]"),
+        sa.Column("trigger_conditions", JSONB, server_default=sa.text("'{}'")),
+        sa.Column("steps", JSONB, server_default=sa.text("'[]'")),
         sa.Column("expected_outcome", sa.Text),
         # Learning from execution (Mem-alpha style)
         sa.Column("success_count", sa.Integer, default=0),
@@ -477,7 +477,7 @@ def upgrade() -> None:
         sa.Column("improvement_notes", sa.Text),
         # Agent link
         sa.Column("learned_from_agent_id", UUID(as_uuid=True), nullable=True),
-        sa.Column("experience_ids", ARRAY(UUID(as_uuid=True)), server_default="'{}'"),
+        sa.Column("experience_ids", ARRAY(UUID(as_uuid=True)), server_default=sa.text("'{}'")),
         # Timestamps
         sa.Column("last_used", sa.DateTime),
         sa.Column("created_at", sa.DateTime, default=datetime.utcnow),
@@ -502,8 +502,8 @@ def upgrade() -> None:
         sa.Column("beliefs_count", sa.Integer, default=0),
         sa.Column("experiences_count", sa.Integer, default=0),
         # Knowledge gaps
-        sa.Column("unknown_areas", ARRAY(sa.String), server_default="'{}'"),
-        sa.Column("questions_to_explore", ARRAY(sa.String), server_default="'{}'"),
+        sa.Column("unknown_areas", ARRAY(sa.String), server_default=sa.text("'{}'")),
+        sa.Column("questions_to_explore", ARRAY(sa.String), server_default=sa.text("'{}'")),
         # Timestamps
         sa.Column("last_updated", sa.DateTime),
         sa.Column("created_at", sa.DateTime, default=datetime.utcnow),
