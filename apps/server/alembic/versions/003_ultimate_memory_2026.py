@@ -25,18 +25,38 @@ depends_on = None
 _pgvector_available = False
 
 
-def check_pgvector_available() -> bool:
-    """Check if pgvector extension is available in PostgreSQL."""
+def try_enable_pgvector() -> bool:
+    """
+    Try to enable pgvector extension. Returns True if successful.
+
+    NOTE: We don't check pg_available_extensions because that can return True
+    even when the extension files don't actually exist on the system
+    (common on Railway PostgreSQL and other managed databases).
+
+    Instead, we just try to create it and catch any errors.
+    """
     global _pgvector_available
     try:
         conn = op.get_bind()
+        # First check if extension is already installed
         result = conn.execute(
-            sa.text("SELECT 1 FROM pg_available_extensions WHERE name = 'vector'")
+            sa.text("SELECT 1 FROM pg_extension WHERE extname = 'vector'")
         )
-        _pgvector_available = result.fetchone() is not None
-        return _pgvector_available
+        if result.fetchone() is not None:
+            logger.info("pgvector extension already installed")
+            _pgvector_available = True
+            return True
+
+        # Try to create the extension
+        conn.execute(sa.text("CREATE EXTENSION IF NOT EXISTS vector"))
+        logger.info("pgvector extension enabled successfully")
+        _pgvector_available = True
+        return True
     except Exception as e:
-        logger.warning(f"Could not check pgvector availability: {e}")
+        # This is expected on Railway and other managed PostgreSQL without pgvector
+        logger.warning(
+            f"pgvector extension not available (this is OK - vector search will be disabled): {e}"
+        )
         _pgvector_available = False
         return False
 
@@ -72,17 +92,11 @@ def create_vector_index_if_available(index_name: str, table_name: str, column_na
 
 
 def upgrade() -> None:
-    # Check and enable pgvector extension if available
-    if check_pgvector_available():
-        try:
-            op.execute("CREATE EXTENSION IF NOT EXISTS vector")
-            logger.info("pgvector extension enabled")
-        except Exception as e:
-            logger.warning(f"Could not enable pgvector extension: {e}. Vector search will be unavailable.")
-            global _pgvector_available
-            _pgvector_available = False
-    else:
-        logger.warning("pgvector extension not available. Vector search features will be disabled.")
+    # Try to enable pgvector extension (will gracefully fail on Railway/managed PostgreSQL)
+    try_enable_pgvector()
+
+    if not _pgvector_available:
+        logger.info("Continuing migration without pgvector. Vector search will use text fallback.")
 
     # ===========================================
     # NETWORK 1: FACT NETWORK (Objective truths)
