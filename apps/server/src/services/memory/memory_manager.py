@@ -124,8 +124,8 @@ class MemoryManager:
         """
         sections = []
         total_length = 0
-        MAX_SECTION_LENGTH = 1500  # Max chars per section
-        MAX_TOTAL_LENGTH = 8000    # Max total chars (increased from 4000)
+        MAX_SECTION_LENGTH = 2500  # Max chars per section
+        MAX_TOTAL_LENGTH = 15000   # Max total chars - generous limit
 
         def truncate(text: str, max_len: int = 200) -> str:
             """Truncate text to max_len chars."""
