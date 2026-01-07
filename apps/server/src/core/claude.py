@@ -36,7 +36,10 @@ class ClaudeClient:
                 json={
                     "model": model or settings.claude_model,
                     "max_tokens": max_tokens,
-                    "system": system or "You are Observer, a helpful AI assistant that analyzes user behavior patterns and suggests automations.",
+                    "system": system or (
+                        "You are Observer, a helpful AI assistant that analyzes "
+                        "user behavior patterns and suggests automations."
+                    ),
                     "messages": [{"role": "user", "content": prompt}],
                 },
             )
@@ -62,7 +65,10 @@ Respond in JSON format with keys: observations, automations, suggestions"""
 
         result = await self.complete(
             prompt=prompt,
-            system="You are an AI analyst specialized in user behavior patterns. Always respond with valid JSON.",
+            system=(
+                "You are an AI analyst specialized in user behavior patterns. "
+                "Always respond with valid JSON."
+            ),
         )
 
         import json
@@ -93,7 +99,10 @@ Only output the Python code, no explanations."""
 
         return await self.complete(
             prompt=prompt,
-            system="You are an expert Python developer. Generate clean, production-ready async code.",
+            system=(
+                "You are an expert Python developer. "
+                "Generate clean, production-ready async code."
+            ),
         )
 
 

@@ -1,6 +1,6 @@
 """Suggestion endpoints."""
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 from uuid import UUID
 
@@ -125,7 +125,7 @@ async def dismiss_suggestion(
         raise HTTPException(status_code=404, detail="Suggestion not found")
 
     suggestion.status = "dismissed"
-    suggestion.dismissed_at = datetime.now(timezone.utc)
+    suggestion.dismissed_at = datetime.now(UTC)
     await db.flush()
 
     return {"message": "Suggestion dismissed"}
