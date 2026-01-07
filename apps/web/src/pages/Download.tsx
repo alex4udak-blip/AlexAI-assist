@@ -3,8 +3,8 @@ import { Card, CardContent } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { Badge } from '../components/ui/Badge';
 
-// TODO: Replace with actual download URL when app is built
-const DOWNLOAD_URL = '';
+// GitHub Release download URL
+const DOWNLOAD_URL = 'https://github.com/alex4udak-blip/AlexAI-assist/releases/latest/download/Observer_0.1.0_universal.dmg';
 
 export default function DownloadPage() {
   const features = [
