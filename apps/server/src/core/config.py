@@ -39,6 +39,7 @@ class Settings(BaseSettings):
     claude_oauth_token: str = ""
     claude_model: str = "claude-sonnet-4-20250514"
     claude_proxy_url: str = "http://ccproxy.railway.internal:3001"
+    ccproxy_internal_token: str = ""
 
     # App settings
     debug: bool = False
