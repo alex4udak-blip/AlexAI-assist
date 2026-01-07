@@ -14,6 +14,7 @@ from src.api.routes import (
     chat,
     events,
     health,
+    memory,
     patterns,
     suggestions,
 )
@@ -71,6 +72,7 @@ app.include_router(suggestions.router, prefix="/api/v1/suggestions", tags=["Sugg
 app.include_router(agents.router, prefix="/api/v1/agents", tags=["Agents"])
 app.include_router(analytics.router, prefix="/api/v1/analytics", tags=["Analytics"])
 app.include_router(chat.router, prefix="/api/v1/chat", tags=["Chat"])
+app.include_router(memory.router, prefix="/api/v1/memory", tags=["Memory"])
 
 
 @app.exception_handler(Exception)

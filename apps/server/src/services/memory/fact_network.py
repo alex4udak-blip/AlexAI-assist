@@ -1,0 +1,530 @@
+"""
+Fact Network - Objective truths about the user.
+Implements Hindsight's Fact Network with temporal validity.
+"""
+
+import logging
+from datetime import datetime
+from typing import Any
+from uuid import UUID, uuid4
+
+from sqlalchemy import and_, func, or_, select, text
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from src.db.models.memory import MemoryFact, MemoryLink
+from .embeddings import embedding_service
+
+logger = logging.getLogger(__name__)
+
+
+class FactNetwork:
+    """
+    Manages objective facts about the user.
+    Features:
+    - Temporal validity (valid_from, valid_to)
+    - Confidence tracking
+    - Heat-based retrieval (MemOS)
+    - Vector similarity search
+    """
+
+    def __init__(self, db: AsyncSession, session_id: str = "default"):
+        self.db = db
+        self.session_id = session_id
+
+    async def add(
+        self,
+        content: str,
+        fact_type: str = "fact",
+        category: str | None = None,
+        confidence: float = 1.0,
+        source: str = "chat",
+        source_id: UUID | None = None,
+        is_persona_attribute: bool = False,
+        is_persona_event: bool = False,
+        event_time: datetime | None = None,
+        keywords: list[str] | None = None,
+        tags: list[str] | None = None,
+    ) -> MemoryFact:
+        """
+        Add a new fact to the network.
+
+        Args:
+            content: The fact content
+            fact_type: Type of fact (preference, habit, goal, demographic, skill, world_fact)
+            category: Category (work, personal, health, finance, learning)
+            confidence: Initial confidence (0-1)
+            source: Where this fact came from (chat, pattern, agent, manual, inferred)
+            source_id: ID of source record
+            is_persona_attribute: O-Mem persona attribute (Pa)
+            is_persona_event: O-Mem persona event (Pf)
+            event_time: When fact occurred in real world
+            keywords: A-MEM keywords
+            tags: A-MEM tags
+
+        Returns:
+            Created MemoryFact
+        """
+        # Check for duplicates
+        existing = await self._find_similar(content, threshold=0.9)
+        if existing:
+            # Update existing instead of creating duplicate
+            await self._reinforce(existing[0]["id"], confidence)
+            result = await self.db.execute(
+                select(MemoryFact).where(MemoryFact.id == UUID(existing[0]["id"]))
+            )
+            return result.scalar_one()
+
+        # Create new fact
+        fact = MemoryFact(
+            id=uuid4(),
+            session_id=self.session_id,
+            content=content,
+            fact_type=fact_type,
+            category=category,
+            confidence=confidence,
+            source=source,
+            source_id=source_id,
+            is_persona_attribute=is_persona_attribute,
+            is_persona_event=is_persona_event,
+            event_time=event_time,
+            record_time=datetime.utcnow(),
+            valid_from=datetime.utcnow(),
+            keywords=keywords or [],
+            tags=tags or [],
+            heat_score=1.0,
+        )
+
+        self.db.add(fact)
+        await self.db.flush()
+
+        # Generate and store embedding
+        embedding = embedding_service.embed(content)
+        if embedding:
+            vector_str = embedding_service.to_pgvector_str(embedding)
+            await self.db.execute(
+                text(
+                    f"""
+                    UPDATE memory_facts
+                    SET embedding_vector = '{vector_str}'::vector
+                    WHERE id = :fact_id
+                    """
+                ).bindparams(fact_id=str(fact.id))
+            )
+
+        logger.info(f"Added fact: {content[:50]}... (type={fact_type}, confidence={confidence})")
+        return fact
+
+    async def search(
+        self,
+        query: str,
+        limit: int = 10,
+        min_confidence: float = 0.0,
+        fact_types: list[str] | None = None,
+        categories: list[str] | None = None,
+        include_invalid: bool = False,
+    ) -> list[dict[str, Any]]:
+        """
+        Search facts by semantic similarity.
+
+        Args:
+            query: Search query
+            limit: Maximum results
+            min_confidence: Minimum confidence threshold
+            fact_types: Filter by fact types
+            categories: Filter by categories
+            include_invalid: Include expired facts
+
+        Returns:
+            List of facts with similarity scores
+        """
+        embedding = embedding_service.embed(query)
+        if not embedding:
+            # Fallback to text search
+            return await self._text_search(query, limit)
+
+        vector_str = embedding_service.to_pgvector_str(embedding)
+
+        # Build query with filters
+        filters = [f"session_id = '{self.session_id}'"]
+        filters.append(f"confidence >= {min_confidence}")
+
+        if not include_invalid:
+            filters.append("(valid_to IS NULL OR valid_to > NOW())")
+
+        if fact_types:
+            types_str = ",".join(f"'{t}'" for t in fact_types)
+            filters.append(f"fact_type IN ({types_str})")
+
+        if categories:
+            cats_str = ",".join(f"'{c}'" for c in categories)
+            filters.append(f"category IN ({cats_str})")
+
+        where_clause = " AND ".join(filters)
+
+        # Vector similarity search
+        result = await self.db.execute(
+            text(
+                f"""
+                SELECT
+                    id,
+                    content,
+                    fact_type,
+                    category,
+                    confidence,
+                    heat_score,
+                    valid_from,
+                    valid_to,
+                    1 - (embedding_vector <=> '{vector_str}'::vector) as score
+                FROM memory_facts
+                WHERE {where_clause}
+                    AND embedding_vector IS NOT NULL
+                ORDER BY embedding_vector <=> '{vector_str}'::vector
+                LIMIT {limit}
+                """
+            )
+        )
+
+        rows = result.fetchall()
+        facts = []
+        for row in rows:
+            facts.append({
+                "id": str(row[0]),
+                "content": row[1],
+                "fact_type": row[2],
+                "category": row[3],
+                "confidence": row[4],
+                "heat_score": row[5],
+                "valid_from": row[6].isoformat() if row[6] else None,
+                "valid_to": row[7].isoformat() if row[7] else None,
+                "score": float(row[8]) if row[8] else 0.0,
+            })
+
+        # Update heat scores for accessed facts
+        for fact in facts:
+            await self._record_access(UUID(fact["id"]))
+
+        return facts
+
+    async def _text_search(self, query: str, limit: int = 10) -> list[dict[str, Any]]:
+        """Fallback text search when embeddings unavailable."""
+        result = await self.db.execute(
+            select(MemoryFact)
+            .where(
+                and_(
+                    MemoryFact.session_id == self.session_id,
+                    MemoryFact.content.ilike(f"%{query}%"),
+                    or_(
+                        MemoryFact.valid_to.is_(None),
+                        MemoryFact.valid_to > datetime.utcnow(),
+                    ),
+                )
+            )
+            .order_by(MemoryFact.heat_score.desc())
+            .limit(limit)
+        )
+
+        facts = []
+        for fact in result.scalars().all():
+            facts.append({
+                "id": str(fact.id),
+                "content": fact.content,
+                "fact_type": fact.fact_type,
+                "category": fact.category,
+                "confidence": fact.confidence,
+                "heat_score": fact.heat_score,
+                "score": 0.5,  # Default score for text search
+            })
+
+        return facts
+
+    async def _find_similar(
+        self, content: str, threshold: float = 0.85
+    ) -> list[dict[str, Any]]:
+        """Find similar existing facts."""
+        results = await self.search(content, limit=3)
+        return [r for r in results if r.get("score", 0) >= threshold]
+
+    async def _reinforce(self, fact_id: UUID, new_confidence: float) -> None:
+        """Reinforce existing fact."""
+        result = await self.db.execute(
+            select(MemoryFact).where(MemoryFact.id == fact_id)
+        )
+        fact = result.scalar_one_or_none()
+        if fact:
+            # Increase confidence (weighted average)
+            fact.confidence = min(1.0, (fact.confidence + new_confidence) / 2 + 0.1)
+            fact.heat_score = min(2.0, fact.heat_score + 0.2)
+            fact.access_count += 1
+            fact.last_accessed = datetime.utcnow()
+
+    async def _record_access(self, fact_id: UUID) -> None:
+        """Record fact access for heat scoring."""
+        await self.db.execute(
+            text(
+                """
+                UPDATE memory_facts
+                SET access_count = access_count + 1,
+                    last_accessed = NOW(),
+                    heat_score = LEAST(2.0, heat_score + 0.1)
+                WHERE id = :fact_id
+                """
+            ).bindparams(fact_id=str(fact_id))
+        )
+
+    async def get_by_type(
+        self,
+        fact_type: str,
+        limit: int = 20,
+        min_confidence: float = 0.5,
+    ) -> list[MemoryFact]:
+        """Get facts by type."""
+        result = await self.db.execute(
+            select(MemoryFact)
+            .where(
+                and_(
+                    MemoryFact.session_id == self.session_id,
+                    MemoryFact.fact_type == fact_type,
+                    MemoryFact.confidence >= min_confidence,
+                    or_(
+                        MemoryFact.valid_to.is_(None),
+                        MemoryFact.valid_to > datetime.utcnow(),
+                    ),
+                )
+            )
+            .order_by(MemoryFact.confidence.desc())
+            .limit(limit)
+        )
+        return list(result.scalars().all())
+
+    async def get_persona_attributes(self) -> list[MemoryFact]:
+        """Get O-Mem persona attributes (Pa)."""
+        result = await self.db.execute(
+            select(MemoryFact)
+            .where(
+                and_(
+                    MemoryFact.session_id == self.session_id,
+                    MemoryFact.is_persona_attribute == True,  # noqa: E712
+                    or_(
+                        MemoryFact.valid_to.is_(None),
+                        MemoryFact.valid_to > datetime.utcnow(),
+                    ),
+                )
+            )
+            .order_by(MemoryFact.confidence.desc())
+        )
+        return list(result.scalars().all())
+
+    async def get_persona_events(self, limit: int = 10) -> list[MemoryFact]:
+        """Get O-Mem persona events (Pf)."""
+        result = await self.db.execute(
+            select(MemoryFact)
+            .where(
+                and_(
+                    MemoryFact.session_id == self.session_id,
+                    MemoryFact.is_persona_event == True,  # noqa: E712
+                )
+            )
+            .order_by(MemoryFact.event_time.desc().nullsfirst())
+            .limit(limit)
+        )
+        return list(result.scalars().all())
+
+    async def update(
+        self,
+        fact_id: UUID,
+        new_content: str | None = None,
+        new_confidence: float | None = None,
+    ) -> MemoryFact | None:
+        """Update a fact."""
+        result = await self.db.execute(
+            select(MemoryFact).where(MemoryFact.id == fact_id)
+        )
+        fact = result.scalar_one_or_none()
+        if not fact:
+            return None
+
+        if new_content:
+            fact.content = new_content
+            # Update embedding
+            embedding = embedding_service.embed(new_content)
+            if embedding:
+                vector_str = embedding_service.to_pgvector_str(embedding)
+                await self.db.execute(
+                    text(
+                        f"""
+                        UPDATE memory_facts
+                        SET embedding_vector = '{vector_str}'::vector
+                        WHERE id = :fact_id
+                        """
+                    ).bindparams(fact_id=str(fact_id))
+                )
+
+        if new_confidence is not None:
+            fact.confidence = new_confidence
+
+        fact.updated_at = datetime.utcnow()
+        return fact
+
+    async def invalidate(self, fact_id: UUID) -> bool:
+        """
+        Invalidate a fact (soft delete).
+        Sets valid_to to now instead of deleting.
+        """
+        result = await self.db.execute(
+            select(MemoryFact).where(MemoryFact.id == fact_id)
+        )
+        fact = result.scalar_one_or_none()
+        if not fact:
+            return False
+
+        fact.valid_to = datetime.utcnow()
+        logger.info(f"Invalidated fact: {fact.content[:50]}...")
+        return True
+
+    async def get_unlinked(self, limit: int = 20) -> list[MemoryFact]:
+        """Get facts without A-MEM links."""
+        # Get facts that aren't sources in any link
+        linked_ids_query = select(MemoryLink.source_id).where(
+            MemoryLink.source_type == "fact"
+        )
+        result = await self.db.execute(
+            select(MemoryFact)
+            .where(
+                and_(
+                    MemoryFact.session_id == self.session_id,
+                    MemoryFact.id.notin_(linked_ids_query),
+                )
+            )
+            .order_by(MemoryFact.created_at.desc())
+            .limit(limit)
+        )
+        return list(result.scalars().all())
+
+    async def create_link(
+        self,
+        source_id: UUID,
+        target_id: UUID,
+        link_type: str = "related",
+        strength: float = 1.0,
+        reason: str | None = None,
+    ) -> MemoryLink:
+        """Create A-MEM link between facts."""
+        link = MemoryLink(
+            id=uuid4(),
+            source_type="fact",
+            source_id=source_id,
+            target_type="fact",
+            target_id=target_id,
+            link_type=link_type,
+            strength=strength,
+            reason=reason,
+        )
+        self.db.add(link)
+        return link
+
+    async def count_by_category(self, category: str) -> int:
+        """Count facts in a category."""
+        result = await self.db.execute(
+            select(func.count(MemoryFact.id))
+            .where(
+                and_(
+                    MemoryFact.session_id == self.session_id,
+                    MemoryFact.category == category,
+                    or_(
+                        MemoryFact.valid_to.is_(None),
+                        MemoryFact.valid_to > datetime.utcnow(),
+                    ),
+                )
+            )
+        )
+        return result.scalar() or 0
+
+    async def apply_decay(self, decay_factor: float = 0.95) -> int:
+        """
+        Apply decay to heat scores (MemOS).
+        Returns number of facts decayed.
+        """
+        result = await self.db.execute(
+            text(
+                """
+                UPDATE memory_facts
+                SET heat_score = heat_score * :decay
+                WHERE session_id = :session_id
+                    AND heat_score > 0.1
+                RETURNING id
+                """
+            ).bindparams(decay=decay_factor, session_id=self.session_id)
+        )
+        rows = result.fetchall()
+        return len(rows)
+
+    async def extract_from_recent_chats(self) -> list[MemoryFact]:
+        """
+        Extract facts from recent chat messages.
+        Uses Claude to identify factual statements.
+        """
+        from src.core.claude import claude_client
+        from src.db.models import ChatMessage
+
+        # Get recent messages
+        result = await self.db.execute(
+            select(ChatMessage)
+            .where(ChatMessage.session_id == self.session_id)
+            .order_by(ChatMessage.timestamp.desc())
+            .limit(20)
+        )
+        messages = result.scalars().all()
+
+        if not messages:
+            return []
+
+        # Build conversation text
+        conversation = "\n".join(
+            f"{m.role}: {m.content}" for m in reversed(messages)
+        )
+
+        # Ask Claude to extract facts
+        prompt = f"""Extract factual information about the user from this conversation.
+Focus on: preferences, habits, goals, demographics, skills, opinions.
+
+Conversation:
+{conversation}
+
+Return a JSON array of facts. Each fact should have:
+- content: the fact (1 sentence)
+- fact_type: preference/habit/goal/demographic/skill/opinion
+- category: work/personal/health/finance/learning/other
+- confidence: 0-1 (how certain)
+
+Return only valid JSON array. Return [] if no facts found.
+Example: [{{"content": "User prefers dark mode", "fact_type": "preference", "category": "work", "confidence": 0.9}}]
+"""
+
+        try:
+            response = await claude_client.complete(
+                prompt=prompt,
+                system="Extract facts. Return valid JSON array only.",
+            )
+
+            import json
+            facts_data = json.loads(response)
+
+            created_facts = []
+            for fact_data in facts_data:
+                if not fact_data.get("content"):
+                    continue
+
+                fact = await self.add(
+                    content=fact_data["content"],
+                    fact_type=fact_data.get("fact_type", "fact"),
+                    category=fact_data.get("category"),
+                    confidence=fact_data.get("confidence", 0.7),
+                    source="chat",
+                )
+                created_facts.append(fact)
+
+            return created_facts
+
+        except Exception as e:
+            logger.error(f"Error extracting facts from chat: {e}")
+            return []

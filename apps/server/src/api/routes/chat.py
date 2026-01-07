@@ -1,4 +1,4 @@
-"""Chat endpoints with PostgreSQL storage and Redis caching."""
+"""Chat endpoints with PostgreSQL storage, Redis caching, and Memory integration."""
 
 import json
 import logging
@@ -17,6 +17,7 @@ from src.core.claude import claude_client
 from src.core.config import settings
 from src.db.models import ChatMessage
 from src.services.analyzer import AnalyzerService
+from src.services.memory import MemoryManager
 
 logger = logging.getLogger(__name__)
 
@@ -72,7 +73,7 @@ async def chat(
     data: ChatMessageInput,
     db: AsyncSession = Depends(get_db_session),
 ) -> ChatResponse:
-    """Chat with Observer AI."""
+    """Chat with Observer AI with Memory integration."""
     message_id = str(uuid4())
     session_id = data.context.get("session_id", "default")
     # Use naive datetime for PostgreSQL TIMESTAMP WITHOUT TIME ZONE column
@@ -82,15 +83,34 @@ async def chat(
     analyzer = AnalyzerService(db)
     activity_context = await analyzer.get_summary()
 
-    # Build system prompt with context
+    # Get memory context (Memory System 2026)
+    memory_manager = MemoryManager(db, session_id)
+    memory_context: dict[str, Any] = {}
+    memory_prompt_section = ""
+
+    try:
+        memory_context = await memory_manager.build_context_for_query(data.message)
+        memory_prompt_section = await memory_manager.format_context_for_prompt(memory_context)
+    except Exception as e:
+        logger.warning(f"Failed to get memory context: {e}")
+
+    # Build system prompt with activity and memory context
     system_prompt = (
         "You are Observer, a personal AI assistant that helps users "
         "understand their work patterns and suggests automations.\n\n"
-        f"Current activity context:\n"
+    )
+
+    # Add memory context if available
+    if memory_prompt_section:
+        system_prompt += f"# MEMORY CONTEXT\n{memory_prompt_section}\n\n"
+
+    system_prompt += (
+        f"# CURRENT ACTIVITY\n"
         f"- Total events today: {activity_context.get('total_events', 0)}\n"
         f"- Top apps: {', '.join([app[0] for app in activity_context.get('top_apps', [])[:5]])}\n"
         f"- Categories: {activity_context.get('categories', {})}\n\n"
         "Be helpful, concise, and proactive in suggesting improvements. "
+        "Use your memory of the user to personalize responses. "
         "Respond in Russian. When appropriate, suggest creating automation agents."
     )
 
@@ -156,6 +176,18 @@ async def chat(
             await r.delete(f"chat_history:{session_id}")
         except Exception:
             pass
+
+    # Process interaction for memory (async, non-blocking)
+    try:
+        await memory_manager.process_interaction(
+            user_message=data.message,
+            assistant_response=response,
+            message_id=user_msg.id,
+            context=memory_context,
+        )
+    except Exception as e:
+        logger.warning(f"Error processing memory: {e}")
+        # Don't fail the chat request if memory processing fails
 
     return ChatResponse(
         id=message_id,
