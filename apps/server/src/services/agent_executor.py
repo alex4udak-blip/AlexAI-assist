@@ -4,6 +4,9 @@ import asyncio
 import json
 from datetime import UTC, datetime
 from typing import Any
+from urllib.parse import urlparse
+
+import httpx
 
 from src.core.claude import claude_client
 from src.db.models import Agent
@@ -133,9 +136,6 @@ class AgentExecutorService:
         context: dict[str, Any],
     ) -> dict[str, Any]:
         """Make an HTTP request with SSRF protection."""
-        import httpx
-        from urllib.parse import urlparse
-
         url = self._render_template(action.get("url", ""), context)
         method = action.get("method", "GET").upper()
         headers = action.get("headers", {})
