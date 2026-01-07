@@ -1,7 +1,10 @@
-import { Download, Apple, Monitor, CheckCircle } from 'lucide-react';
+import { Download, Apple, Monitor, CheckCircle, Clock } from 'lucide-react';
 import { Card, CardContent } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { Badge } from '../components/ui/Badge';
+
+// TODO: Replace with actual download URL when app is built
+const DOWNLOAD_URL = '';
 
 export default function DownloadPage() {
   const features = [
@@ -11,6 +14,14 @@ export default function DownloadPage() {
     'Низкое потребление ресурсов',
     'Автоматические обновления',
   ];
+
+  const isAvailable = Boolean(DOWNLOAD_URL);
+
+  const handleDownload = () => {
+    if (DOWNLOAD_URL) {
+      window.open(DOWNLOAD_URL, '_blank');
+    }
+  };
 
   return (
     <div className="max-w-2xl mx-auto space-y-8">
@@ -40,7 +51,9 @@ export default function DownloadPage() {
                 </p>
               </div>
             </div>
-            <Badge variant="success">v0.1.0</Badge>
+            <Badge variant={isAvailable ? 'success' : 'warning'}>
+              {isAvailable ? 'v0.1.0' : 'В разработке'}
+            </Badge>
           </div>
 
           <ul className="space-y-3 mb-6">
@@ -52,13 +65,30 @@ export default function DownloadPage() {
             ))}
           </ul>
 
-          <Button className="w-full" size="lg">
-            <Download className="w-5 h-5" />
-            Скачать для macOS
+          <Button
+            className="w-full"
+            size="lg"
+            disabled={!isAvailable}
+            onClick={handleDownload}
+          >
+            {isAvailable ? (
+              <>
+                <Download className="w-5 h-5" />
+                Скачать для macOS
+              </>
+            ) : (
+              <>
+                <Clock className="w-5 h-5" />
+                Скоро будет доступно
+              </>
+            )}
           </Button>
 
           <p className="text-xs text-text-muted text-center mt-4">
-            Требуется macOS 10.15 или новее. ~50 МБ загрузка.
+            {isAvailable
+              ? 'Требуется macOS 10.15 или новее. ~50 МБ загрузка.'
+              : 'Приложение находится в разработке. Следите за обновлениями.'
+            }
           </p>
         </CardContent>
       </Card>
