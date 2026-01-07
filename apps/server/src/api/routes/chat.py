@@ -143,21 +143,46 @@ async def chat(
     )
 
     # Load conversation history from database
-    # Limit to 10 messages to prevent 413 context overflow errors
     history_query = (
         select(ChatMessage)
         .where(ChatMessage.session_id == session_id)
         .order_by(ChatMessage.timestamp.asc())
-        .limit(10)  # Last 10 messages for context (reduced from 20 to prevent 413)
+        .limit(100)  # Keep full history
     )
     history_result = await db.execute(history_query)
     history_messages = history_result.scalars().all()
 
-    # Build messages array with history + new message
-    messages = [
-        {"role": msg.role, "content": msg.content}
-        for msg in history_messages
-    ]
+    # Build messages array with smart truncation to prevent 413
+    # Keep recent messages (last 20) in full, truncate older ones
+    MAX_TOTAL_HISTORY_CHARS = 30000  # ~30k chars for history
+    MAX_MESSAGE_CHARS = 2000  # Max chars per message
+
+    messages = []
+    total_chars = 0
+    msg_list = list(history_messages)
+
+    # Always keep the most recent 20 messages in full
+    recent_threshold = max(0, len(msg_list) - 20)
+
+    for i, msg in enumerate(msg_list):
+        content = msg.content
+
+        # Truncate older messages more aggressively
+        if i < recent_threshold:
+            if len(content) > 500:
+                content = content[:500] + "..."
+
+        # Ensure no single message is too long
+        if len(content) > MAX_MESSAGE_CHARS:
+            content = content[:MAX_MESSAGE_CHARS] + "..."
+
+        # Skip if we've exceeded total limit (but always keep last 10)
+        if total_chars + len(content) > MAX_TOTAL_HISTORY_CHARS and i < len(msg_list) - 10:
+            continue
+
+        messages.append({"role": msg.role, "content": content})
+        total_chars += len(content)
+
     messages.append({"role": "user", "content": data.message})
 
     # Get response from Claude with full conversation history
