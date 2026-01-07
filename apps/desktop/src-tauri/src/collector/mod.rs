@@ -113,43 +113,95 @@ pub async fn start_collector(state: Arc<Mutex<AppState>>, _app_handle: AppHandle
 fn categorize_app(app_name: &str) -> &'static str {
     let app_lower = app_name.to_lowercase();
 
+    // Coding tools
     if app_lower.contains("code")
         || app_lower.contains("xcode")
         || app_lower.contains("terminal")
         || app_lower.contains("iterm")
+        || app_lower.contains("intellij")
+        || app_lower.contains("pycharm")
+        || app_lower.contains("webstorm")
+        || app_lower.contains("vim")
+        || app_lower.contains("neovim")
+        || app_lower.contains("sublime")
+        || app_lower.contains("atom")
     {
         return "coding";
     }
 
-    if app_lower.contains("chrome")
-        || app_lower.contains("safari")
-        || app_lower.contains("firefox")
-        || app_lower.contains("edge")
+    // Research/Knowledge tools (check BEFORE writing!)
+    if app_lower.contains("notion")
+        || app_lower.contains("obsidian")
+        || app_lower.contains("roam")
+        || app_lower.contains("logseq")
+        || app_lower.contains("evernote")
+        || app_lower.contains("devonthink")
+        || app_lower.contains("anki")
+        || app_lower.contains("reader")
+        || app_lower.contains("readwise")
     {
-        return "browsing";
+        return "research";
     }
 
-    if app_lower.contains("slack")
-        || app_lower.contains("discord")
-        || app_lower.contains("teams")
-        || app_lower.contains("zoom")
-    {
-        return "communication";
-    }
-
+    // Writing tools
     if app_lower.contains("word")
         || app_lower.contains("pages")
-        || app_lower.contains("notion")
-        || app_lower.contains("obsidian")
+        || app_lower.contains("docs")
+        || app_lower.contains("typora")
+        || app_lower.contains("ulysses")
+        || app_lower.contains("ia writer")
+        || app_lower.contains("bear")
+        || app_lower.contains("scrivener")
     {
         return "writing";
     }
 
+    // Browsing
+    if app_lower.contains("chrome")
+        || app_lower.contains("safari")
+        || app_lower.contains("firefox")
+        || app_lower.contains("edge")
+        || app_lower.contains("arc")
+        || app_lower.contains("brave")
+        || app_lower.contains("opera")
+    {
+        return "browsing";
+    }
+
+    // Communication
+    if app_lower.contains("slack")
+        || app_lower.contains("discord")
+        || app_lower.contains("teams")
+        || app_lower.contains("zoom")
+        || app_lower.contains("telegram")
+        || app_lower.contains("messages")
+        || app_lower.contains("mail")
+        || app_lower.contains("outlook")
+    {
+        return "communication";
+    }
+
+    // Design tools
     if app_lower.contains("figma")
         || app_lower.contains("sketch")
         || app_lower.contains("photoshop")
+        || app_lower.contains("illustrator")
+        || app_lower.contains("affinity")
+        || app_lower.contains("canva")
+        || app_lower.contains("framer")
     {
         return "design";
+    }
+
+    // Entertainment
+    if app_lower.contains("spotify")
+        || app_lower.contains("music")
+        || app_lower.contains("netflix")
+        || app_lower.contains("youtube")
+        || app_lower.contains("steam")
+        || app_lower.contains("twitch")
+    {
+        return "entertainment";
     }
 
     "other"

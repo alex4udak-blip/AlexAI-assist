@@ -1,12 +1,16 @@
 """Background scheduler for periodic tasks."""
 
 import logging
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
+from apscheduler.triggers.cron import CronTrigger
 from apscheduler.triggers.interval import IntervalTrigger
+from sqlalchemy import distinct, select
 
+from src.db.models import ChatMessage
 from src.db.session import async_session_maker
+from src.services.memory_service import MemoryService
 from src.services.pattern_detector import PatternDetectorService
 
 logger = logging.getLogger(__name__)
@@ -51,6 +55,66 @@ async def detect_patterns_job() -> None:
         logger.error(f"Pattern detection job failed: {e}")
 
 
+async def daily_summary_job() -> None:
+    """Create daily summaries for all active sessions."""
+    logger.info("Creating daily summaries...")
+    try:
+        async with async_session_maker() as db:
+            # Get all sessions with activity in the last 24 hours
+            yesterday = datetime.utcnow() - timedelta(days=1)
+            query = (
+                select(distinct(ChatMessage.session_id))
+                .where(ChatMessage.timestamp >= yesterday)
+            )
+            result = await db.execute(query)
+            sessions = [row[0] for row in result.all()]
+
+            memory = MemoryService(db)
+            for session_id in sessions:
+                try:
+                    await memory.create_daily_summary(session_id, datetime.utcnow())
+                except Exception as e:
+                    logger.error(f"Failed to create summary for {session_id}: {e}")
+
+            await db.commit()
+            logger.info(f"Created daily summaries for {len(sessions)} sessions")
+    except Exception as e:
+        logger.error(f"Daily summary job failed: {e}")
+
+
+async def extract_insights_job() -> None:
+    """Analyze patterns and create insights."""
+    logger.info("Extracting insights from patterns...")
+    try:
+        async with async_session_maker() as db:
+            detector = PatternDetectorService(db)
+            patterns = await detector.detect_patterns(min_occurrences=5)
+
+            # Create insights from detected patterns
+            memory = MemoryService(db)
+            context_switches = patterns.get("context_switches", {})
+
+            if context_switches.get("assessment") == "high":
+                from src.db.models import MemoryInsight
+                from uuid import uuid4
+
+                insight = MemoryInsight(
+                    id=uuid4(),
+                    session_id=None,  # Global insight
+                    insight_type="optimization",
+                    title="High context switching detected",
+                    content=f"You're switching between apps frequently ({context_switches.get('switch_rate', 0):.1%}). Consider batching similar tasks.",
+                    relevance_score=0.8,
+                    created_at=datetime.utcnow(),
+                )
+                db.add(insight)
+
+            await db.commit()
+            logger.info("Insight extraction complete")
+    except Exception as e:
+        logger.error(f"Insight extraction job failed: {e}")
+
+
 def start_scheduler() -> None:
     """Start the background scheduler."""
     # Run pattern detection every 5 minutes
@@ -59,6 +123,24 @@ def start_scheduler() -> None:
         trigger=IntervalTrigger(minutes=5),
         id="detect_patterns",
         name="Detect behavior patterns",
+        replace_existing=True,
+    )
+
+    # Run daily summary at midnight
+    scheduler.add_job(
+        daily_summary_job,
+        trigger=CronTrigger(hour=0, minute=5),
+        id="daily_summary",
+        name="Create daily summaries",
+        replace_existing=True,
+    )
+
+    # Extract insights every 6 hours
+    scheduler.add_job(
+        extract_insights_job,
+        trigger=IntervalTrigger(hours=6),
+        id="extract_insights",
+        name="Extract insights from patterns",
         replace_existing=True,
     )
 

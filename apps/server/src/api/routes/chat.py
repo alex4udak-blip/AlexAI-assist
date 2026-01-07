@@ -1,5 +1,6 @@
 """Chat endpoints with PostgreSQL storage and Redis caching."""
 
+import asyncio
 import json
 import logging
 from datetime import datetime, timedelta
@@ -16,7 +17,7 @@ from src.api.deps import get_db_session
 from src.core.claude import claude_client
 from src.core.config import settings
 from src.db.models import ChatMessage
-from src.services.analyzer import AnalyzerService
+from src.services.memory_service import MemoryService
 
 logger = logging.getLogger(__name__)
 
@@ -78,28 +79,42 @@ async def chat(
     # Use naive datetime for PostgreSQL TIMESTAMP WITHOUT TIME ZONE column
     timestamp = datetime.utcnow()
 
-    # Get context from recent activity
-    analyzer = AnalyzerService(db)
-    activity_context = await analyzer.get_summary()
+    # Build rich context from memory system
+    memory_service = MemoryService(db)
+    memory_context = await memory_service.build_context(session_id)
 
-    # Build system prompt with context
-    system_prompt = (
-        "You are Observer, a personal AI assistant that helps users "
-        "understand their work patterns and suggests automations.\n\n"
-        f"Current activity context:\n"
-        f"- Total events today: {activity_context.get('total_events', 0)}\n"
-        f"- Top apps: {', '.join([app[0] for app in activity_context.get('top_apps', [])[:5]])}\n"
-        f"- Categories: {activity_context.get('categories', {})}\n\n"
-        "Be helpful, concise, and proactive in suggesting improvements. "
-        "Respond in Russian. When appropriate, suggest creating automation agents."
-    )
+    # Build system prompt with full memory context
+    system_prompt = f"""You are Observer, a personal AI assistant that knows the user deeply.
+You help users understand their work patterns and suggests automations.
 
-    # Load conversation history from database
+## USER PROFILE (long-term memory):
+{memory_context['user_profile']}
+
+## RECENT ACTIVITY SUMMARY:
+{memory_context['recent_summary']}
+
+## ACTIVE GOALS:
+{memory_context['active_goals']}
+
+## AGENT STATUS:
+{memory_context['agent_status']}
+
+## RECENT INSIGHTS:
+{memory_context['recent_insights']}
+
+## CURRENT ACTIVITY:
+{memory_context['activity_context']}
+
+Remember: You're building a long-term relationship. Reference past conversations naturally.
+Respond in Russian. Be proactive about patterns and improvements.
+When appropriate, suggest creating automation agents."""
+
+    # Load recent conversation history (short-term memory)
     history_query = (
         select(ChatMessage)
         .where(ChatMessage.session_id == session_id)
         .order_by(ChatMessage.timestamp.asc())
-        .limit(20)  # Last 20 messages for context
+        .limit(10)  # Last 10 messages for immediate context
     )
     history_result = await db.execute(history_query)
     history_messages = history_result.scalars().all()
@@ -111,7 +126,7 @@ async def chat(
     ]
     messages.append({"role": "user", "content": data.message})
 
-    # Get response from Claude with full conversation history
+    # Get response from Claude with full context
     try:
         response = await claude_client.complete(
             messages=messages,
@@ -156,6 +171,23 @@ async def chat(
             await r.delete(f"chat_history:{session_id}")
         except Exception:
             pass
+
+    # Background task: extract facts from this conversation
+    # Using asyncio.create_task to not block the response
+    async def extract_facts_background() -> None:
+        try:
+            from src.db.session import async_session_maker
+
+            async with async_session_maker() as bg_db:
+                bg_memory = MemoryService(bg_db)
+                await bg_memory.extract_facts_from_chat(
+                    session_id, data.message, response
+                )
+                await bg_db.commit()
+        except Exception as e:
+            logger.error(f"Background fact extraction failed: {e}")
+
+    asyncio.create_task(extract_facts_background())
 
     return ChatResponse(
         id=message_id,

@@ -1,9 +1,25 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useMemo } from 'react';
 import { motion } from 'framer-motion';
 import { Bot, Sparkles } from 'lucide-react';
 import { Message } from './Message';
 import { ChatInput } from './ChatInput';
 import { api, type ChatMessage } from '../../lib/api';
+
+// Generate or retrieve persistent session ID
+function getSessionId(): string {
+  const key = 'observer_session_id';
+  try {
+    let id = localStorage.getItem(key);
+    if (!id) {
+      id = crypto.randomUUID();
+      localStorage.setItem(key, id);
+    }
+    return id;
+  } catch {
+    // Fallback if localStorage is not available
+    return crypto.randomUUID();
+  }
+}
 
 export function ChatWindow() {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -11,6 +27,9 @@ export function ChatWindow() {
   const [loading, setLoading] = useState(false);
   const [historyLoaded, setHistoryLoaded] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  // Persistent session ID for this browser
+  const sessionId = useMemo(() => getSessionId(), []);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -22,7 +41,7 @@ export function ChatWindow() {
 
   // Load history and merge with any pending messages
   useEffect(() => {
-    api.getChatHistory()
+    api.getChatHistory(sessionId)
       .then((history) => {
         setMessages((currentMessages) => {
           // Get IDs from history to avoid duplicates
@@ -40,7 +59,7 @@ export function ChatWindow() {
         console.error('Failed to load chat history:', err);
         setHistoryLoaded(true); // Allow sending even if history fails
       });
-  }, []);
+  }, [sessionId]);
 
   const handleSend = async () => {
     if (!input.trim() || loading) return;
@@ -57,7 +76,7 @@ export function ChatWindow() {
     setLoading(true);
 
     try {
-      const response = await api.chat(input);
+      const response = await api.chat(input, { session_id: sessionId });
       const assistantMessage: ChatMessage = {
         id: response.id,
         role: 'assistant',
