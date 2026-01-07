@@ -7,8 +7,8 @@ import { randomUUID } from 'crypto';
 
 const app = express();
 
-// Request size limit (10KB max)
-app.use(express.json({ limit: '10kb' }));
+// Request size limit (1MB max for large prompts with context)
+app.use(express.json({ limit: '1mb' }));
 
 // Configuration
 const INTERNAL_TOKEN = process.env.CCPROXY_INTERNAL_TOKEN;
