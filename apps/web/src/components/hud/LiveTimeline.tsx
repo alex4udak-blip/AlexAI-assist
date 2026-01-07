@@ -70,15 +70,15 @@ export function LiveTimeline({
     <motion.div
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
-      className="p-5 rounded-xl bg-bg-secondary/60 backdrop-blur-md border border-border-subtle
-                 shadow-inner-glow"
+      className="p-4 rounded-xl bg-bg-secondary/60 backdrop-blur-md border border-border-subtle
+                 shadow-inner-glow overflow-hidden"
     >
-      <div className="flex items-center justify-between mb-4">
-        <h3 className="text-xs text-text-muted uppercase tracking-wider font-mono">
-          Live Timeline
+      <div className="flex items-center justify-between gap-2 mb-3">
+        <h3 className="text-xs text-text-muted uppercase tracking-wider font-mono flex-shrink-0">
+          Timeline
         </h3>
-        <div className="flex items-center gap-2 text-xs text-text-muted font-mono">
-          <Clock className="w-3.5 h-3.5" />
+        <div className="flex items-center gap-1.5 text-[10px] text-text-muted font-mono flex-shrink-0">
+          <Clock className="w-3 h-3" />
           {now.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })}
         </div>
       </div>
@@ -180,18 +180,18 @@ export function LiveTimeline({
       </div>
 
       {/* Legend */}
-      <div className="flex items-center gap-4 mt-3 pt-3 border-t border-border-subtle">
-        <div className="flex items-center gap-1.5">
-          <Monitor className="w-3.5 h-3.5 text-hud-cyan" />
-          <span className="text-xs text-text-muted">Приложения</span>
+      <div className="flex items-center gap-3 mt-2 pt-2 border-t border-border-subtle overflow-x-auto">
+        <div className="flex items-center gap-1 flex-shrink-0">
+          <Monitor className="w-3 h-3 text-hud-cyan" />
+          <span className="text-[10px] text-text-muted">Apps</span>
         </div>
-        <div className="flex items-center gap-1.5">
-          <Bot className="w-3.5 h-3.5 text-hud-cyan" />
-          <span className="text-xs text-text-muted">Действия агентов</span>
+        <div className="flex items-center gap-1 flex-shrink-0">
+          <Bot className="w-3 h-3 text-hud-cyan" />
+          <span className="text-[10px] text-text-muted">Agents</span>
         </div>
-        <div className="flex items-center gap-1.5 ml-auto">
-          <div className="w-2 h-2 bg-status-error rounded-full" />
-          <span className="text-xs text-text-muted">Сейчас</span>
+        <div className="flex items-center gap-1 ml-auto flex-shrink-0">
+          <div className="w-1.5 h-1.5 bg-status-error rounded-full" />
+          <span className="text-[10px] text-text-muted">Now</span>
         </div>
       </div>
     </motion.div>

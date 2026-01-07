@@ -55,7 +55,7 @@ export function CurrentFocus({
     <motion.div
       initial={{ opacity: 0, scale: 0.95 }}
       animate={{ opacity: 1, scale: 1 }}
-      className="p-5 rounded-xl bg-bg-secondary/60 backdrop-blur-md border border-border-subtle
+      className="p-4 rounded-xl bg-bg-secondary/60 backdrop-blur-md border border-border-subtle
                  shadow-inner-glow relative overflow-hidden"
     >
       {/* Animated background glow */}
@@ -67,13 +67,13 @@ export function CurrentFocus({
 
       <div className="relative">
         {/* App Icon & Name */}
-        <div className="flex items-center gap-4 mb-4">
-          <div className="w-16 h-16 rounded-xl bg-hud-gradient border border-border-default
-                          flex items-center justify-center shadow-hud">
-            <Monitor className="w-8 h-8 text-hud-cyan" />
+        <div className="flex items-center gap-3 mb-4">
+          <div className="w-14 h-14 rounded-xl bg-hud-gradient border border-border-default
+                          flex items-center justify-center shadow-hud flex-shrink-0">
+            <Monitor className="w-7 h-7 text-hud-cyan" />
           </div>
-          <div>
-            <h4 className="text-xl font-semibold text-text-primary">{appName}</h4>
+          <div className="min-w-0 flex-1">
+            <h4 className="text-lg font-semibold text-text-primary truncate">{appName}</h4>
             {category && (
               <span className="text-xs font-mono text-hud-cyan uppercase tracking-wider">
                 {category}
