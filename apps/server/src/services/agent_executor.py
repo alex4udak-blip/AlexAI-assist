@@ -66,7 +66,7 @@ class AgentExecutorService:
         context: dict[str, Any],
     ) -> dict[str, Any]:
         """Execute a single action."""
-        action_type = action.get("type")
+        action_type = action.get("type", "")
 
         handlers = {
             "notify": self._action_notify,
@@ -288,7 +288,7 @@ class AgentExecutorService:
                 if len(parts) == 2:
                     left = self._resolve_value(parts[0].strip(), context)
                     right = self._resolve_value(parts[1].strip(), context)
-                    return op_func(left, right)
+                    return bool(op_func(left, right))
 
         # If no operator, treat as boolean context lookup
         return bool(self._resolve_value(condition, context))

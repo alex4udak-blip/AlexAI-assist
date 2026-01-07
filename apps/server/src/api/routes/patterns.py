@@ -8,6 +8,7 @@ from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.api.deps import get_db_session
+from src.db.models import Pattern
 from src.services.pattern_detector import PatternDetectorService
 
 router = APIRouter()
@@ -39,7 +40,7 @@ async def get_patterns(
     automatable: bool | None = None,
     limit: int = Query(50, le=100),
     db: AsyncSession = Depends(get_db_session),
-) -> list[PatternResponse]:
+) -> list[Pattern]:
     """Get detected patterns."""
     service = PatternDetectorService(db)
     patterns = await service.get_patterns(
@@ -69,7 +70,7 @@ async def detect_patterns(
 async def get_pattern(
     pattern_id: UUID,
     db: AsyncSession = Depends(get_db_session),
-) -> PatternResponse:
+) -> Pattern:
     """Get a specific pattern."""
     service = PatternDetectorService(db)
     pattern = await service.get_pattern(pattern_id)

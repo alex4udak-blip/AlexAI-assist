@@ -9,6 +9,7 @@ from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.api.deps import get_db_session
+from src.db.models import Agent, AgentLog
 from src.services.agent_executor import agent_executor
 from src.services.agent_manager import AgentManagerService
 
@@ -84,7 +85,7 @@ async def get_agents(
     agent_type: str | None = None,
     limit: int = Query(50, le=100),
     db: AsyncSession = Depends(get_db_session),
-) -> list[AgentResponse]:
+) -> list[Agent]:
     """Get all agents."""
     service = AgentManagerService(db)
     return await service.get_agents(
@@ -98,7 +99,7 @@ async def get_agents(
 async def create_agent(
     data: AgentCreate,
     db: AsyncSession = Depends(get_db_session),
-) -> AgentResponse:
+) -> Agent:
     """Create a new agent."""
     service = AgentManagerService(db)
     return await service.create_agent(
@@ -116,7 +117,7 @@ async def create_agent(
 async def get_agent(
     agent_id: UUID,
     db: AsyncSession = Depends(get_db_session),
-) -> AgentResponse:
+) -> Agent:
     """Get a specific agent."""
     service = AgentManagerService(db)
     agent = await service.get_agent(agent_id)
@@ -130,7 +131,7 @@ async def update_agent(
     agent_id: UUID,
     data: AgentUpdate,
     db: AsyncSession = Depends(get_db_session),
-) -> AgentResponse:
+) -> Agent:
     """Update an agent."""
     service = AgentManagerService(db)
     agent = await service.update_agent(
@@ -192,7 +193,7 @@ async def run_agent(
 async def enable_agent(
     agent_id: UUID,
     db: AsyncSession = Depends(get_db_session),
-) -> AgentResponse:
+) -> Agent:
     """Enable an agent."""
     service = AgentManagerService(db)
     agent = await service.enable_agent(agent_id)
@@ -205,7 +206,7 @@ async def enable_agent(
 async def disable_agent(
     agent_id: UUID,
     db: AsyncSession = Depends(get_db_session),
-) -> AgentResponse:
+) -> Agent:
     """Disable an agent."""
     service = AgentManagerService(db)
     agent = await service.disable_agent(agent_id)
@@ -220,7 +221,7 @@ async def get_agent_logs(
     level: str | None = None,
     limit: int = Query(100, le=500),
     db: AsyncSession = Depends(get_db_session),
-) -> list[AgentLogResponse]:
+) -> list[AgentLog]:
     """Get logs for an agent."""
     service = AgentManagerService(db)
     return await service.get_logs(
