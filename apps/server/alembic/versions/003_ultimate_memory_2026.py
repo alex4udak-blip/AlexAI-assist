@@ -61,7 +61,7 @@ def try_enable_pgvector() -> bool:
         return False
 
 
-def add_vector_column_if_available(table_name: str, column_name: str = "embedding_vector", dimensions: int = 384) -> None:
+def add_vector_column_if_available(table_name: str, column_name: str = "embedding_vector", dimensions: int = 1536) -> None:
     """Add vector column to table if pgvector is available."""
     if not _pgvector_available:
         logger.info(f"Skipping vector column for {table_name} (pgvector not available)")
@@ -84,7 +84,7 @@ def create_vector_index_if_available(index_name: str, table_name: str, column_na
             f"""
             CREATE INDEX {index_name}
             ON {table_name} USING ivfflat ({column_name} vector_cosine_ops)
-            WITH (lists = 100)
+            WITH (lists = 50)
             """
         )
     except Exception as e:
@@ -175,7 +175,7 @@ def upgrade() -> None:
         sa.Column("updated_at", sa.DateTime, onupdate=datetime.utcnow),
     )
 
-    # Add vector column for similarity search (384-dim for MiniLM) - optional
+    # Add vector column for similarity search (1536-dim for OpenAI text-embedding-3-small) - optional
     add_vector_column_if_available("memory_facts")
     create_vector_index_if_available("idx_facts_embedding", "memory_facts")
 
