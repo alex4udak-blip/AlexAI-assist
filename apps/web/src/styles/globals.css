@@ -71,7 +71,7 @@
 
   /* Focus visible */
   :focus-visible {
-    @apply outline-none ring-2 ring-accent-primary/50 ring-offset-2 ring-offset-bg-primary;
+    @apply outline-none ring-2 ring-hud-cyan/50 ring-offset-2 ring-offset-bg-primary;
   }
 }
 
@@ -89,7 +89,7 @@
 
   .card-glow::before {
     content: '';
-    @apply absolute inset-0 rounded-2xl bg-glow-gradient opacity-0
+    @apply absolute inset-0 rounded-2xl bg-hud-gradient opacity-0
            transition-opacity duration-300 pointer-events-none;
   }
 
@@ -102,12 +102,12 @@
     @apply inline-flex items-center justify-center gap-2
            font-medium text-sm rounded-lg
            transition-all duration-150 ease-out-expo
-           focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-primary/50;
+           focus:outline-none focus-visible:ring-2 focus-visible:ring-hud-cyan/50;
   }
 
   .btn-primary {
-    @apply btn bg-accent-gradient text-white px-4 py-2
-           hover:opacity-90 hover:shadow-glow-sm;
+    @apply btn bg-hud-gradient text-white px-4 py-2
+           hover:opacity-90 hover:shadow-hud-sm;
   }
 
   .btn-secondary {
@@ -130,7 +130,7 @@
   .input {
     @apply w-full bg-white/[0.03] border border-border-subtle rounded-xl
            px-4 py-3 text-sm text-text-primary placeholder:text-text-muted
-           focus:border-accent-primary/50 focus:bg-white/[0.05]
+           focus:border-hud-cyan/50 focus:bg-white/[0.05]
            transition-all duration-200 outline-none;
   }
 
@@ -157,7 +157,7 @@
   }
 
   .badge-accent {
-    @apply bg-accent-muted text-accent-primary;
+    @apply bg-hud-muted text-hud-cyan;
   }
 
   /* Nav items */
@@ -267,16 +267,16 @@
 @layer utilities {
   /* Text gradient */
   .text-gradient {
-    @apply bg-accent-gradient bg-clip-text text-transparent;
+    @apply bg-hud-gradient bg-clip-text text-transparent;
   }
 
   /* Glow effects */
   .glow {
-    @apply shadow-glow;
+    @apply shadow-glow-cyan;
   }
 
   .glow-sm {
-    @apply shadow-glow-sm;
+    @apply shadow-hud-sm;
   }
 
   /* Backdrop blur */
