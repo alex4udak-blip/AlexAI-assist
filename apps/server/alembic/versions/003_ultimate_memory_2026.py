@@ -29,16 +29,13 @@ def try_enable_pgvector() -> bool:
     """
     Try to enable pgvector extension. Returns True if successful.
 
-    NOTE: We don't check pg_available_extensions because that can return True
-    even when the extension files don't actually exist on the system
-    (common on Railway PostgreSQL and other managed databases).
-
-    Instead, we just try to create it and catch any errors.
+    Uses SAVEPOINT to avoid breaking the transaction if CREATE EXTENSION fails.
     """
     global _pgvector_available
+    conn = op.get_bind()
+
     try:
-        conn = op.get_bind()
-        # First check if extension is already installed
+        # First check if extension is already installed (safe query)
         result = conn.execute(
             sa.text("SELECT 1 FROM pg_extension WHERE extname = 'vector'")
         )
@@ -46,14 +43,24 @@ def try_enable_pgvector() -> bool:
             logger.info("pgvector extension already installed")
             _pgvector_available = True
             return True
+    except Exception as e:
+        logger.warning(f"Could not check pg_extension: {e}")
 
-        # Try to create the extension
+    # Try to create extension using SAVEPOINT to avoid breaking transaction
+    try:
+        conn.execute(sa.text("SAVEPOINT pgvector_check"))
         conn.execute(sa.text("CREATE EXTENSION IF NOT EXISTS vector"))
+        conn.execute(sa.text("RELEASE SAVEPOINT pgvector_check"))
         logger.info("pgvector extension enabled successfully")
         _pgvector_available = True
         return True
     except Exception as e:
-        # This is expected on Railway and other managed PostgreSQL without pgvector
+        # Rollback to savepoint to restore transaction state
+        try:
+            conn.execute(sa.text("ROLLBACK TO SAVEPOINT pgvector_check"))
+        except Exception:
+            pass  # Savepoint might not exist
+
         logger.warning(
             f"pgvector extension not available (this is OK - vector search will be disabled): {e}"
         )
