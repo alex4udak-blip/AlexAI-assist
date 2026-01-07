@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Select } from '../components/ui/Select';
+import { motion } from 'framer-motion';
 import { CategoryBreakdown } from '../components/analytics/CategoryBreakdown';
 import { ProductivityScore } from '../components/analytics/ProductivityScore';
 import { AppUsage } from '../components/analytics/AppUsage';
@@ -11,14 +11,23 @@ import {
   useTrends,
 } from '../hooks/useAnalytics';
 
-const periodOptions = [
-  { value: '7', label: 'Последние 7 дней' },
-  { value: '14', label: 'Последние 14 дней' },
-  { value: '30', label: 'Последние 30 дней' },
-];
+type Period = '7' | '14' | '30';
+
+const container = {
+  hidden: { opacity: 0 },
+  show: {
+    opacity: 1,
+    transition: { staggerChildren: 0.1 },
+  },
+};
+
+const item = {
+  hidden: { opacity: 0, y: 20 },
+  show: { opacity: 1, y: 0 },
+};
 
 export default function Analytics() {
-  const [period, setPeriod] = useState('7');
+  const [period, setPeriod] = useState<Period>('7');
 
   const { data: categories, loading: categoriesLoading } = useCategories({
     days: parseInt(period),
@@ -32,30 +41,46 @@ export default function Analytics() {
   });
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-text-primary">Аналитика</h1>
-          <p className="text-text-tertiary mt-1">
-            Анализ ваших паттернов активности
-          </p>
+    <motion.div
+      variants={container}
+      initial="hidden"
+      animate="show"
+      className="space-y-6 max-w-7xl mx-auto"
+    >
+      {/* Period selector */}
+      <motion.div variants={item} className="flex justify-end">
+        <div className="flex gap-1 p-1 rounded-lg bg-white/[0.03]">
+          {(['7', '14', '30'] as Period[]).map((p) => (
+            <button
+              key={p}
+              onClick={() => setPeriod(p)}
+              className={`px-3 py-1.5 text-sm font-medium rounded-md transition-all duration-150
+                         ${period === p
+                           ? 'bg-white/[0.08] text-text-primary'
+                           : 'text-text-tertiary hover:text-text-secondary hover:bg-white/[0.03]'
+                         }`}
+            >
+              {p === '7' ? '7 дней' : p === '14' ? '14 дней' : '30 дней'}
+            </button>
+          ))}
         </div>
-        <Select
-          options={periodOptions}
-          value={period}
-          onChange={(e) => setPeriod(e.target.value)}
-          className="w-40"
-        />
-      </div>
+      </motion.div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      {/* Productivity + Categories */}
+      <motion.div variants={item} className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <ProductivityScore data={productivity ?? undefined} loading={productivityLoading} />
         <CategoryBreakdown data={categories ?? undefined} loading={categoriesLoading} />
-      </div>
+      </motion.div>
 
-      <TrendChart data={trends ?? undefined} loading={trendsLoading} />
+      {/* Trend chart */}
+      <motion.div variants={item}>
+        <TrendChart data={trends ?? undefined} loading={trendsLoading} />
+      </motion.div>
 
-      <AppUsage data={appUsage ?? undefined} loading={appUsageLoading} />
-    </div>
+      {/* App usage */}
+      <motion.div variants={item}>
+        <AppUsage data={appUsage ?? undefined} loading={appUsageLoading} />
+      </motion.div>
+    </motion.div>
   );
 }

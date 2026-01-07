@@ -1,5 +1,4 @@
 import { Send } from 'lucide-react';
-import { cn } from '../../lib/utils';
 
 interface ChatInputProps {
   value: string;
@@ -8,12 +7,7 @@ interface ChatInputProps {
   disabled?: boolean;
 }
 
-export function ChatInput({
-  value,
-  onChange,
-  onSend,
-  disabled,
-}: ChatInputProps) {
+export function ChatInput({ value, onChange, onSend, disabled }: ChatInputProps) {
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
@@ -22,46 +16,39 @@ export function ChatInput({
   };
 
   return (
-    <div className="border-t border-border-subtle p-4 bg-bg-secondary">
-      <div className="flex items-end gap-3">
-        <div className="flex-1 relative">
+    <div className="p-4 border-t border-border-subtle">
+      <div className="max-w-3xl mx-auto">
+        <div className="flex items-center gap-3 p-3 rounded-xl border border-border-subtle
+                        bg-white/[0.03] focus-within:border-accent-primary/50
+                        focus-within:bg-white/[0.05] transition-all duration-200">
           <textarea
             value={value}
             onChange={(e) => onChange(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder="Введите сообщение..."
+            placeholder="Спроси что угодно..."
             disabled={disabled}
             rows={1}
-            className={cn(
-              'w-full bg-bg-tertiary border border-border-default rounded-xl',
-              'px-4 py-3 pr-12 text-text-primary placeholder:text-text-muted',
-              'focus:border-accent-primary focus:ring-1 focus:ring-accent-primary/30',
-              'transition-all duration-200 outline-none resize-none',
-              'max-h-32',
-              disabled && 'opacity-50 cursor-not-allowed'
-            )}
-            style={{
-              height: 'auto',
-              minHeight: '48px',
-            }}
+            className="flex-1 bg-transparent text-text-primary placeholder:text-text-muted
+                       outline-none text-sm resize-none min-h-[24px] max-h-32
+                       disabled:opacity-50 disabled:cursor-not-allowed"
+            style={{ height: 'auto' }}
           />
           <button
             onClick={onSend}
             disabled={disabled || !value.trim()}
-            className={cn(
-              'absolute right-2 bottom-2 p-2 rounded-lg transition-colors',
-              value.trim()
-                ? 'bg-accent-primary text-white hover:bg-accent-hover'
-                : 'bg-bg-hover text-text-muted'
-            )}
+            className={`p-2 rounded-lg transition-all duration-150 shrink-0
+                       ${value.trim()
+                         ? 'bg-accent-primary text-white hover:bg-accent-primary/90 hover:shadow-glow-sm'
+                         : 'bg-white/[0.05] text-text-muted cursor-not-allowed'
+                       }`}
           >
             <Send className="w-4 h-4" />
           </button>
         </div>
+        <p className="text-xs text-text-muted mt-2 text-center">
+          Enter — отправить, Shift+Enter — новая строка
+        </p>
       </div>
-      <p className="text-xs text-text-muted mt-2 text-center">
-        Нажмите Enter для отправки, Shift+Enter для новой строки
-      </p>
     </div>
   );
 }

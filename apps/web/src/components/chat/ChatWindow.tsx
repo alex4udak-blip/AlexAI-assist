@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
-import { Send } from 'lucide-react';
+import { motion } from 'framer-motion';
+import { Bot, Sparkles } from 'lucide-react';
 import { Message } from './Message';
 import { ChatInput } from './ChatInput';
 import { api, type ChatMessage } from '../../lib/api';
@@ -60,43 +61,88 @@ export function ChatWindow() {
 
   return (
     <div className="flex flex-col h-full">
-      <div className="flex-1 overflow-y-auto p-4 space-y-4">
-        {messages.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-full text-center">
-            <div className="w-16 h-16 rounded-2xl bg-accent-gradient flex items-center justify-center mb-4">
-              <Send className="w-8 h-8 text-white" />
-            </div>
-            <h2 className="text-xl font-semibold text-text-primary mb-2">
-              Чат с Observer
-            </h2>
-            <p className="text-text-tertiary max-w-md">
-              Задавайте вопросы о паттернах вашей активности, получайте предложения
-              по автоматизации или просите помощи с рабочим процессом.
-            </p>
-          </div>
-        ) : (
-          messages.map((message) => (
-            <Message key={message.id} message={message} />
-          ))
-        )}
-        {loading && (
-          <div className="flex items-center gap-2 text-text-tertiary">
-            <div className="flex gap-1">
-              <span className="w-2 h-2 bg-accent-primary rounded-full animate-bounce" />
-              <span
-                className="w-2 h-2 bg-accent-primary rounded-full animate-bounce"
-                style={{ animationDelay: '0.1s' }}
-              />
-              <span
-                className="w-2 h-2 bg-accent-primary rounded-full animate-bounce"
-                style={{ animationDelay: '0.2s' }}
-              />
-            </div>
-            <span className="text-sm">Observer думает...</span>
-          </div>
-        )}
-        <div ref={messagesEndRef} />
+      {/* Messages */}
+      <div className="flex-1 overflow-y-auto p-4 lg:p-6 scrollbar-hide">
+        <div className="max-w-3xl mx-auto space-y-6">
+          {messages.length === 0 ? (
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="flex flex-col items-center justify-center min-h-[60vh] text-center"
+            >
+              <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-violet-500 to-blue-500
+                              flex items-center justify-center mb-6 shadow-glow">
+                <Bot className="w-8 h-8 text-white" />
+              </div>
+              <h2 className="text-2xl font-semibold text-text-primary tracking-tight mb-3">
+                Чат с Observer
+              </h2>
+              <p className="text-text-tertiary max-w-md mb-8">
+                Задавайте вопросы о паттернах вашей активности, получайте предложения
+                по автоматизации или просите помощи с рабочим процессом.
+              </p>
+
+              {/* Quick prompts */}
+              <div className="flex flex-wrap justify-center gap-2">
+                {[
+                  'Как прошёл мой день?',
+                  'Какие паттерны ты заметил?',
+                  'Предложи автоматизацию',
+                ].map((prompt) => (
+                  <button
+                    key={prompt}
+                    onClick={() => {
+                      setInput(prompt);
+                    }}
+                    className="flex items-center gap-2 px-4 py-2 rounded-xl
+                               border border-border-subtle bg-white/[0.02]
+                               text-sm text-text-secondary
+                               hover:bg-white/[0.05] hover:border-border-default
+                               transition-all duration-150"
+                  >
+                    <Sparkles className="w-4 h-4 text-accent-primary" />
+                    {prompt}
+                  </button>
+                ))}
+              </div>
+            </motion.div>
+          ) : (
+            <>
+              {messages.map((message) => (
+                <Message key={message.id} message={message} />
+              ))}
+            </>
+          )}
+
+          {/* Loading indicator */}
+          {loading && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              className="flex items-center gap-3"
+            >
+              <div className="w-8 h-8 rounded-full bg-gradient-to-br from-violet-500 to-blue-500
+                              flex items-center justify-center">
+                <Bot className="w-4 h-4 text-white" />
+              </div>
+              <div className="flex items-center gap-2 px-4 py-3 rounded-2xl rounded-tl-md bg-white/[0.05]">
+                <div className="flex gap-1">
+                  <span className="w-2 h-2 bg-accent-primary rounded-full animate-bounce" />
+                  <span className="w-2 h-2 bg-accent-primary rounded-full animate-bounce"
+                        style={{ animationDelay: '0.1s' }} />
+                  <span className="w-2 h-2 bg-accent-primary rounded-full animate-bounce"
+                        style={{ animationDelay: '0.2s' }} />
+                </div>
+                <span className="text-sm text-text-tertiary ml-1">Observer думает...</span>
+              </div>
+            </motion.div>
+          )}
+
+          <div ref={messagesEndRef} />
+        </div>
       </div>
+
+      {/* Input */}
       <ChatInput
         value={input}
         onChange={setInput}
