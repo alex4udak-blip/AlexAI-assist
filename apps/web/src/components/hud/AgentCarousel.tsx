@@ -1,6 +1,6 @@
 import { useState, useRef } from 'react';
 import { motion, PanInfo, useAnimation } from 'framer-motion';
-import { Play, Pause, Clock, CheckCircle, XCircle, ChevronRight } from 'lucide-react';
+import { Play, Pause, Clock, CheckCircle, ChevronRight } from 'lucide-react';
 
 interface Agent {
   id: string;
