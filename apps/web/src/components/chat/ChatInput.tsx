@@ -28,7 +28,9 @@ export function ChatInput({ value, onChange, onSend, disabled }: ChatInputProps)
             disabled={disabled}
             rows={1}
             className="flex-1 bg-transparent text-text-primary placeholder:text-text-muted
-                       border-0 outline-none ring-0 focus:border-0 focus:outline-none focus:ring-0
+                       border-0 outline-none ring-0 ring-offset-0
+                       focus:border-0 focus:outline-none focus:ring-0 focus:ring-offset-0
+                       focus-visible:ring-0 focus-visible:ring-offset-0 focus-visible:outline-none
                        text-sm resize-none min-h-[24px] max-h-32
                        disabled:opacity-50 disabled:cursor-not-allowed"
             style={{ height: 'auto' }}
