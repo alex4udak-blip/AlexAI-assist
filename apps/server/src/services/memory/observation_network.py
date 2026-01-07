@@ -15,7 +15,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from src.core.security import validate_session_id
 from src.db.models.memory import MemoryEntity, MemoryRelationship
 from .confidence_utils import calculate_weighted_average
-from .embeddings import embedding_service
+from .embeddings import embedding_service, check_pgvector_available
 
 logger = logging.getLogger(__name__)
 
@@ -145,20 +145,21 @@ class ObservationNetwork:
         self.db.add(entity)
         await self.db.flush()
 
-        # Generate and store embedding
-        embed_text = f"{name} - {entity_type}. {summary or ''}"
-        embedding = embedding_service.embed(embed_text)
-        if embedding:
-            vector_str = embedding_service.to_pgvector_str(embedding)
-            await self.db.execute(
-                text(
-                    """
-                    UPDATE memory_entities
-                    SET embedding_vector = :vector::vector
-                    WHERE id = :entity_id
-                    """
-                ).bindparams(vector=vector_str, entity_id=str(entity.id))
-            )
+        # Generate and store embedding (only if pgvector is available)
+        if await check_pgvector_available(self.db):
+            embed_text = f"{name} - {entity_type}. {summary or ''}"
+            embedding = embedding_service.embed(embed_text)
+            if embedding:
+                vector_str = embedding_service.to_pgvector_str(embedding)
+                await self.db.execute(
+                    text(
+                        """
+                        UPDATE memory_entities
+                        SET embedding_vector = :vector::vector
+                        WHERE id = :entity_id
+                        """
+                    ).bindparams(vector=vector_str, entity_id=str(entity.id))
+                )
 
         logger.info(f"Added entity: {name} (type={entity_type})")
         return entity
@@ -207,6 +208,10 @@ class ObservationNetwork:
         Returns:
             List of entities with scores
         """
+        # Check if pgvector is available
+        if not await check_pgvector_available(self.db):
+            return await self._text_search_entities(query, limit, entity_types)
+
         embedding = embedding_service.embed(query)
         if not embedding:
             return await self._text_search_entities(query, limit, entity_types)

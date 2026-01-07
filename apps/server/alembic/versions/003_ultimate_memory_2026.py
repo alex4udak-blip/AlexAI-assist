@@ -11,6 +11,9 @@ from alembic import op
 import sqlalchemy as sa
 from sqlalchemy.dialects.postgresql import UUID, JSONB, ARRAY
 from datetime import datetime
+import logging
+
+logger = logging.getLogger(__name__)
 
 # revision identifiers
 revision = "003"
@@ -18,10 +21,68 @@ down_revision = "002"
 branch_labels = None
 depends_on = None
 
+# Global flag for pgvector availability (set during migration)
+_pgvector_available = False
+
+
+def check_pgvector_available() -> bool:
+    """Check if pgvector extension is available in PostgreSQL."""
+    global _pgvector_available
+    try:
+        conn = op.get_bind()
+        result = conn.execute(
+            sa.text("SELECT 1 FROM pg_available_extensions WHERE name = 'vector'")
+        )
+        _pgvector_available = result.fetchone() is not None
+        return _pgvector_available
+    except Exception as e:
+        logger.warning(f"Could not check pgvector availability: {e}")
+        _pgvector_available = False
+        return False
+
+
+def add_vector_column_if_available(table_name: str, column_name: str = "embedding_vector", dimensions: int = 384) -> None:
+    """Add vector column to table if pgvector is available."""
+    if not _pgvector_available:
+        logger.info(f"Skipping vector column for {table_name} (pgvector not available)")
+        return
+
+    try:
+        op.execute(f"ALTER TABLE {table_name} ADD COLUMN {column_name} vector({dimensions})")
+    except Exception as e:
+        logger.warning(f"Could not add vector column to {table_name}: {e}")
+
+
+def create_vector_index_if_available(index_name: str, table_name: str, column_name: str = "embedding_vector") -> None:
+    """Create vector index if pgvector is available."""
+    if not _pgvector_available:
+        logger.info(f"Skipping vector index {index_name} (pgvector not available)")
+        return
+
+    try:
+        op.execute(
+            f"""
+            CREATE INDEX {index_name}
+            ON {table_name} USING ivfflat ({column_name} vector_cosine_ops)
+            WITH (lists = 100)
+            """
+        )
+    except Exception as e:
+        logger.warning(f"Could not create vector index {index_name}: {e}")
+
 
 def upgrade() -> None:
-    # Enable pgvector extension
-    op.execute("CREATE EXTENSION IF NOT EXISTS vector")
+    # Check and enable pgvector extension if available
+    if check_pgvector_available():
+        try:
+            op.execute("CREATE EXTENSION IF NOT EXISTS vector")
+            logger.info("pgvector extension enabled")
+        except Exception as e:
+            logger.warning(f"Could not enable pgvector extension: {e}. Vector search will be unavailable.")
+            global _pgvector_available
+            _pgvector_available = False
+    else:
+        logger.warning("pgvector extension not available. Vector search features will be disabled.")
 
     # ===========================================
     # NETWORK 1: FACT NETWORK (Objective truths)
@@ -61,17 +122,9 @@ def upgrade() -> None:
         sa.Column("updated_at", sa.DateTime, onupdate=datetime.utcnow),
     )
 
-    # Add vector column for similarity search (384-dim for MiniLM)
-    op.execute(
-        "ALTER TABLE memory_facts ADD COLUMN embedding_vector vector(384)"
-    )
-    op.execute(
-        """
-        CREATE INDEX idx_facts_embedding
-        ON memory_facts USING ivfflat (embedding_vector vector_cosine_ops)
-        WITH (lists = 100)
-        """
-    )
+    # Add vector column for similarity search (384-dim for MiniLM) - optional
+    add_vector_column_if_available("memory_facts")
+    create_vector_index_if_available("idx_facts_embedding", "memory_facts")
 
     # ===========================================
     # NETWORK 2: EXPERIENCE NETWORK (What happened)
@@ -104,17 +157,9 @@ def upgrade() -> None:
         sa.Column("created_at", sa.DateTime, default=datetime.utcnow),
     )
 
-    # Add vector column
-    op.execute(
-        "ALTER TABLE memory_experiences ADD COLUMN embedding_vector vector(384)"
-    )
-    op.execute(
-        """
-        CREATE INDEX idx_experiences_embedding
-        ON memory_experiences USING ivfflat (embedding_vector vector_cosine_ops)
-        WITH (lists = 100)
-        """
-    )
+    # Add vector column - optional
+    add_vector_column_if_available("memory_experiences")
+    create_vector_index_if_available("idx_experiences_embedding", "memory_experiences")
 
     # ===========================================
     # NETWORK 3: OBSERVATION NETWORK (Entity summaries + KG)
@@ -145,17 +190,9 @@ def upgrade() -> None:
         sa.Column("created_at", sa.DateTime, default=datetime.utcnow),
     )
 
-    # Add vector column
-    op.execute(
-        "ALTER TABLE memory_entities ADD COLUMN embedding_vector vector(384)"
-    )
-    op.execute(
-        """
-        CREATE INDEX idx_entities_embedding
-        ON memory_entities USING ivfflat (embedding_vector vector_cosine_ops)
-        WITH (lists = 100)
-        """
-    )
+    # Add vector column - optional
+    add_vector_column_if_available("memory_entities")
+    create_vector_index_if_available("idx_entities_embedding", "memory_entities")
 
     # Relationships (Temporal KG - Zep/Graphiti style)
     op.create_table(
@@ -351,10 +388,8 @@ def upgrade() -> None:
         sa.Column("created_at", sa.DateTime, default=datetime.utcnow),
     )
 
-    # Add vector column
-    op.execute(
-        "ALTER TABLE memory_episodes ADD COLUMN embedding_vector vector(384)"
-    )
+    # Add vector column - optional
+    add_vector_column_if_available("memory_episodes")
 
     # ===========================================
     # PROCEDURAL MEMORY (Learned skills)
@@ -530,4 +565,8 @@ def downgrade() -> None:
     for table in tables:
         op.drop_table(table)
 
-    op.execute("DROP EXTENSION IF EXISTS vector")
+    # Drop pgvector extension only if it exists
+    try:
+        op.execute("DROP EXTENSION IF EXISTS vector")
+    except Exception as e:
+        logger.warning(f"Could not drop vector extension: {e}")
