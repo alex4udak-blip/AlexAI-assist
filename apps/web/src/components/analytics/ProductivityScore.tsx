@@ -1,4 +1,4 @@
-import { TrendingUp, TrendingDown, Target } from 'lucide-react';
+import { Target } from 'lucide-react';
 
 interface ProductivityScoreProps {
   data?: {
@@ -30,8 +30,6 @@ export function ProductivityScore({ data, loading }: ProductivityScoreProps) {
   }
 
   const score = data?.score ?? 0;
-  const trend = data?.trend ?? 'neutral';
-  const TrendIcon = trend === 'up' ? TrendingUp : TrendingDown;
 
   const getScoreColor = () => {
     if (score >= 70) return { stroke: '#10B981', glow: 'rgba(16, 185, 129, 0.3)' };
@@ -55,11 +53,7 @@ export function ProductivityScore({ data, loading }: ProductivityScoreProps) {
             Продуктивность
           </h3>
         </div>
-        <div className={`flex items-center gap-1 text-sm
-                        ${trend === 'up' ? 'text-status-success' : 'text-status-error'}`}>
-          <TrendIcon className="w-4 h-4" />
-          <span>{trend === 'up' ? '+' : '-'}5%</span>
-        </div>
+{/* Trend indicator removed - no real comparison data from backend */}
       </div>
 
       <div className="flex items-center gap-8">
