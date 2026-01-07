@@ -1,3 +1,4 @@
+use crate::sync::get_dashboard_url;
 use tauri::{
     menu::{Menu, MenuItem},
     tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
@@ -26,7 +27,7 @@ pub fn create_tray(app: &App) -> Result<(), Box<dyn std::error::Error>> {
                 }
             }
             "dashboard" => {
-                let _ = open::that("http://localhost:3000");
+                let _ = open::that(get_dashboard_url());
             }
             _ => {}
         })

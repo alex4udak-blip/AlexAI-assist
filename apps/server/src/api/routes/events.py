@@ -144,7 +144,7 @@ async def get_timeline(
         select(Event)
         .where(Event.timestamp >= start)
         .order_by(Event.timestamp.desc())
-        .limit(500)
+        .limit(2000)
     )
 
     if device_id:

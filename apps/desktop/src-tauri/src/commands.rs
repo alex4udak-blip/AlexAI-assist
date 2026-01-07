@@ -1,3 +1,4 @@
+use crate::sync::get_dashboard_url;
 use crate::AppState;
 use serde::Serialize;
 use std::sync::Arc;
@@ -100,5 +101,5 @@ pub async fn sync_now(state: State<'_, Arc<Mutex<AppState>>>) -> Result<(), Stri
 
 #[tauri::command]
 pub async fn open_dashboard() -> Result<(), String> {
-    open::that("http://localhost:3000").map_err(|e| e.to_string())
+    open::that(get_dashboard_url()).map_err(|e| e.to_string())
 }
