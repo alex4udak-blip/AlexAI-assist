@@ -1,6 +1,8 @@
 import { motion } from 'framer-motion';
 import { useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
+  // Desktop components
   StatusBar,
   ActivityRings,
   WeeklyHeatmap,
@@ -11,12 +13,20 @@ import {
   Achievements,
   QuickActions,
   LiveTimeline,
+  // Mobile components
+  MobileHeader,
+  AgentCarousel,
+  CompactHeatmap,
+  UnifiedFeed,
+  MobileAchievements,
 } from '../components/hud';
+import { Plus } from 'lucide-react';
 import { useAnalyticsSummary, useTimeline, useProductivity } from '../hooks/useAnalytics';
 import { useAgents } from '../hooks/useAgents';
 import { useSuggestions } from '../hooks/usePatterns';
 import { useMutation } from '../hooks/useApi';
 import { api } from '../lib/api';
+import { useIsMobile, useIsTablet } from '../hooks/useMediaQuery';
 
 const container = {
   hidden: { opacity: 0 },
@@ -31,10 +41,28 @@ const item = {
   show: { opacity: 1, y: 0 },
 };
 
+// Mobile-optimized animation variants
+const mobileContainer = {
+  hidden: { opacity: 0 },
+  show: {
+    opacity: 1,
+    transition: { staggerChildren: 0.03 },
+  },
+};
+
+const mobileItem = {
+  hidden: { opacity: 0, y: 10 },
+  show: { opacity: 1, y: 0 },
+};
+
 export default function Dashboard() {
+  const navigate = useNavigate();
+  const isMobile = useIsMobile();
+  const isTablet = useIsTablet();
+
   const { data: summary } = useAnalyticsSummary();
   const { data: productivity } = useProductivity();
-  const { data: timeline } = useTimeline(24);
+  const { data: timeline, refetch: refetchTimeline } = useTimeline(24);
   const { data: agents, refetch: refetchAgents } = useAgents();
   const { data: suggestions } = useSuggestions({ status: 'pending' });
 
@@ -56,10 +84,18 @@ export default function Dashboard() {
     refetchAgents();
   };
 
+  const handleCreateAgent = () => {
+    navigate('/agents');
+  };
+
+  const handleRefresh = async () => {
+    await Promise.all([refetchAgents(), refetchTimeline()]);
+  };
+
   // Calculate activity rings data
   const ringsData = useMemo(() => ({
     productivity: productivity?.score ?? 0,
-    focus: Math.min(100, (summary?.total_events ?? 0) / 5), // Example calculation
+    focus: Math.min(100, (summary?.total_events ?? 0) / 5),
     automation: agents?.filter(a => a.status === 'active').length
       ? Math.min(100, agents.reduce((acc, a) => acc + a.total_time_saved_seconds, 0) / 36)
       : 0,
@@ -73,7 +109,7 @@ export default function Dashboard() {
 
     timeline.forEach(event => {
       const date = new Date(event.timestamp);
-      const day = (date.getDay() + 6) % 7; // Monday = 0
+      const day = (date.getDay() + 6) % 7;
       const hour = date.getHours();
       const key = `${day}-${hour}`;
       counts[key] = (counts[key] || 0) + 1;
@@ -150,6 +186,37 @@ export default function Dashboard() {
 
     return result;
   }, [summary, productivity, suggestions, agents]);
+
+  // Calculate activity streak (consecutive days with activity)
+  const activityStreak = useMemo(() => {
+    if (!timeline || timeline.length === 0) return 0;
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    // Get unique days with activity
+    const daysWithActivity = new Set<string>();
+    timeline.forEach(event => {
+      const date = new Date(event.timestamp);
+      date.setHours(0, 0, 0, 0);
+      daysWithActivity.add(date.toISOString());
+    });
+
+    // Count consecutive days from today backwards
+    let streak = 0;
+    let checkDate = new Date(today);
+
+    while (true) {
+      if (daysWithActivity.has(checkDate.toISOString())) {
+        streak++;
+        checkDate.setDate(checkDate.getDate() - 1);
+      } else {
+        break;
+      }
+    }
+
+    return streak;
+  }, [timeline]);
 
   // Generate achievements
   const achievements = useMemo(() => {
@@ -228,8 +295,220 @@ export default function Dashboard() {
     }));
   }, [timeline]);
 
+  // Generate unified feed for mobile
+  const unifiedFeedItems = useMemo(() => {
+    const items: {
+      id: string;
+      type: 'agent' | 'activity' | 'insight';
+      title: string;
+      description: string;
+      timestamp: string;
+      status?: 'success' | 'error' | 'warning' | 'info';
+      icon?: 'bot' | 'monitor' | 'lightbulb' | 'trending-up' | 'trending-down' | 'sparkles';
+    }[] = [];
+
+    // Add agent activities
+    agentActivities.forEach(activity => {
+      items.push({
+        id: `agent-${activity.id}`,
+        type: 'agent',
+        title: activity.agentName,
+        description: activity.action,
+        timestamp: activity.timestamp,
+        status: activity.status,
+        icon: 'bot',
+      });
+    });
+
+    // Add timeline events (last 10)
+    timeline?.slice(0, 10).forEach(event => {
+      items.push({
+        id: `activity-${event.id}`,
+        type: 'activity',
+        title: event.app_name || 'Unknown',
+        description: event.window_title || 'Активность',
+        timestamp: event.timestamp,
+        status: 'info',
+        icon: 'monitor',
+      });
+    });
+
+    // Add insights
+    insights.forEach(insight => {
+      items.push({
+        id: `insight-${insight.id}`,
+        type: 'insight',
+        title: insight.type === 'positive' ? 'Хорошие новости' :
+               insight.type === 'suggestion' ? 'Рекомендация' : 'Наблюдение',
+        description: insight.message,
+        timestamp: new Date().toISOString(),
+        status: insight.type === 'positive' ? 'success' :
+                insight.type === 'negative' ? 'warning' : 'info',
+        icon: insight.type === 'suggestion' ? 'sparkles' :
+              insight.type === 'positive' ? 'trending-up' : 'lightbulb',
+      });
+    });
+
+    // Sort by timestamp
+    return items.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+  }, [agentActivities, timeline, insights]);
+
   const activeAgents = agents?.filter(a => a.status === 'active') || [];
 
+  // Mobile Layout
+  if (isMobile) {
+    return (
+      <>
+        <motion.div
+          variants={mobileContainer}
+          initial="hidden"
+          animate="show"
+          className="pb-24"
+        >
+          {/* Mobile Header */}
+          <MobileHeader
+            productivity={ringsData.productivity}
+            focus={ringsData.focus}
+            automation={ringsData.automation}
+            focusTime={currentFocus?.sessionMinutes}
+            currentApp={currentFocus?.appName}
+            category={currentFocus?.category}
+          />
+
+          {/* Agent Carousel */}
+          <motion.div variants={mobileItem} className="mt-4">
+            <div className="px-4 mb-3">
+              <h3 className="text-xs text-text-muted uppercase tracking-wider font-mono">
+                Агенты
+              </h3>
+            </div>
+            <AgentCarousel
+              agents={agents ?? []}
+              onRunAgent={handleRunAgent}
+              onToggleAgent={handleToggleAgent}
+              onViewDetails={(id) => navigate(`/agents/${id}`)}
+            />
+          </motion.div>
+
+          {/* Achievements (horizontal scroll) */}
+          <motion.div variants={mobileItem}>
+            <MobileAchievements achievements={achievements} streak={activityStreak} />
+          </motion.div>
+
+          {/* Compact Heatmap */}
+          <motion.div variants={mobileItem} className="px-4 mt-4">
+            <CompactHeatmap data={heatmapData} />
+          </motion.div>
+
+          {/* Unified Feed */}
+          <motion.div variants={mobileItem} className="mt-4 h-[400px]">
+            <UnifiedFeed
+              items={unifiedFeedItems}
+              onRefresh={handleRefresh}
+            />
+          </motion.div>
+        </motion.div>
+
+        {/* FAB Button for creating agent */}
+        <motion.button
+          initial={{ scale: 0 }}
+          animate={{ scale: 1 }}
+          whileTap={{ scale: 0.9 }}
+          onClick={handleCreateAgent}
+          className="fixed right-4 bottom-20 z-50 w-14 h-14 rounded-full
+                     bg-hud-gradient shadow-hud flex items-center justify-center
+                     active:shadow-hud-lg transition-shadow touch-manipulation"
+          style={{ marginBottom: 'env(safe-area-inset-bottom, 0px)' }}
+        >
+          <Plus className="w-6 h-6 text-white" />
+        </motion.button>
+      </>
+    );
+  }
+
+  // Tablet Layout
+  if (isTablet) {
+    return (
+      <motion.div
+        variants={container}
+        initial="hidden"
+        animate="show"
+        className="space-y-4 max-w-[1200px] mx-auto px-4"
+      >
+        {/* Status Bar */}
+        <motion.div variants={item}>
+          <StatusBar
+            focusTime={currentFocus?.sessionMinutes}
+            activeAgents={activeAgents.length}
+            totalAgents={agents?.length ?? 0}
+            systemHealth="healthy"
+          />
+        </motion.div>
+
+        {/* Two Column Grid for Tablet */}
+        <div className="grid grid-cols-2 gap-4">
+          {/* Left Column */}
+          <div className="space-y-4">
+            <motion.div variants={item}>
+              <ActivityRings
+                productivity={ringsData.productivity}
+                focus={ringsData.focus}
+                automation={ringsData.automation}
+              />
+            </motion.div>
+
+            <motion.div variants={item}>
+              <CurrentFocus
+                appName={currentFocus?.appName}
+                sessionMinutes={currentFocus?.sessionMinutes}
+                category={currentFocus?.category}
+              />
+            </motion.div>
+
+            <motion.div variants={item}>
+              <AIInsights insights={insights} />
+            </motion.div>
+          </div>
+
+          {/* Right Column */}
+          <div className="space-y-4">
+            <motion.div variants={item}>
+              <div className="p-5 rounded-xl bg-bg-secondary/60 backdrop-blur-md border border-border-subtle
+                             shadow-inner-glow">
+                <h3 className="text-xs text-text-muted uppercase tracking-wider font-mono mb-4">
+                  Agent Command Center
+                </h3>
+                <AgentGrid
+                  agents={agents?.slice(0, 4) ?? []}
+                  onRunAgent={handleRunAgent}
+                  onToggleAgent={handleToggleAgent}
+                />
+              </div>
+            </motion.div>
+
+            <motion.div variants={item}>
+              <Achievements achievements={achievements} streak={activityStreak} />
+            </motion.div>
+          </div>
+        </div>
+
+        {/* Full Width Bottom Section */}
+        <motion.div variants={item}>
+          <WeeklyHeatmap data={heatmapData} />
+        </motion.div>
+
+        <motion.div variants={item} className="h-[250px]">
+          <AgentActivityStream activities={agentActivities} />
+        </motion.div>
+
+        <motion.div variants={item}>
+          <QuickActions onCreateAgent={handleCreateAgent} />
+        </motion.div>
+      </motion.div>
+    );
+  }
+
+  // Desktop Layout (Original)
   return (
     <motion.div
       variants={container}
@@ -300,11 +579,11 @@ export default function Dashboard() {
           </motion.div>
 
           <motion.div variants={item}>
-            <Achievements achievements={achievements} streak={3} />
+            <Achievements achievements={achievements} streak={activityStreak} />
           </motion.div>
 
           <motion.div variants={item}>
-            <QuickActions />
+            <QuickActions onCreateAgent={handleCreateAgent} />
           </motion.div>
         </div>
       </div>

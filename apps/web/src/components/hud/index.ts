@@ -1,3 +1,4 @@
+// Desktop HUD components
 export { StatusBar } from './StatusBar';
 export { ActivityRings } from './ActivityRings';
 export { WeeklyHeatmap } from './WeeklyHeatmap';
@@ -8,3 +9,11 @@ export { AIInsights } from './AIInsights';
 export { Achievements } from './Achievements';
 export { QuickActions } from './QuickActions';
 export { LiveTimeline } from './LiveTimeline';
+
+// Mobile-specific components
+export { MobileHeader } from './MobileHeader';
+export { AgentCarousel } from './AgentCarousel';
+export { CompactHeatmap } from './CompactHeatmap';
+export { UnifiedFeed } from './UnifiedFeed';
+export { MobileAchievements } from './MobileAchievements';
+export { BottomNavigation } from './BottomNavigation';
