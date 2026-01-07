@@ -50,6 +50,8 @@ setupCredentials();
 let claudeProcess = null;
 let responseResolve = null;
 let currentResponse = '';
+let restartAttempts = 0;
+const MAX_RESTART_DELAY = 60000; // Max 60 sec between restarts
 
 function startClaudeSession() {
   console.log('Starting persistent Claude session...');
@@ -62,11 +64,15 @@ function startClaudeSession() {
   ], {
     env: {
       ...process.env,
-      CLAUDE_CODE_OAUTH_TOKEN: process.env.CLAUDE_OAUTH_TOKEN
+      CLAUDE_CODE_OAUTH_TOKEN: process.env.CLAUDE_OAUTH_TOKEN,
+      HOME: process.env.HOME || '/home/appuser'
     }
   });
 
   claudeProcess.stdout.on('data', (data) => {
+    // Reset restart attempts on successful output
+    restartAttempts = 0;
+
     const lines = data.toString().split('\n').filter(l => l.trim());
 
     for (const line of lines) {
@@ -103,8 +109,12 @@ function startClaudeSession() {
   claudeProcess.on('close', (code) => {
     console.log('Claude process closed with code:', code);
     claudeProcess = null;
-    // Restart after 1 sec
-    setTimeout(startClaudeSession, 1000);
+
+    // Exponential backoff for restarts
+    restartAttempts++;
+    const delay = Math.min(1000 * Math.pow(2, restartAttempts - 1), MAX_RESTART_DELAY);
+    console.log(`Restarting in ${delay}ms (attempt ${restartAttempts})...`);
+    setTimeout(startClaudeSession, delay);
   });
 
   claudeProcess.on('error', (err) => {
