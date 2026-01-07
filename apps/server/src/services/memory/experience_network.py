@@ -11,6 +11,7 @@ from uuid import UUID, uuid4
 from sqlalchemy import and_, func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from src.core.security import validate_session_id
 from src.db.models.memory import MemoryExperience, MemoryProcedure
 from .embeddings import embedding_service
 
@@ -27,9 +28,20 @@ class ExperienceNetwork:
     - Procedural extraction (Mem-alpha)
     """
 
+    # Allowed experience types for validation
+    ALLOWED_EXPERIENCE_TYPES = frozenset({
+        "agent_run", "user_action", "conversation", "pattern_detected",
+    })
+
+    # Allowed outcomes for validation
+    ALLOWED_OUTCOMES = frozenset({
+        "success", "failure", "partial", "unknown",
+    })
+
     def __init__(self, db: AsyncSession, session_id: str = "default"):
         self.db = db
-        self.session_id = session_id
+        # Validate session_id to prevent session forgery
+        self.session_id = validate_session_id(session_id)
 
     async def add(
         self,
@@ -61,7 +73,53 @@ class ExperienceNetwork:
 
         Returns:
             Created MemoryExperience
+
+        Raises:
+            ValueError: If validation fails
         """
+        # Validate required string fields
+        if not description or not description.strip():
+            raise ValueError("description is required and cannot be empty")
+
+        description = description.strip()
+
+        # Validate string length
+        if len(description) > 5000:
+            raise ValueError(f"description exceeds maximum length of 5000 characters (got {len(description)})")
+
+        # Validate experience_type
+        if experience_type not in self.ALLOWED_EXPERIENCE_TYPES:
+            raise ValueError(
+                f"Invalid experience_type: {experience_type}. "
+                f"Allowed values: {', '.join(sorted(self.ALLOWED_EXPERIENCE_TYPES))}"
+            )
+
+        # Validate outcome
+        if outcome not in self.ALLOWED_OUTCOMES:
+            raise ValueError(
+                f"Invalid outcome: {outcome}. "
+                f"Allowed values: {', '.join(sorted(self.ALLOWED_OUTCOMES))}"
+            )
+
+        # Validate action_taken length if provided
+        if action_taken is not None:
+            action_taken = action_taken.strip()
+            if len(action_taken) > 2000:
+                raise ValueError(f"action_taken exceeds maximum length of 2000 characters (got {len(action_taken)})")
+
+        # Validate lesson_learned length if provided
+        if lesson_learned is not None:
+            lesson_learned = lesson_learned.strip()
+            if len(lesson_learned) > 2000:
+                raise ValueError(f"lesson_learned exceeds maximum length of 2000 characters (got {len(lesson_learned)})")
+
+        # Validate duration_seconds if provided
+        if duration_seconds is not None:
+            if duration_seconds < 0:
+                raise ValueError(f"duration_seconds must be non-negative (got {duration_seconds})")
+            if duration_seconds > 86400 * 7:  # 1 week in seconds
+                raise ValueError(f"duration_seconds exceeds maximum of 1 week (got {duration_seconds})")
+
         experience = MemoryExperience(
             id=uuid4(),
             session_id=self.session_id,
@@ -86,12 +144,12 @@ class ExperienceNetwork:
             vector_str = embedding_service.to_pgvector_str(embedding)
             await self.db.execute(
                 text(
-                    f"""
+                    """
                     UPDATE memory_experiences
-                    SET embedding_vector = '{vector_str}'::vector
+                    SET embedding_vector = :vector::vector
                     WHERE id = :exp_id
                     """
-                ).bindparams(exp_id=str(experience.id))
+                ).bindparams(vector=vector_str, exp_id=str(experience.id))
             )
 
         logger.info(f"Added experience: {description[:50]}... (type={experience_type})")
@@ -175,7 +233,7 @@ class ExperienceNetwork:
 
         result = await self.db.execute(
             text(
-                f"""
+                """
                 SELECT
                     id,
                     description,
@@ -183,14 +241,14 @@ class ExperienceNetwork:
                     outcome,
                     lesson_learned,
                     occurred_at,
-                    1 - (embedding_vector <=> '{vector_str}'::vector) as score
+                    1 - (embedding_vector <=> :vector::vector) as score
                 FROM memory_experiences
                 WHERE session_id = :session_id
                     AND embedding_vector IS NOT NULL
-                ORDER BY embedding_vector <=> '{vector_str}'::vector
+                ORDER BY embedding_vector <=> :vector::vector
                 LIMIT :limit
                 """
-            ).bindparams(session_id=self.session_id, limit=limit)
+            ).bindparams(vector=vector_str, session_id=self.session_id, limit=limit)
         )
 
         experiences = []

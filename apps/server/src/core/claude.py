@@ -8,6 +8,7 @@ import httpx
 from httpx import HTTPStatusError, TimeoutException
 
 from src.core.config import settings
+from src.core.retry import retry_with_backoff, with_circuit_breaker
 
 logger = logging.getLogger(__name__)
 
@@ -34,6 +35,8 @@ class ClaudeClient:
             headers["Authorization"] = f"Bearer {self.internal_token}"
         return headers
 
+    @retry_with_backoff(max_attempts=3, min_wait=1, max_wait=10)
+    @with_circuit_breaker(service_name="claude_api")
     async def complete(
         self,
         prompt: str | None = None,

@@ -1,6 +1,11 @@
 // Accessibility API wrapper for macOS
 // This module provides access to the macOS Accessibility API
 // to read information about the currently focused application and UI elements
+//
+// THREAD SAFETY NOTES:
+// - All Core Foundation and Accessibility API calls in this module should be made from the main thread
+// - Core Graphics window functions should also be called from the main thread
+// - Functions in this module are marked with thread safety requirements
 
 #[cfg(target_os = "macos")]
 pub mod macos {
@@ -26,6 +31,91 @@ pub mod macos {
         fn CFRelease(cf: *mut c_void);
     }
 
+    // External C function declarations for GCD (Grand Central Dispatch)
+    #[link(name = "System", kind = "dylib")]
+    extern "C" {
+        fn dispatch_get_main_queue() -> *mut c_void;
+        fn dispatch_sync_f(
+            queue: *mut c_void,
+            context: *mut c_void,
+            work: unsafe extern "C" fn(*mut c_void),
+        );
+        fn pthread_main_np() -> i32;
+    }
+
+    /// Check if the current thread is the main thread
+    ///
+    /// # Safety
+    /// This function calls into pthread APIs which are safe to call from any thread
+    #[inline]
+    fn is_main_thread() -> bool {
+        unsafe { pthread_main_np() != 0 }
+    }
+
+    /// Assert that we're running on the main thread
+    ///
+    /// # Panics
+    /// Panics if called from a non-main thread
+    #[inline]
+    fn assert_main_thread() {
+        if !is_main_thread() {
+            panic!("This function must be called from the main thread");
+        }
+    }
+
+    /// Execute a closure on the main thread synchronously
+    ///
+    /// If already on the main thread, executes immediately.
+    /// Otherwise, dispatches to main thread and waits for completion.
+    ///
+    /// # Safety
+    /// Uses GCD (Grand Central Dispatch) FFI calls
+    fn run_on_main_thread<F, R>(f: F) -> R
+    where
+        F: FnOnce() -> R + Send,
+        R: Send,
+    {
+        if is_main_thread() {
+            // Already on main thread, execute directly
+            return f();
+        }
+
+        // Need to dispatch to main thread
+        use std::mem::ManuallyDrop;
+        use std::ptr;
+
+        struct Context<F, R> {
+            func: ManuallyDrop<F>,
+            result: ManuallyDrop<Option<R>>,
+        }
+
+        unsafe extern "C" fn trampoline<F, R>(ctx: *mut c_void)
+        where
+            F: FnOnce() -> R,
+        {
+            let ctx = &mut *(ctx as *mut Context<F, R>);
+            let func = ManuallyDrop::take(&mut ctx.func);
+            let result = func();
+            ctx.result = ManuallyDrop::new(Some(result));
+        }
+
+        unsafe {
+            let mut ctx = Context {
+                func: ManuallyDrop::new(f),
+                result: ManuallyDrop::new(None),
+            };
+
+            let main_queue = dispatch_get_main_queue();
+            dispatch_sync_f(
+                main_queue,
+                &mut ctx as *mut _ as *mut c_void,
+                trampoline::<F, R>,
+            );
+
+            ManuallyDrop::take(&mut ctx.result).unwrap()
+        }
+    }
+
     // AX error codes
     const K_AX_ERROR_SUCCESS: i32 = 0;
 
@@ -37,9 +127,17 @@ pub mod macos {
     const K_AX_VALUE_ATTRIBUTE: &str = "AXValue";
     const K_AX_ROLE_ATTRIBUTE: &str = "AXRole";
 
-    /// Get information about the currently focused UI element
+    /// Get information about the currently focused UI element (internal implementation)
     /// Returns (app_name, window_title) if successful
-    pub fn get_focused_element_info() -> Option<(String, String)> {
+    ///
+    /// # Thread Safety
+    /// This function must be called from the main thread only.
+    ///
+    /// # Safety
+    /// Uses unsafe FFI calls to Core Foundation and Accessibility APIs
+    fn get_focused_element_info_impl() -> Option<(String, String)> {
+        assert_main_thread();
+
         unsafe {
             let system_wide = AXUIElementCreateSystemWide();
             if system_wide.is_null() {
@@ -77,6 +175,10 @@ pub mod macos {
                 let name = cf_string.to_string();
                 name
             } else {
+                // Release if non-null but failed
+                if !title_value.is_null() {
+                    CFRelease(title_value);
+                }
                 "Unknown".to_string()
             };
 
@@ -89,8 +191,6 @@ pub mod macos {
                 focused_attr.as_concrete_TypeRef() as *const c_void,
                 &mut focused_element,
             );
-
-            CFRelease(focused_app);
 
             let window_title = if element_result == K_AX_ERROR_SUCCESS && !focused_element.is_null()
             {
@@ -110,18 +210,45 @@ pub mod macos {
                     let cf_string = CFString::wrap_under_create_rule(win_title_value as _);
                     cf_string.to_string()
                 } else {
+                    // Release if non-null but failed
+                    if !win_title_value.is_null() {
+                        CFRelease(win_title_value);
+                    }
                     String::new()
                 }
             } else {
+                // Release if non-null but failed to get element
+                if !focused_element.is_null() {
+                    CFRelease(focused_element);
+                }
                 String::new()
             };
 
+            CFRelease(focused_app);
             Some((app_name, window_title))
         }
     }
 
-    /// Get currently selected text in the focused application
-    pub fn get_selected_text() -> Option<String> {
+    /// Get information about the currently focused UI element
+    /// Returns (app_name, window_title) if successful
+    ///
+    /// # Thread Safety
+    /// This function is thread-safe. It can be called from any thread.
+    /// If not on the main thread, it will automatically dispatch to the main thread.
+    pub fn get_focused_element_info() -> Option<(String, String)> {
+        run_on_main_thread(|| get_focused_element_info_impl())
+    }
+
+    /// Get currently selected text in the focused application (internal implementation)
+    ///
+    /// # Thread Safety
+    /// This function must be called from the main thread only.
+    ///
+    /// # Safety
+    /// Uses unsafe FFI calls to Core Foundation and Accessibility APIs
+    fn get_selected_text_impl() -> Option<String> {
+        assert_main_thread();
+
         unsafe {
             let system_wide = AXUIElementCreateSystemWide();
             if system_wide.is_null() {
@@ -178,14 +305,34 @@ pub mod macos {
                 if !text.is_empty() {
                     return Some(text);
                 }
+            } else if !selected_text.is_null() {
+                // Release if non-null but failed
+                CFRelease(selected_text);
             }
 
             None
         }
     }
 
-    /// Get the current URL from browser (if focused)
-    pub fn get_browser_url() -> Option<String> {
+    /// Get currently selected text in the focused application
+    ///
+    /// # Thread Safety
+    /// This function is thread-safe. It can be called from any thread.
+    /// If not on the main thread, it will automatically dispatch to the main thread.
+    pub fn get_selected_text() -> Option<String> {
+        run_on_main_thread(|| get_selected_text_impl())
+    }
+
+    /// Get the current URL from browser (if focused) (internal implementation)
+    ///
+    /// # Thread Safety
+    /// This function must be called from the main thread only.
+    ///
+    /// # Safety
+    /// Uses unsafe FFI calls to Core Foundation and Accessibility APIs
+    fn get_browser_url_impl() -> Option<String> {
+        assert_main_thread();
+
         unsafe {
             let system_wide = AXUIElementCreateSystemWide();
             if system_wide.is_null() {
@@ -222,6 +369,10 @@ pub mod macos {
                 let cf_string = CFString::wrap_under_create_rule(title_value as _);
                 cf_string.to_string().to_lowercase()
             } else {
+                // Release if non-null but failed
+                if !title_value.is_null() {
+                    CFRelease(title_value);
+                }
                 CFRelease(focused_app);
                 return None;
             };
@@ -248,13 +399,32 @@ pub mod macos {
         }
     }
 
+    /// Get the current URL from browser (if focused)
+    ///
+    /// # Thread Safety
+    /// This function is thread-safe. It can be called from any thread.
+    /// If not on the main thread, it will automatically dispatch to the main thread.
+    pub fn get_browser_url() -> Option<String> {
+        run_on_main_thread(|| get_browser_url_impl())
+    }
+
     /// Check if the app has accessibility permission
+    ///
+    /// # Thread Safety
+    /// This function is thread-safe and can be called from any thread.
+    /// AXIsProcessTrusted() is documented as thread-safe by Apple.
+    ///
+    /// # Safety
+    /// Uses unsafe FFI call to Accessibility API
     pub fn has_accessibility_permission() -> bool {
         unsafe { AXIsProcessTrusted() }
     }
 
     /// Request accessibility permission from the user
     /// Opens System Preferences to the appropriate pane
+    ///
+    /// # Thread Safety
+    /// This function is thread-safe and can be called from any thread.
     pub fn request_accessibility_permission() -> bool {
         use std::process::Command;
 
@@ -266,13 +436,19 @@ pub mod macos {
         result.is_ok()
     }
 
-    /// Get all visible windows using CGWindowListCopyWindowInfo
-    pub fn get_all_windows() -> Vec<(String, String)> {
+    /// Get all visible windows using CGWindowListCopyWindowInfo (internal implementation)
+    ///
+    /// # Thread Safety
+    /// This function must be called from the main thread only.
+    ///
+    /// # Safety
+    /// Uses unsafe FFI calls to Core Graphics and Core Foundation APIs
+    fn get_all_windows_impl() -> Vec<(String, String)> {
+        assert_main_thread();
+
         unsafe {
-            let window_list = CGWindowListCopyWindowInfo(
-                kCGWindowListOptionOnScreenOnly,
-                kCGNullWindowID,
-            );
+            let window_list =
+                CGWindowListCopyWindowInfo(kCGWindowListOptionOnScreenOnly, kCGNullWindowID);
 
             if window_list.is_null() {
                 return Vec::new();
@@ -282,11 +458,14 @@ pub mod macos {
             let count = core_foundation::array::CFArray::<core_foundation::dictionary::CFDictionary>::wrap_under_get_rule(window_list as _).len();
 
             for i in 0..count {
-                let array = core_foundation::array::CFArray::<core_foundation::dictionary::CFDictionary>::wrap_under_get_rule(window_list as _);
+                let array = core_foundation::array::CFArray::<
+                    core_foundation::dictionary::CFDictionary,
+                >::wrap_under_get_rule(window_list as _);
                 if let Some(dict) = array.get(i as isize) {
                     // Get owner name (app name)
                     let owner_key = CFString::new("kCGWindowOwnerName");
-                    let app_name = dict.find(owner_key.as_concrete_TypeRef() as *const c_void)
+                    let app_name = dict
+                        .find(owner_key.as_concrete_TypeRef() as *const c_void)
                         .map(|v| {
                             let cf_str = CFString::wrap_under_get_rule(*v as _);
                             cf_str.to_string()
@@ -295,7 +474,8 @@ pub mod macos {
 
                     // Get window name (title)
                     let name_key = CFString::new("kCGWindowName");
-                    let window_title = dict.find(name_key.as_concrete_TypeRef() as *const c_void)
+                    let window_title = dict
+                        .find(name_key.as_concrete_TypeRef() as *const c_void)
                         .map(|v| {
                             let cf_str = CFString::wrap_under_get_rule(*v as _);
                             cf_str.to_string()
@@ -311,6 +491,15 @@ pub mod macos {
             CFRelease(window_list as *mut c_void);
             windows
         }
+    }
+
+    /// Get all visible windows using CGWindowListCopyWindowInfo
+    ///
+    /// # Thread Safety
+    /// This function is thread-safe. It can be called from any thread.
+    /// If not on the main thread, it will automatically dispatch to the main thread.
+    pub fn get_all_windows() -> Vec<(String, String)> {
+        run_on_main_thread(|| get_all_windows_impl())
     }
 }
 

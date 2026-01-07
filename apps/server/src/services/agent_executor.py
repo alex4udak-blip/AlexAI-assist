@@ -11,7 +11,11 @@ from urllib.parse import urlparse
 import httpx
 
 from src.core.claude import claude_client
+from src.core.logging import get_logger, log_error, log_security_event
+from src.core.retry import retry_with_backoff, with_circuit_breaker
 from src.db.models import Agent
+
+logger = get_logger(__name__)
 
 
 class AgentExecutorService:
@@ -28,9 +32,29 @@ class AgentExecutorService:
         success = True
         error = None
 
+        logger.info(
+            f"Starting agent execution: {agent.name}",
+            extra={
+                "event_type": "agent_execution_started",
+                "agent_id": str(agent.id),
+                "agent_name": agent.name,
+                "action_count": len(agent.actions),
+            },
+        )
+
         try:
             for i, action in enumerate(agent.actions):
                 action_type = action.get("type")
+                logger.debug(
+                    f"Executing action {i + 1}/{len(agent.actions)}: {action_type}",
+                    extra={
+                        "event_type": "agent_action_started",
+                        "agent_id": str(agent.id),
+                        "action_index": i,
+                        "action_type": action_type,
+                    },
+                )
+
                 action_result = await self._execute_action(
                     agent=agent,
                     action=action,
@@ -45,14 +69,44 @@ class AgentExecutorService:
                 if not action_result.get("success"):
                     success = False
                     error = action_result.get("error")
+                    log_error(
+                        logger,
+                        f"Agent action failed: {action_type}",
+                        extra={
+                            "event_type": "agent_action_failed",
+                            "agent_id": str(agent.id),
+                            "action_index": i,
+                            "action_type": action_type,
+                            "error": error,
+                        },
+                    )
                     break
 
                 # Update context with action result
                 context[f"action_{i}_result"] = action_result
 
+            logger.info(
+                f"Agent execution {'completed' if success else 'failed'}: {agent.name}",
+                extra={
+                    "event_type": "agent_execution_completed",
+                    "agent_id": str(agent.id),
+                    "success": success,
+                    "actions_executed": len(results),
+                },
+            )
+
         except Exception as e:
             success = False
             error = str(e)
+            log_error(
+                logger,
+                f"Agent execution error: {agent.name}",
+                error=e,
+                extra={
+                    "event_type": "agent_execution_error",
+                    "agent_id": str(agent.id),
+                },
+            )
 
         return {
             "success": success,
@@ -89,6 +143,15 @@ class AgentExecutorService:
         try:
             return await handler(action, context)
         except Exception as e:
+            log_error(
+                logger,
+                f"Action handler error: {action_type}",
+                error=e,
+                extra={
+                    "event_type": "action_handler_error",
+                    "action_type": action_type,
+                },
+            )
             return {
                 "success": False,
                 "error": str(e),
@@ -121,16 +184,52 @@ class AgentExecutorService:
 
         try:
             analysis = await claude_client.complete(rendered_prompt)
+            logger.debug(
+                "Claude analysis completed",
+                extra={
+                    "event_type": "claude_analysis",
+                    "prompt_length": len(rendered_prompt),
+                    "response_length": len(analysis),
+                },
+            )
             return {
                 "success": True,
                 "analysis": analysis,
                 "type": "analysis",
             }
         except Exception as e:
+            log_error(
+                logger,
+                "Claude analysis failed",
+                error=e,
+                extra={"event_type": "claude_analysis_error"},
+            )
             return {
                 "success": False,
                 "error": f"Analysis failed: {e}",
             }
+
+    @retry_with_backoff(max_attempts=3, min_wait=1, max_wait=10)
+    @with_circuit_breaker(service_name="agent_http")
+    async def _make_http_request(
+        self,
+        method: str,
+        url: str,
+        headers: dict[str, str],
+        body: dict[str, Any] | None,
+    ) -> httpx.Response:
+        """Make HTTP request with retry logic."""
+        async with httpx.AsyncClient(timeout=30) as client:
+            response = await client.request(
+                method=method,
+                url=url,
+                headers=headers,
+                json=body if method in ("POST", "PUT", "PATCH") else None,
+            )
+            # Raise for 5xx errors to trigger retry
+            if 500 <= response.status_code < 600:
+                response.raise_for_status()
+            return response
 
     async def _action_http(
         self,
@@ -149,6 +248,14 @@ class AgentExecutorService:
 
             # Only allow http/https
             if parsed.scheme not in ("http", "https"):
+                log_security_event(
+                    logger,
+                    "HTTP action blocked: invalid URL scheme",
+                    details={
+                        "scheme": parsed.scheme,
+                        "url": url[:100],  # Truncate for logging
+                    },
+                )
                 return {
                     "success": False,
                     "error": f"Invalid URL scheme: {parsed.scheme}. Only http/https allowed.",
@@ -172,6 +279,12 @@ class AgentExecutorService:
 
             hostname = parsed.hostname or ""
             if hostname in blocked_hosts:
+                log_security_event(
+                    logger,
+                    "SSRF attempt blocked: blocked host",
+                    details={"hostname": hostname},
+                    level="ERROR",
+                )
                 return {
                     "success": False,
                     "error": "URL points to blocked host",
@@ -180,6 +293,12 @@ class AgentExecutorService:
 
             for pattern in blocked_patterns:
                 if hostname.startswith(pattern) or hostname.endswith(pattern):
+                    log_security_event(
+                        logger,
+                        "SSRF attempt blocked: private network",
+                        details={"hostname": hostname, "pattern": pattern},
+                        level="ERROR",
+                    )
                     return {
                         "success": False,
                         "error": "URL points to internal/private network",
@@ -187,6 +306,12 @@ class AgentExecutorService:
                     }
 
         except Exception as e:
+            log_error(
+                logger,
+                "HTTP action URL validation failed",
+                error=e,
+                extra={"event_type": "http_url_validation_error"},
+            )
             return {
                 "success": False,
                 "error": f"Invalid URL: {e}",
@@ -197,18 +322,44 @@ class AgentExecutorService:
             body = self._render_template(json.dumps(body), context)
             body = json.loads(body)
 
-        async with httpx.AsyncClient(timeout=30) as client:
-            response = await client.request(
+        try:
+            response = await self._make_http_request(
                 method=method,
                 url=url,
                 headers=headers,
-                json=body if method in ("POST", "PUT", "PATCH") else None,
+                body=body,
+            )
+
+            logger.info(
+                f"HTTP request completed: {method} {url}",
+                extra={
+                    "event_type": "http_request",
+                    "method": method,
+                    "url": url[:100],  # Truncate for logging
+                    "status_code": response.status_code,
+                },
             )
 
             return {
                 "success": response.is_success,
                 "status_code": response.status_code,
                 "body": response.text[:1000],
+                "type": "http",
+            }
+        except Exception as e:
+            log_error(
+                logger,
+                f"HTTP request failed: {method} {url}",
+                error=e,
+                extra={
+                    "event_type": "http_request_error",
+                    "method": method,
+                    "url": url[:100],
+                },
+            )
+            return {
+                "success": False,
+                "error": f"HTTP request failed: {e}",
                 "type": "http",
             }
 

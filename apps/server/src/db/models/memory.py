@@ -34,8 +34,8 @@ class MemoryFact(Base):
     is_persona_event: Mapped[bool] = mapped_column(Boolean, default=False)
 
     # A-MEM Zettelkasten
-    keywords: Mapped[list[str] | None] = mapped_column(ARRAY(String), server_default="{}")
-    tags: Mapped[list[str] | None] = mapped_column(ARRAY(String), server_default="{}")
+    keywords: Mapped[list[str] | None] = mapped_column(ARRAY(String), server_default="'{}'")
+    tags: Mapped[list[str] | None] = mapped_column(ARRAY(String), server_default="'{}'")
     context: Mapped[str | None] = mapped_column(Text)
 
     # Hindsight temporal
@@ -48,7 +48,7 @@ class MemoryFact(Base):
     confidence: Mapped[float] = mapped_column(Float, default=1.0)
     source: Mapped[str | None] = mapped_column(String(50))
     source_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True)
-    evidence_ids: Mapped[list[uuid.UUID] | None] = mapped_column(ARRAY(UUID(as_uuid=True)), server_default="{}")
+    evidence_ids: Mapped[list[uuid.UUID] | None] = mapped_column(ARRAY(UUID(as_uuid=True)), server_default="'{}'")
 
     # MemOS scheduling
     heat_score: Mapped[float] = mapped_column(Float, default=1.0)
@@ -87,7 +87,7 @@ class MemoryExperience(Base):
     # What happened
     action_taken: Mapped[str | None] = mapped_column(Text)
     outcome: Mapped[str | None] = mapped_column(String(50))  # success, failure, partial
-    outcome_details: Mapped[dict[str, Any] | None] = mapped_column(JSONB, server_default="{}")
+    outcome_details: Mapped[dict[str, Any] | None] = mapped_column(JSONB, server_default="'{}'")
 
     # Learning
     lesson_learned: Mapped[str | None] = mapped_column(Text)
@@ -99,8 +99,8 @@ class MemoryExperience(Base):
 
     # References
     agent_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True)
-    related_facts: Mapped[list[uuid.UUID] | None] = mapped_column(ARRAY(UUID(as_uuid=True)), server_default="{}")
-    related_entities: Mapped[list[uuid.UUID] | None] = mapped_column(ARRAY(UUID(as_uuid=True)), server_default="{}")
+    related_facts: Mapped[list[uuid.UUID] | None] = mapped_column(ARRAY(UUID(as_uuid=True)), server_default="'{}'")
+    related_entities: Mapped[list[uuid.UUID] | None] = mapped_column(ARRAY(UUID(as_uuid=True)), server_default="'{}'")
 
     # Procedural
     is_procedural: Mapped[bool] = mapped_column(Boolean, default=False)
@@ -130,8 +130,8 @@ class MemoryEntity(Base):
 
     # Synthesized profile
     summary: Mapped[str | None] = mapped_column(Text)
-    key_facts: Mapped[list[str] | None] = mapped_column(ARRAY(String), server_default="{}")
-    attributes: Mapped[dict[str, Any] | None] = mapped_column(JSONB, server_default="{}")
+    key_facts: Mapped[list[str] | None] = mapped_column(ARRAY(String), server_default="'{}'")
+    attributes: Mapped[dict[str, Any] | None] = mapped_column(JSONB, server_default="'{}'")
 
     # Usage statistics
     mention_count: Mapped[int] = mapped_column(Integer, default=1)
@@ -196,7 +196,7 @@ class MemoryRelationship(Base):
     confidence: Mapped[float] = mapped_column(Float, default=1.0)
 
     # Evidence
-    evidence: Mapped[list[uuid.UUID] | None] = mapped_column(ARRAY(UUID(as_uuid=True)), server_default="{}")
+    evidence: Mapped[list[uuid.UUID] | None] = mapped_column(ARRAY(UUID(as_uuid=True)), server_default="'{}'")
 
     # Timestamps
     created_at: Mapped[datetime] = mapped_column(default=datetime.utcnow)
@@ -239,8 +239,8 @@ class MemoryBelief(Base):
     confidence_history: Mapped[list[dict[str, Any]] | None] = mapped_column(JSONB, server_default="[]")
 
     # Evidence
-    supporting_facts: Mapped[list[uuid.UUID] | None] = mapped_column(ARRAY(UUID(as_uuid=True)), server_default="{}")
-    contradicting_facts: Mapped[list[uuid.UUID] | None] = mapped_column(ARRAY(UUID(as_uuid=True)), server_default="{}")
+    supporting_facts: Mapped[list[uuid.UUID] | None] = mapped_column(ARRAY(UUID(as_uuid=True)), server_default="'{}'")
+    contradicting_facts: Mapped[list[uuid.UUID] | None] = mapped_column(ARRAY(UUID(as_uuid=True)), server_default="'{}'")
 
     # Evolution
     formed_at: Mapped[datetime] = mapped_column(default=datetime.utcnow)
@@ -281,7 +281,7 @@ class MemoryTopic(Base):
     description: Mapped[str | None] = mapped_column(Text)
 
     # Messages
-    message_ids: Mapped[list[uuid.UUID] | None] = mapped_column(ARRAY(UUID(as_uuid=True)), server_default="{}")
+    message_ids: Mapped[list[uuid.UUID] | None] = mapped_column(ARRAY(UUID(as_uuid=True)), server_default="'{}'")
     message_count: Mapped[int] = mapped_column(Integer, default=0)
 
     # Temporal
@@ -290,7 +290,7 @@ class MemoryTopic(Base):
 
     # Summary
     summary: Mapped[str | None] = mapped_column(Text)
-    key_points: Mapped[list[str] | None] = mapped_column(ARRAY(String), server_default="{}")
+    key_points: Mapped[list[str] | None] = mapped_column(ARRAY(String), server_default="'{}'")
 
     # Timestamps
     created_at: Mapped[datetime] = mapped_column(default=datetime.utcnow)
@@ -306,8 +306,8 @@ class MemoryKeywordIndex(Base):
     session_id: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
 
     keyword: Mapped[str] = mapped_column(String(100), nullable=False)
-    message_ids: Mapped[list[uuid.UUID] | None] = mapped_column(ARRAY(UUID(as_uuid=True)), server_default="{}")
-    fact_ids: Mapped[list[uuid.UUID] | None] = mapped_column(ARRAY(UUID(as_uuid=True)), server_default="{}")
+    message_ids: Mapped[list[uuid.UUID] | None] = mapped_column(ARRAY(UUID(as_uuid=True)), server_default="'{}'")
+    fact_ids: Mapped[list[uuid.UUID] | None] = mapped_column(ARRAY(UUID(as_uuid=True)), server_default="'{}'")
     occurrence_count: Mapped[int] = mapped_column(Integer, default=1)
 
     created_at: Mapped[datetime] = mapped_column(default=datetime.utcnow)
@@ -332,7 +332,7 @@ class MemoryCube(Base):
 
     # MemOS metadata
     version: Mapped[int] = mapped_column(Integer, default=1)
-    provenance: Mapped[dict[str, Any] | None] = mapped_column(JSONB, server_default="{}")
+    provenance: Mapped[dict[str, Any] | None] = mapped_column(JSONB, server_default="'{}'")
 
     # Governance
     access_level: Mapped[str] = mapped_column(String(20), default="private")
@@ -438,20 +438,20 @@ class MemoryEpisode(Base):
     # Content
     title: Mapped[str | None] = mapped_column(String(255))
     summary: Mapped[str] = mapped_column(Text, nullable=False)
-    key_points: Mapped[list[str] | None] = mapped_column(ARRAY(String), server_default="{}")
+    key_points: Mapped[list[str] | None] = mapped_column(ARRAY(String), server_default="'{}'")
     highlights: Mapped[list[dict[str, Any]] | None] = mapped_column(JSONB, server_default="[]")
 
     # Metrics
-    metrics: Mapped[dict[str, Any] | None] = mapped_column(JSONB, server_default="{}")
+    metrics: Mapped[dict[str, Any] | None] = mapped_column(JSONB, server_default="'{}'")
 
     # Extracted knowledge
-    facts_extracted: Mapped[list[uuid.UUID] | None] = mapped_column(ARRAY(UUID(as_uuid=True)), server_default="{}")
-    beliefs_formed: Mapped[list[uuid.UUID] | None] = mapped_column(ARRAY(UUID(as_uuid=True)), server_default="{}")
-    entities_mentioned: Mapped[list[uuid.UUID] | None] = mapped_column(ARRAY(UUID(as_uuid=True)), server_default="{}")
+    facts_extracted: Mapped[list[uuid.UUID] | None] = mapped_column(ARRAY(UUID(as_uuid=True)), server_default="'{}'")
+    beliefs_formed: Mapped[list[uuid.UUID] | None] = mapped_column(ARRAY(UUID(as_uuid=True)), server_default="'{}'")
+    entities_mentioned: Mapped[list[uuid.UUID] | None] = mapped_column(ARRAY(UUID(as_uuid=True)), server_default="'{}'")
 
     # Sources
-    source_messages: Mapped[list[uuid.UUID] | None] = mapped_column(ARRAY(UUID(as_uuid=True)), server_default="{}")
-    source_events: Mapped[list[uuid.UUID] | None] = mapped_column(ARRAY(UUID(as_uuid=True)), server_default="{}")
+    source_messages: Mapped[list[uuid.UUID] | None] = mapped_column(ARRAY(UUID(as_uuid=True)), server_default="'{}'")
+    source_events: Mapped[list[uuid.UUID] | None] = mapped_column(ARRAY(UUID(as_uuid=True)), server_default="'{}'")
 
     # Timestamps
     created_at: Mapped[datetime] = mapped_column(default=datetime.utcnow)
@@ -476,7 +476,7 @@ class MemoryProcedure(Base):
     procedure_type: Mapped[str | None] = mapped_column(String(50))
 
     # The procedure
-    trigger_conditions: Mapped[dict[str, Any] | None] = mapped_column(JSONB, server_default="{}")
+    trigger_conditions: Mapped[dict[str, Any] | None] = mapped_column(JSONB, server_default="'{}'")
     steps: Mapped[list[dict[str, Any]] | None] = mapped_column(JSONB, server_default="[]")
     expected_outcome: Mapped[str | None] = mapped_column(Text)
 
@@ -493,7 +493,7 @@ class MemoryProcedure(Base):
 
     # Agent link
     learned_from_agent_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True)
-    experience_ids: Mapped[list[uuid.UUID] | None] = mapped_column(ARRAY(UUID(as_uuid=True)), server_default="{}")
+    experience_ids: Mapped[list[uuid.UUID] | None] = mapped_column(ARRAY(UUID(as_uuid=True)), server_default="'{}'")
 
     # Timestamps
     last_used: Mapped[datetime | None] = mapped_column(nullable=True)
@@ -528,8 +528,8 @@ class MemoryMeta(Base):
     experiences_count: Mapped[int] = mapped_column(Integer, default=0)
 
     # Knowledge gaps
-    unknown_areas: Mapped[list[str] | None] = mapped_column(ARRAY(String), server_default="{}")
-    questions_to_explore: Mapped[list[str] | None] = mapped_column(ARRAY(String), server_default="{}")
+    unknown_areas: Mapped[list[str] | None] = mapped_column(ARRAY(String), server_default="'{}'")
+    questions_to_explore: Mapped[list[str] | None] = mapped_column(ARRAY(String), server_default="'{}'")
 
     # Timestamps
     last_updated: Mapped[datetime | None] = mapped_column(nullable=True)

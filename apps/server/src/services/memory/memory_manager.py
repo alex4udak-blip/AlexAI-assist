@@ -9,6 +9,7 @@ from uuid import UUID, uuid4
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from src.core.security import validate_session_id
 from .fact_network import FactNetwork
 from .experience_network import ExperienceNetwork
 from .observation_network import ObservationNetwork
@@ -29,22 +30,24 @@ class MemoryManager:
 
     def __init__(self, db: AsyncSession, session_id: str = "default"):
         self.db = db
-        self.session_id = session_id
+        # Validate session_id to prevent session forgery
+        self.session_id = validate_session_id(session_id)
 
         # Initialize networks (Hindsight architecture)
-        self.facts = FactNetwork(db, session_id)
-        self.experiences = ExperienceNetwork(db, session_id)
-        self.observations = ObservationNetwork(db, session_id)
-        self.beliefs = BeliefNetwork(db, session_id)
+        # Use validated session_id to prevent forgery attacks
+        self.facts = FactNetwork(db, self.session_id)
+        self.experiences = ExperienceNetwork(db, self.session_id)
+        self.observations = ObservationNetwork(db, self.session_id)
+        self.beliefs = BeliefNetwork(db, self.session_id)
 
         # O-Mem persona layer
-        self.persona = PersonaMemory(db, session_id)
+        self.persona = PersonaMemory(db, self.session_id)
 
         # MemOS scheduling
-        self.scheduler = MemScheduler(db, session_id)
+        self.scheduler = MemScheduler(db, self.session_id)
 
         # Memory-R1 operations
-        self.operator = MemoryOperator(db, session_id)
+        self.operator = MemoryOperator(db, self.session_id)
 
     # ==========================================
     # CONTEXT BUILDING (For each chat request)

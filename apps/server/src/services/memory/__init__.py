@@ -21,6 +21,7 @@ from .persona_memory import PersonaMemory
 from .memory_scheduler import MemScheduler
 from .memory_operations import MemoryOperator
 from .embeddings import EmbeddingService, embedding_service
+from . import confidence_utils
 
 __all__ = [
     "MemoryManager",
@@ -33,4 +34,5 @@ __all__ = [
     "MemoryOperator",
     "EmbeddingService",
     "embedding_service",
+    "confidence_utils",
 ]

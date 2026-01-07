@@ -5,15 +5,81 @@ Decides ADD/UPDATE/DELETE/NOOP for each interaction.
 
 import json
 import logging
+import re
+import unicodedata
 from datetime import datetime
 from typing import Any
 from uuid import UUID, uuid4
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from src.core.security import validate_session_id
 from src.db.models.memory import MemoryOperation
 
 logger = logging.getLogger(__name__)
+
+
+def sanitize_user_input(text: str, max_length: int = 10000) -> str:
+    """
+    Sanitize user input to prevent prompt injection attacks.
+
+    Args:
+        text: Raw user input
+        max_length: Maximum allowed length
+
+    Returns:
+        Sanitized text safe for embedding in prompts
+    """
+    if not text or not isinstance(text, str):
+        return ""
+
+    # Step 1: Limit length
+    text = text[:max_length]
+
+    # Step 2: Strip control characters (except common whitespace)
+    # Keep: \n (newline), \t (tab), \r (carriage return)
+    # Remove: other control characters that could affect prompt parsing
+    text = "".join(
+        char for char in text
+        if unicodedata.category(char)[0] != "C" or char in {"\n", "\t", "\r", " "}
+    )
+
+    # Step 3: Remove potential prompt injection patterns
+    # These patterns could be used to escape the user content section
+    injection_patterns = [
+        r"(?i)<\|im_start\|>",  # ChatML tokens
+        r"(?i)<\|im_end\|>",
+        r"(?i)<\|system\|>",
+        r"(?i)<\|assistant\|>",
+        r"(?i)<\|user\|>",
+        r"(?i)##\s*INSTRUCTIONS",  # Attempts to inject new instructions
+        r"(?i)##\s*SYSTEM",
+        r"(?i)##\s*OVERRIDE",
+        r"(?i)IGNORE\s+PREVIOUS\s+INSTRUCTIONS",
+        r"(?i)IGNORE\s+ALL\s+PREVIOUS",
+        r"(?i)NEW\s+INSTRUCTIONS:",
+        r"(?i)SYSTEM\s+PROMPT:",
+        r"(?i)You\s+are\s+now",  # Attempts to redefine assistant role
+        r"(?i)Disregard\s+all",
+    ]
+
+    for pattern in injection_patterns:
+        text = re.sub(pattern, "[FILTERED]", text)
+
+    # Step 4: Escape markdown formatting that could affect prompt structure
+    # Replace triple backticks which could close/open code blocks
+    text = text.replace("```", "'''")
+
+    # Step 5: Normalize excessive whitespace
+    # Prevent prompt stuffing with whitespace
+    text = re.sub(r"\n{4,}", "\n\n\n", text)  # Max 3 consecutive newlines
+    text = re.sub(r" {10,}", " " * 9, text)  # Max 9 consecutive spaces
+
+    # Step 6: Remove null bytes and other problematic characters
+    text = text.replace("\x00", "")
+    text = text.replace("\uffff", "")
+
+    return text.strip()
 
 
 class MemoryOperator:
@@ -59,7 +125,8 @@ Example output:
 
     def __init__(self, db: AsyncSession, session_id: str = "default"):
         self.db = db
-        self.session_id = session_id
+        # Validate session_id to prevent session forgery
+        self.session_id = validate_session_id(session_id)
 
     async def decide_operations(
         self,
@@ -73,13 +140,17 @@ Example output:
         """
         from src.core.claude import claude_client
 
+        # Sanitize user inputs to prevent prompt injection
+        sanitized_user_msg = sanitize_user_input(user_message, max_length=1000)
+        sanitized_assistant_resp = sanitize_user_input(assistant_response, max_length=1000)
+
         # Format current context
         context_str = self._format_context(current_context) if current_context else "No prior context."
 
         prompt = self.DECISION_PROMPT.format(
             current_context=context_str,
-            user_message=user_message[:1000],
-            assistant_response=assistant_response[:1000],
+            user_message=sanitized_user_msg,
+            assistant_response=sanitized_assistant_resp,
         )
 
         try:
@@ -117,21 +188,36 @@ Example output:
             return []
 
     def _format_context(self, context: dict[str, Any]) -> str:
-        """Format context for prompt."""
+        """Format context for prompt with sanitization."""
         parts = []
 
         if context.get("relevant_facts"):
-            facts = [f["content"] for f in context["relevant_facts"][:5]]
-            parts.append(f"Known facts:\n" + "\n".join(f"- {f}" for f in facts))
+            # Sanitize fact content before embedding in prompt
+            facts = [
+                sanitize_user_input(f.get("content", ""), max_length=500)
+                for f in context["relevant_facts"][:5]
+            ]
+            facts = [f for f in facts if f]  # Remove empty facts
+            if facts:
+                parts.append(f"Known facts:\n" + "\n".join(f"- {f}" for f in facts))
 
         if context.get("beliefs"):
-            beliefs = [b["belief"] for b in context["beliefs"][:3]]
-            parts.append(f"Current beliefs:\n" + "\n".join(f"- {b}" for b in beliefs))
+            # Sanitize belief content before embedding in prompt
+            beliefs = [
+                sanitize_user_input(b.get("belief", ""), max_length=500)
+                for b in context["beliefs"][:3]
+            ]
+            beliefs = [b for b in beliefs if b]  # Remove empty beliefs
+            if beliefs:
+                parts.append(f"Current beliefs:\n" + "\n".join(f"- {b}" for b in beliefs))
 
         if context.get("persona"):
             p = context["persona"]
             if p.get("summary"):
-                parts.append(f"User profile: {p['summary'][:200]}")
+                # Sanitize persona summary before embedding in prompt
+                sanitized_summary = sanitize_user_input(p["summary"], max_length=200)
+                if sanitized_summary:
+                    parts.append(f"User profile: {sanitized_summary}")
 
         return "\n\n".join(parts) if parts else "No prior context."
 

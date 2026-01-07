@@ -1,4 +1,5 @@
 import { config } from './config';
+import { AuthStorage } from './authStorage';
 
 const API_URL = config.apiUrl;
 
@@ -6,13 +7,14 @@ export type QueryParams = Record<string, string | number | boolean | undefined>;
 
 interface FetchOptions extends RequestInit {
   params?: QueryParams;
+  requireAuth?: boolean; // Whether this endpoint requires authentication
 }
 
 async function fetchApi<T>(
   endpoint: string,
   options: FetchOptions = {}
 ): Promise<T> {
-  const { params, ...fetchOptions } = options;
+  const { params, requireAuth = false, ...fetchOptions } = options;
 
   let url = `${API_URL}${endpoint}`;
 
@@ -29,13 +31,30 @@ async function fetchApi<T>(
     }
   }
 
+  // Build headers
+  const headers: HeadersInit = {
+    'Content-Type': 'application/json',
+    ...fetchOptions.headers,
+  };
+
+  // Add authentication header if token exists
+  const accessToken = AuthStorage.getAccessToken();
+  if (accessToken) {
+    headers['Authorization'] = `Bearer ${accessToken}`;
+  } else if (requireAuth) {
+    throw new Error('Authentication required');
+  }
+
   const response = await fetch(url, {
     ...fetchOptions,
-    headers: {
-      'Content-Type': 'application/json',
-      ...fetchOptions.headers,
-    },
+    headers,
   });
+
+  // Handle 401 Unauthorized - clear tokens
+  if (response.status === 401) {
+    AuthStorage.clearToken();
+    throw new Error('Authentication failed. Please log in again.');
+  }
 
   if (!response.ok) {
     const error = await response.json().catch(() => ({}));

@@ -11,7 +11,9 @@ from uuid import UUID, uuid4
 from sqlalchemy import and_, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from src.core.security import validate_session_id
 from src.db.models.memory import MemoryBelief, MemoryFact
+from .confidence_utils import calculate_challenge, calculate_reinforcement
 
 logger = logging.getLogger(__name__)
 
@@ -26,9 +28,15 @@ class BeliefNetwork:
     - History tracking
     """
 
+    # Allowed belief types for validation
+    ALLOWED_BELIEF_TYPES = frozenset({
+        "preference", "opinion", "inference", "prediction",
+    })
+
     def __init__(self, db: AsyncSession, session_id: str = "default"):
         self.db = db
-        self.session_id = session_id
+        # Validate session_id to prevent session forgery
+        self.session_id = validate_session_id(session_id)
 
     async def form(
         self,
@@ -48,7 +56,41 @@ class BeliefNetwork:
 
         Returns:
             Created MemoryBelief
+
+        Raises:
+            ValueError: If validation fails
         """
+        # Validate required string fields
+        if not belief or not belief.strip():
+            raise ValueError("belief is required and cannot be empty")
+
+        belief = belief.strip()
+
+        # Validate string length
+        if len(belief) > 2000:
+            raise ValueError(f"belief exceeds maximum length of 2000 characters (got {len(belief)})")
+
+        # Validate belief_type
+        if belief_type not in self.ALLOWED_BELIEF_TYPES:
+            raise ValueError(
+                f"Invalid belief_type: {belief_type}. "
+                f"Allowed values: {', '.join(sorted(self.ALLOWED_BELIEF_TYPES))}"
+            )
+
+        # Validate initial_confidence range
+        if not 0.0 <= initial_confidence <= 1.0:
+            raise ValueError(f"initial_confidence must be between 0 and 1 (got {initial_confidence})")
+
+        # Validate supporting_facts list
+        if supporting_facts is not None:
+            if not isinstance(supporting_facts, list):
+                raise ValueError("supporting_facts must be a list")
+            if len(supporting_facts) > 100:
+                raise ValueError(f"supporting_facts list exceeds maximum of 100 items (got {len(supporting_facts)})")
+            for fact_id in supporting_facts:
+                if not isinstance(fact_id, UUID):
+                    raise ValueError("each supporting_fact must be a UUID")
+
         # Check for similar existing beliefs
         existing = await self._find_similar(belief)
         if existing:
@@ -169,9 +211,9 @@ class BeliefNetwork:
         if not belief:
             return None
 
-        # Increase confidence (with diminishing returns)
+        # Use unified confidence calculation with diminishing returns
         old_confidence = belief.confidence
-        new_confidence = min(0.99, old_confidence + (1 - old_confidence) * 0.2)
+        new_confidence = calculate_reinforcement(old_confidence, reinforcement_strength=0.2)
 
         belief.confidence = new_confidence
         belief.times_reinforced += 1
@@ -213,9 +255,9 @@ class BeliefNetwork:
         if not belief:
             return None
 
-        # Decrease confidence
+        # Use unified confidence calculation for challenges
         old_confidence = belief.confidence
-        new_confidence = max(0.01, old_confidence * 0.7)
+        new_confidence = calculate_challenge(old_confidence, challenge_strength=0.7)
 
         belief.confidence = new_confidence
         belief.times_challenged += 1
@@ -344,7 +386,7 @@ class BeliefNetwork:
 
                 # If most evidence is still valid, slightly reinforce
                 if valid > len(belief.supporting_facts) * 0.5:
-                    belief.confidence = min(0.99, belief.confidence + 0.02)
+                    belief.confidence = calculate_reinforcement(belief.confidence, reinforcement_strength=0.02)
                     modified += 1
 
             # Check for contradicting evidence
@@ -367,7 +409,7 @@ class BeliefNetwork:
                 if contra > 0:
                     ratio = contra / max(1, len(belief.supporting_facts or []) + contra)
                     if ratio > 0.3:
-                        belief.confidence = max(0.1, belief.confidence * 0.9)
+                        belief.confidence = calculate_challenge(belief.confidence, challenge_strength=0.9)
                         modified += 1
 
         return modified

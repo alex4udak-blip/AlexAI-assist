@@ -1,8 +1,13 @@
 """Application configuration."""
 
+import logging
+import secrets
 from functools import lru_cache
 
+from pydantic import model_validator
 from pydantic_settings import BaseSettings
+
+logger = logging.getLogger(__name__)
 
 
 class Settings(BaseSettings):
@@ -44,6 +49,27 @@ class Settings(BaseSettings):
     # App settings
     debug: bool = False
     environment: str = "development"
+
+    @model_validator(mode="after")
+    def validate_secret_key(self) -> "Settings":
+        """Validate SECRET_KEY based on environment."""
+        if not self.secret_key or self.secret_key == "":
+            is_production = self.environment.lower() in ("production", "prod")
+
+            if is_production:
+                raise ValueError(
+                    "SECRET_KEY must be set via environment variable in production. "
+                    "Generate a secure key with: python -c 'import secrets; print(secrets.token_urlsafe(32))'"
+                )
+
+            # Development: generate random key with warning
+            self.secret_key = secrets.token_urlsafe(32)
+            logger.warning(
+                "SECRET_KEY not set - generated random key for development. "
+                "This key will change on restart. Set SECRET_KEY environment variable for persistence."
+            )
+
+        return self
 
     class Config:
         env_file = ".env"

@@ -30,7 +30,7 @@
       }
     ],
     "security": {
-      "csp": null
+      "csp": "default-src 'self' tauri:; script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src 'self' https://*.railway.app http://localhost:* ws://localhost:*; img-src 'self' data: https:; font-src 'self'"
     }
   },
   "bundle": {
