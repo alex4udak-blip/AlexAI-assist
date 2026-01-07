@@ -34,6 +34,9 @@ self.addEventListener('fetch', (event) => {
   // Skip non-GET requests
   if (event.request.method !== 'GET') return;
 
+  // Skip non-http(s) requests (chrome-extension, etc)
+  if (!event.request.url.startsWith('http')) return;
+
   // Skip API and WebSocket requests
   const url = new URL(event.request.url);
   if (url.pathname.startsWith('/api') || url.pathname.startsWith('/ws')) {
@@ -73,8 +76,6 @@ self.addEventListener('push', (event) => {
   const data = event.data.json();
   const options = {
     body: data.body,
-    icon: '/icons/icon-192.png',
-    badge: '/icons/icon-192.png',
     data: data.url,
     actions: data.actions || [],
   };
