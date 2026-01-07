@@ -1,12 +1,13 @@
 """Chat endpoints with PostgreSQL storage and Redis caching."""
 
 import json
-from datetime import datetime
+import logging
+from datetime import datetime, timedelta
 from typing import Any
 from uuid import uuid4
 
 import redis.asyncio as redis
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -16,6 +17,8 @@ from src.core.claude import claude_client
 from src.core.config import settings
 from src.db.models import ChatMessage
 from src.services.analyzer import AnalyzerService
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -110,17 +113,24 @@ async def chat(
     )
     db.add(user_msg)
 
-    # Store assistant message in database
+    # Store assistant message in database with slight offset for proper ordering
+    assistant_timestamp = timestamp + timedelta(milliseconds=100)
     assistant_msg = ChatMessage(
         id=uuid4(),
         session_id=session_id,
         role="assistant",
         content=response,
-        timestamp=timestamp,
+        timestamp=assistant_timestamp,
     )
     db.add(assistant_msg)
 
-    await db.commit()
+    try:
+        await db.commit()
+        logger.info(f"Chat messages saved for session {session_id}")
+    except Exception as e:
+        logger.error(f"Failed to save chat messages: {e}")
+        await db.rollback()
+        raise HTTPException(status_code=500, detail="Failed to save chat messages")
 
     # Invalidate cache for this session
     r = await get_redis()
