@@ -1,5 +1,5 @@
 import { motion, AnimatePresence } from 'framer-motion';
-import { Bot, CheckCircle, AlertTriangle, Clock, Zap, Database, RefreshCw } from 'lucide-react';
+import { Bot, CheckCircle, AlertTriangle, Clock } from 'lucide-react';
 import { formatRelativeTime } from '../../lib/utils';
 
 interface ActivityItem {
@@ -15,12 +15,6 @@ interface AgentActivityStreamProps {
   activities: ActivityItem[];
   maxItems?: number;
 }
-
-const iconMap: Record<string, typeof Bot> = {
-  sync: Database,
-  backup: RefreshCw,
-  default: Zap,
-};
 
 export function AgentActivityStream({ activities, maxItems = 10 }: AgentActivityStreamProps) {
   const displayActivities = activities.slice(0, maxItems);

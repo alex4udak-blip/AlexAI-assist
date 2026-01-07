@@ -134,7 +134,7 @@ export default function Dashboard() {
     return {
       appName: latest.app_name || 'Unknown',
       sessionMinutes: Math.min(minutes, 120),
-      category: latest.category,
+      category: latest.category ?? undefined,
     };
   }, [timeline]);
 
@@ -291,7 +291,7 @@ export default function Dashboard() {
       type: 'app' as const,
       name: event.app_name || 'Unknown',
       startTime: event.timestamp,
-      category: event.category,
+      category: event.category ?? undefined,
     }));
   }, [timeline]);
 
