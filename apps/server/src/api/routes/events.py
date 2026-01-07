@@ -89,7 +89,7 @@ async def create_events(
         )
         db.add(event)
 
-    await db.flush()
+    await db.commit()
     return {"created": len(batch.events)}
 
 

@@ -88,7 +88,8 @@ async def create_suggestion(
         time_saved_minutes=data.time_saved_minutes,
     )
     db.add(suggestion)
-    await db.flush()
+    await db.commit()
+    await db.refresh(suggestion)
     return suggestion
 
 
@@ -126,6 +127,6 @@ async def dismiss_suggestion(
 
     suggestion.status = "dismissed"
     suggestion.dismissed_at = datetime.now(UTC)
-    await db.flush()
+    await db.commit()
 
     return {"message": "Suggestion dismissed"}

@@ -22,8 +22,8 @@ class Settings(BaseSettings):
     # Redis
     redis_url: str = "redis://localhost:6379"
 
-    # Security
-    secret_key: str = "change-me-in-production"
+    # Security - MUST be set via SECRET_KEY env variable in production
+    secret_key: str = ""
     algorithm: str = "HS256"
     access_token_expire_minutes: int = 30
 

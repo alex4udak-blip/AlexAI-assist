@@ -18,7 +18,11 @@ export default function Settings() {
 
   const handleSave = () => {
     // Save settings to localStorage or API
-    localStorage.setItem('observer-settings', JSON.stringify(settings));
+    try {
+      localStorage.setItem('observer-settings', JSON.stringify(settings));
+    } catch (err) {
+      console.error('Failed to save settings:', err);
+    }
   };
 
   const handleClearData = () => {
@@ -27,7 +31,11 @@ export default function Settings() {
         'Вы уверены, что хотите очистить все локальные данные? Это действие нельзя отменить.'
       )
     ) {
-      localStorage.clear();
+      try {
+        localStorage.clear();
+      } catch (err) {
+        console.error('Failed to clear localStorage:', err);
+      }
       window.location.reload();
     }
   };
@@ -104,7 +112,7 @@ export default function Settings() {
             <p className="text-sm text-text-tertiary mb-4">
               Очистить все локальные данные, включая настройки и кэшированную информацию.
             </p>
-            <Button variant="danger" onClick={handleClearData}>
+            <Button variant="danger" onClick={handleClearData} aria-label="Очистить локальные данные">
               <Trash2 className="w-4 h-4" />
               Очистить локальные данные
             </Button>
@@ -128,7 +136,7 @@ export default function Settings() {
               <span className="w-2 h-2 bg-status-success rounded-full" />
               <span className="text-sm text-text-secondary">Подключено</span>
             </div>
-            <Button variant="ghost" size="sm">
+            <Button variant="ghost" size="sm" aria-label="Проверить подключение к серверу">
               <RefreshCw className="w-4 h-4" />
               Проверить подключение
             </Button>
@@ -137,7 +145,7 @@ export default function Settings() {
       </Card>
 
       <div className="flex justify-end">
-        <Button onClick={handleSave}>
+        <Button onClick={handleSave} aria-label="Сохранить настройки">
           <Save className="w-4 h-4" />
           Сохранить настройки
         </Button>
