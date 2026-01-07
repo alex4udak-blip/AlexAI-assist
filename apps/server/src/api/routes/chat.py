@@ -186,39 +186,66 @@ async def chat(
     messages.append({"role": "user", "content": data.message})
 
     # Get response from Claude with full conversation history
-    try:
-        response = await claude_client.complete(
-            messages=messages,
-            system=system_prompt,
-        )
-        logger.info(
-            "Claude response generated",
-            extra={
-                "event_type": "claude_response",
-                "session_id": session_id,
-                "response_length": len(response),
-            },
-        )
-    except Exception as e:
-        error_str = str(e)
-        log_error(
-            logger,
-            "Failed to get Claude response",
-            error=e,
-            extra={
-                "event_type": "claude_error",
-                "session_id": session_id,
-            },
-        )
-        # Provide user-friendly error message without exposing internal details
-        if "413" in error_str or "too large" in error_str.lower():
-            response = "Извините, контекст беседы слишком большой. Попробуйте начать новую беседу."
-        elif "rate" in error_str.lower() or "429" in error_str:
-            response = "Превышен лимит запросов. Пожалуйста, подождите немного и попробуйте снова."
-        elif "timeout" in error_str.lower():
-            response = "Превышено время ожидания ответа. Пожалуйста, попробуйте снова."
-        else:
-            response = "Извините, произошла ошибка при подключении к AI. Пожалуйста, попробуйте снова."
+    # Auto-retry with reduced context on 413 error
+    response = None
+    retry_count = 0
+    max_retries = 3
+    current_messages = messages.copy()
+    current_system = system_prompt
+
+    while response is None and retry_count < max_retries:
+        try:
+            response = await claude_client.complete(
+                messages=current_messages,
+                system=current_system,
+            )
+            logger.info(
+                "Claude response generated",
+                extra={
+                    "event_type": "claude_response",
+                    "session_id": session_id,
+                    "response_length": len(response),
+                    "retry_count": retry_count,
+                },
+            )
+        except Exception as e:
+            error_str = str(e)
+            retry_count += 1
+
+            # On 413, reduce context and retry
+            if ("413" in error_str or "too large" in error_str.lower()) and retry_count < max_retries:
+                logger.warning(
+                    f"Context too large, reducing and retrying ({retry_count}/{max_retries})",
+                    extra={"event_type": "context_reduction", "session_id": session_id},
+                )
+                # Reduce messages - keep only last half
+                if len(current_messages) > 4:
+                    half = len(current_messages) // 2
+                    current_messages = current_messages[half:]
+                # Reduce system prompt
+                if len(current_system) > 2000:
+                    current_system = current_system[:2000] + "\n[Context reduced due to size limits]"
+                continue
+
+            log_error(
+                logger,
+                "Failed to get Claude response",
+                error=e,
+                extra={
+                    "event_type": "claude_error",
+                    "session_id": session_id,
+                    "retry_count": retry_count,
+                },
+            )
+            # Provide user-friendly error message
+            if "413" in error_str or "too large" in error_str.lower():
+                response = "Извините, контекст беседы слишком большой. Попробуйте очистить историю чата."
+            elif "rate" in error_str.lower() or "429" in error_str:
+                response = "Превышен лимит запросов. Пожалуйста, подождите немного и попробуйте снова."
+            elif "timeout" in error_str.lower():
+                response = "Превышено время ожидания ответа. Пожалуйста, попробуйте снова."
+            else:
+                response = "Извините, произошла ошибка при подключении к AI. Пожалуйста, попробуйте снова."
 
     # Store user message in database
     user_msg = ChatMessage(

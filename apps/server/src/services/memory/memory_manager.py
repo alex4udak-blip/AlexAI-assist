@@ -124,8 +124,8 @@ class MemoryManager:
         """
         sections = []
         total_length = 0
-        MAX_SECTION_LENGTH = 800  # Max chars per section
-        MAX_TOTAL_LENGTH = 4000   # Max total chars
+        MAX_SECTION_LENGTH = 2500  # Max chars per section
+        MAX_TOTAL_LENGTH = 15000   # Max total chars - generous limit
 
         def truncate(text: str, max_len: int = 200) -> str:
             """Truncate text to max_len chars."""
@@ -149,15 +149,15 @@ class MemoryManager:
 
                 if attrs:
                     persona_section += "**Key Attributes:**\n"
-                    for a in attrs[:5]:  # Reduced from 7
+                    for a in attrs[:10]:  # More attributes
                         content = a.get('content', str(a)) if isinstance(a, dict) else str(a)
-                        persona_section += f"- {truncate(content, 100)}\n"
+                        persona_section += f"- {truncate(content, 150)}\n"
 
                 if events:
                     persona_section += "\n**Important Events:**\n"
-                    for e in events[:3]:  # Reduced from 5
+                    for e in events[:7]:  # More events
                         content = e.get('content', str(e)) if isinstance(e, dict) else str(e)
-                        persona_section += f"- {truncate(content, 100)}\n"
+                        persona_section += f"- {truncate(content, 150)}\n"
 
                 if len(persona_section) <= MAX_SECTION_LENGTH:
                     sections.append(persona_section)
@@ -165,10 +165,10 @@ class MemoryManager:
 
         # Relevant Facts (Hindsight fact network) - only if room
         if context.get("relevant_facts") and total_length < MAX_TOTAL_LENGTH:
-            facts = context["relevant_facts"][:5]  # Reduced from 7
+            facts = context["relevant_facts"][:10]  # More facts
             if facts:
                 facts_str = "\n".join(
-                    f"- {truncate(f['content'], 150)} ({f.get('confidence', 1.0):.0%})"
+                    f"- {truncate(f['content'], 200)} ({f.get('confidence', 1.0):.0%})"
                     for f in facts
                 )
                 facts_section = f"## RELEVANT KNOWLEDGE\n{facts_str}"
@@ -178,12 +178,12 @@ class MemoryManager:
 
         # Entity Context (observation network) - only if room
         if context.get("entity_context") and total_length < MAX_TOTAL_LENGTH:
-            entities = context["entity_context"][:3]  # Reduced from 5
+            entities = context["entity_context"][:7]  # More entities
             if entities:
                 ent_lines = []
                 for e in entities:
-                    summary = truncate(e.get("summary") or "No summary", 80)
-                    ent_lines.append(f"- **{truncate(e['name'], 30)}**: {summary}")
+                    summary = truncate(e.get("summary") or "No summary", 120)
+                    ent_lines.append(f"- **{truncate(e['name'], 50)}**: {summary}")
                 ent_section = f"## ENTITY CONTEXT\n" + "\n".join(ent_lines)
                 if len(ent_section) <= MAX_SECTION_LENGTH:
                     sections.append(ent_section)
@@ -191,10 +191,10 @@ class MemoryManager:
 
         # Beliefs (high confidence) - only if room
         if context.get("beliefs") and total_length < MAX_TOTAL_LENGTH:
-            beliefs = context["beliefs"][:3]  # Reduced from 5
+            beliefs = context["beliefs"][:7]  # More beliefs
             if beliefs:
                 bel_str = "\n".join(
-                    f"- {truncate(b['belief'], 120)} ({b.get('confidence', 0.5):.0%})"
+                    f"- {truncate(b['belief'], 180)} ({b.get('confidence', 0.5):.0%})"
                     for b in beliefs
                 )
                 bel_section = f"## MY UNDERSTANDING\n{bel_str}"
@@ -204,9 +204,9 @@ class MemoryManager:
 
         # Recent Experiences - only if room
         if context.get("recent_experiences") and total_length < MAX_TOTAL_LENGTH:
-            exp = context["recent_experiences"][:2]  # Reduced from 3
+            exp = context["recent_experiences"][:5]  # More experiences
             if exp:
-                exp_str = "\n".join(f"- {truncate(e['description'], 100)}" for e in exp)
+                exp_str = "\n".join(f"- {truncate(e['description'], 150)}" for e in exp)
                 exp_section = f"## RECENT INTERACTIONS\n{exp_str}"
                 if len(exp_section) <= MAX_SECTION_LENGTH:
                     sections.append(exp_section)
