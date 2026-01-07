@@ -11,37 +11,46 @@ const DEV_API_URL = 'http://localhost:8000';
 const DEV_WS_URL = 'ws://localhost:8000';
 
 function getApiUrl(): string {
-  // Priority 1: Environment variable (set at build time or runtime)
+  // Priority 1: Environment variable
   if (envApiUrl) return envApiUrl;
 
-  // Priority 2: Development fallback
+  // Priority 2: Development (localhost)
   if (typeof window !== 'undefined') {
     const host = window.location.hostname;
     if (host === 'localhost' || host === '127.0.0.1') {
       return DEV_API_URL;
     }
+
+    // Priority 3: Railway auto-detection
+    if (host.includes('railway.app')) {
+      // Replace web service name with server service name
+      const serverHost = host.replace(/web-production[^.]*/, 'server-production-0b14');
+      return `https://${serverHost}`;
+    }
   }
 
-  // Priority 3: Default to development
-  // Note: Production deployments MUST set VITE_API_URL environment variable
   console.warn('[Config] VITE_API_URL not set, using development default');
   return DEV_API_URL;
 }
 
 function getWsUrl(): string {
-  // Priority 1: Environment variable (set at build time or runtime)
+  // Priority 1: Environment variable
   if (envWsUrl) return envWsUrl;
 
-  // Priority 2: Development fallback
+  // Priority 2: Development (localhost)
   if (typeof window !== 'undefined') {
     const host = window.location.hostname;
     if (host === 'localhost' || host === '127.0.0.1') {
       return DEV_WS_URL;
     }
+
+    // Priority 3: Railway auto-detection
+    if (host.includes('railway.app')) {
+      const serverHost = host.replace(/web-production[^.]*/, 'server-production-0b14');
+      return `wss://${serverHost}`;
+    }
   }
 
-  // Priority 3: Default to development
-  // Note: Production deployments MUST set VITE_WS_URL environment variable
   console.warn('[Config] VITE_WS_URL not set, using development default');
   return DEV_WS_URL;
 }
