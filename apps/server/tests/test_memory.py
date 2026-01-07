@@ -15,7 +15,7 @@ class TestEmbeddingService:
     def test_embedding_service_initialization(self):
         """Test service initialization."""
         service = EmbeddingService()
-        assert service.EMBEDDING_DIM == 384
+        assert service.EMBEDDING_DIM == 1536
 
     def test_to_pgvector_str(self):
         """Test vector string conversion for PostgreSQL."""
@@ -645,7 +645,7 @@ class TestExperienceNetwork:
 
         # Mock embedding service to return vector
         from src.services.memory.experience_network import embedding_service
-        embedding_service.embed = MagicMock(return_value=[0.1] * 384)
+        embedding_service.embed = MagicMock(return_value=[0.1] * 1536)
         embedding_service.to_pgvector_str = MagicMock(return_value="[0.1,...]")
 
         # Mock database results
@@ -804,7 +804,7 @@ class TestObservationNetwork:
 
         # Mock embedding service
         from src.services.memory.observation_network import embedding_service
-        embedding_service.embed = MagicMock(return_value=[0.1] * 384)
+        embedding_service.embed = MagicMock(return_value=[0.1] * 1536)
         embedding_service.to_pgvector_str = MagicMock(return_value="[0.1,...]")
 
         # Mock database results
