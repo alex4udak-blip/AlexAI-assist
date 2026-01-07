@@ -267,6 +267,19 @@ export default function Dashboard() {
     return result;
   }, [agents, summary]);
 
+  // Calculate system health based on recent events
+  const systemHealth = useMemo(() => {
+    if (!timeline || timeline.length === 0) return 'warning';
+
+    const latestEvent = new Date(timeline[0].timestamp);
+    const now = new Date();
+    const minutesAgo = (now.getTime() - latestEvent.getTime()) / 60000;
+
+    if (minutesAgo < 5) return 'healthy';
+    if (minutesAgo < 30) return 'warning';
+    return 'critical';
+  }, [timeline]);
+
   // Generate agent activity stream
   const agentActivities = useMemo(() => {
     if (!agents) return [];
@@ -441,7 +454,7 @@ export default function Dashboard() {
             focusTime={currentFocus?.sessionMinutes}
             activeAgents={activeAgents.length}
             totalAgents={agents?.length ?? 0}
-            systemHealth="healthy"
+            systemHealth={systemHealth as 'healthy' | 'warning' | 'critical'}
           />
         </motion.div>
 
@@ -522,7 +535,7 @@ export default function Dashboard() {
           focusTime={currentFocus?.sessionMinutes}
           activeAgents={activeAgents.length}
           totalAgents={agents?.length ?? 0}
-          systemHealth="healthy"
+          systemHealth={systemHealth as 'healthy' | 'warning' | 'critical'}
         />
       </motion.div>
 
