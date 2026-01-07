@@ -13,7 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.core.security import validate_session_id
 from src.db.models.memory import MemoryExperience, MemoryProcedure
-from .embeddings import embedding_service
+from .embeddings import embedding_service, check_pgvector_available
 
 logger = logging.getLogger(__name__)
 
@@ -138,19 +138,20 @@ class ExperienceNetwork:
         self.db.add(experience)
         await self.db.flush()
 
-        # Generate and store embedding
-        embedding = embedding_service.embed(description)
-        if embedding:
-            vector_str = embedding_service.to_pgvector_str(embedding)
-            await self.db.execute(
-                text(
-                    """
-                    UPDATE memory_experiences
-                    SET embedding_vector = :vector::vector
-                    WHERE id = :exp_id
-                    """
-                ).bindparams(vector=vector_str, exp_id=str(experience.id))
-            )
+        # Generate and store embedding (only if pgvector is available)
+        if await check_pgvector_available(self.db):
+            embedding = embedding_service.embed(description)
+            if embedding:
+                vector_str = embedding_service.to_pgvector_str(embedding)
+                await self.db.execute(
+                    text(
+                        """
+                        UPDATE memory_experiences
+                        SET embedding_vector = :vector::vector
+                        WHERE id = :exp_id
+                        """
+                    ).bindparams(vector=vector_str, exp_id=str(experience.id))
+                )
 
         logger.info(f"Added experience: {description[:50]}... (type={experience_type})")
         return experience
@@ -225,6 +226,10 @@ class ExperienceNetwork:
         Returns:
             List of experiences with scores
         """
+        # Check if pgvector is available
+        if not await check_pgvector_available(self.db):
+            return await self._text_search(query, limit)
+
         embedding = embedding_service.embed(query)
         if not embedding:
             return await self._text_search(query, limit)

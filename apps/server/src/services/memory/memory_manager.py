@@ -117,8 +117,24 @@ class MemoryManager:
         return context
 
     async def format_context_for_prompt(self, context: dict[str, Any]) -> str:
-        """Format context into system prompt section."""
+        """Format context into system prompt section.
+
+        Applies strict length limits to prevent 413 errors from Claude API.
+        Maximum prompt section size: ~4000 chars.
+        """
         sections = []
+        total_length = 0
+        MAX_SECTION_LENGTH = 800  # Max chars per section
+        MAX_TOTAL_LENGTH = 4000   # Max total chars
+
+        def truncate(text: str, max_len: int = 200) -> str:
+            """Truncate text to max_len chars."""
+            if not text:
+                return ""
+            text = str(text)
+            if len(text) <= max_len:
+                return text
+            return text[:max_len - 3] + "..."
 
         # Persona (O-Mem style)
         if context.get("persona"):
@@ -129,76 +145,93 @@ class MemoryManager:
             if p.get("summary") or attrs:
                 persona_section = "## USER PROFILE\n"
                 if p.get("summary"):
-                    persona_section += f"{p['summary']}\n\n"
+                    persona_section += f"{truncate(p['summary'], 300)}\n\n"
 
                 if attrs:
                     persona_section += "**Key Attributes:**\n"
-                    for a in attrs[:7]:
-                        if isinstance(a, dict):
-                            persona_section += f"- {a.get('content', a)}\n"
-                        else:
-                            persona_section += f"- {a}\n"
+                    for a in attrs[:5]:  # Reduced from 7
+                        content = a.get('content', str(a)) if isinstance(a, dict) else str(a)
+                        persona_section += f"- {truncate(content, 100)}\n"
 
                 if events:
                     persona_section += "\n**Important Events:**\n"
-                    for e in events[:5]:
-                        if isinstance(e, dict):
-                            persona_section += f"- {e.get('content', e)}\n"
-                        else:
-                            persona_section += f"- {e}\n"
+                    for e in events[:3]:  # Reduced from 5
+                        content = e.get('content', str(e)) if isinstance(e, dict) else str(e)
+                        persona_section += f"- {truncate(content, 100)}\n"
 
-                sections.append(persona_section)
+                if len(persona_section) <= MAX_SECTION_LENGTH:
+                    sections.append(persona_section)
+                    total_length += len(persona_section)
 
-        # Relevant Facts (Hindsight fact network)
-        if context.get("relevant_facts"):
-            facts = context["relevant_facts"][:7]
+        # Relevant Facts (Hindsight fact network) - only if room
+        if context.get("relevant_facts") and total_length < MAX_TOTAL_LENGTH:
+            facts = context["relevant_facts"][:5]  # Reduced from 7
             if facts:
                 facts_str = "\n".join(
-                    f"- {f['content']} ({f.get('confidence', 1.0):.0%})"
+                    f"- {truncate(f['content'], 150)} ({f.get('confidence', 1.0):.0%})"
                     for f in facts
                 )
-                sections.append(f"## RELEVANT KNOWLEDGE\n{facts_str}")
+                facts_section = f"## RELEVANT KNOWLEDGE\n{facts_str}"
+                if len(facts_section) <= MAX_SECTION_LENGTH:
+                    sections.append(facts_section)
+                    total_length += len(facts_section)
 
-        # Entity Context (observation network)
-        if context.get("entity_context"):
-            entities = context["entity_context"][:5]
+        # Entity Context (observation network) - only if room
+        if context.get("entity_context") and total_length < MAX_TOTAL_LENGTH:
+            entities = context["entity_context"][:3]  # Reduced from 5
             if entities:
                 ent_lines = []
                 for e in entities:
-                    summary = e.get("summary") or "No summary"
-                    ent_lines.append(f"- **{e['name']}**: {summary[:100]}")
-                sections.append(f"## ENTITY CONTEXT\n" + "\n".join(ent_lines))
+                    summary = truncate(e.get("summary") or "No summary", 80)
+                    ent_lines.append(f"- **{truncate(e['name'], 30)}**: {summary}")
+                ent_section = f"## ENTITY CONTEXT\n" + "\n".join(ent_lines)
+                if len(ent_section) <= MAX_SECTION_LENGTH:
+                    sections.append(ent_section)
+                    total_length += len(ent_section)
 
-        # Beliefs (high confidence)
-        if context.get("beliefs"):
-            beliefs = context["beliefs"][:5]
+        # Beliefs (high confidence) - only if room
+        if context.get("beliefs") and total_length < MAX_TOTAL_LENGTH:
+            beliefs = context["beliefs"][:3]  # Reduced from 5
             if beliefs:
                 bel_str = "\n".join(
-                    f"- {b['belief']} ({b.get('confidence', 0.5):.0%})"
+                    f"- {truncate(b['belief'], 120)} ({b.get('confidence', 0.5):.0%})"
                     for b in beliefs
                 )
-                sections.append(f"## MY UNDERSTANDING\n{bel_str}")
+                bel_section = f"## MY UNDERSTANDING\n{bel_str}"
+                if len(bel_section) <= MAX_SECTION_LENGTH:
+                    sections.append(bel_section)
+                    total_length += len(bel_section)
 
-        # Recent Experiences
-        if context.get("recent_experiences"):
-            exp = context["recent_experiences"][:3]
+        # Recent Experiences - only if room
+        if context.get("recent_experiences") and total_length < MAX_TOTAL_LENGTH:
+            exp = context["recent_experiences"][:2]  # Reduced from 3
             if exp:
-                exp_str = "\n".join(f"- {e['description']}" for e in exp)
-                sections.append(f"## RECENT INTERACTIONS\n{exp_str}")
+                exp_str = "\n".join(f"- {truncate(e['description'], 100)}" for e in exp)
+                exp_section = f"## RECENT INTERACTIONS\n{exp_str}"
+                if len(exp_section) <= MAX_SECTION_LENGTH:
+                    sections.append(exp_section)
+                    total_length += len(exp_section)
 
-        # Topic context
-        if context.get("topic_history"):
+        # Topic context - skip if already at limit
+        if context.get("topic_history") and total_length < MAX_TOTAL_LENGTH - 300:
             th = context["topic_history"]
             if th.get("summary"):
-                topic_section = f"## TOPIC: {th.get('topic', 'Unknown')}\n"
-                topic_section += f"{th['summary']}\n"
+                topic_section = f"## TOPIC: {truncate(th.get('topic', 'Unknown'), 30)}\n"
+                topic_section += f"{truncate(th['summary'], 200)}\n"
                 if th.get("key_points"):
                     topic_section += "Key points:\n"
-                    for kp in th["key_points"][:3]:
-                        topic_section += f"- {kp}\n"
-                sections.append(topic_section)
+                    for kp in th["key_points"][:2]:
+                        topic_section += f"- {truncate(kp, 80)}\n"
+                if len(topic_section) <= MAX_SECTION_LENGTH:
+                    sections.append(topic_section)
 
-        return "\n\n".join(sections) if sections else ""
+        result = "\n\n".join(sections) if sections else ""
+
+        # Final safety truncation
+        if len(result) > MAX_TOTAL_LENGTH:
+            result = result[:MAX_TOTAL_LENGTH - 50] + "\n\n[Context truncated]"
+
+        return result
 
     # ==========================================
     # MEMORY PROCESSING (After each interaction)

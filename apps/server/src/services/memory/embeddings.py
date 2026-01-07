@@ -12,6 +12,7 @@ logger = logging.getLogger(__name__)
 
 # Lazy load sentence-transformers to avoid import overhead
 _model = None
+_pgvector_available: bool | None = None  # None = not checked yet
 
 
 def _get_model():
@@ -30,6 +31,43 @@ def _get_model():
             )
             _model = "unavailable"
     return _model
+
+
+async def check_pgvector_available(db_session: Any) -> bool:
+    """
+    Check if pgvector extension is available in the database.
+    Caches the result for subsequent calls.
+    """
+    global _pgvector_available
+    if _pgvector_available is not None:
+        return _pgvector_available
+
+    try:
+        from sqlalchemy import text as sql_text
+
+        result = await db_session.execute(
+            sql_text("SELECT 1 FROM pg_extension WHERE extname = 'vector'")
+        )
+        _pgvector_available = result.fetchone() is not None
+        if not _pgvector_available:
+            logger.warning(
+                "pgvector extension not installed. Vector search will be unavailable. "
+                "To enable, run: CREATE EXTENSION vector"
+            )
+    except Exception as e:
+        logger.warning(f"Could not check pgvector availability: {e}")
+        _pgvector_available = False
+
+    return _pgvector_available
+
+
+def is_pgvector_available() -> bool:
+    """
+    Return cached pgvector availability status.
+    Returns False if not yet checked.
+    """
+    global _pgvector_available
+    return _pgvector_available if _pgvector_available is not None else False
 
 
 class EmbeddingService:
@@ -159,8 +197,13 @@ class EmbeddingService:
             db_session: Database session
 
         Returns:
-            True if successful
+            True if successful, False if unavailable or error
         """
+        # Check pgvector availability first
+        if not await check_pgvector_available(db_session):
+            # pgvector not available, skip silently
+            return False
+
         # Validate table name against whitelist
         if table_name not in self.ALLOWED_TABLES:
             logger.error(f"Invalid table name for embedding: {table_name}")

@@ -14,7 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from src.core.security import validate_session_id
 from src.db.models.memory import MemoryFact, MemoryLink
 from .confidence_utils import calculate_reinforcement, calculate_weighted_average
-from .embeddings import embedding_service
+from .embeddings import embedding_service, check_pgvector_available, is_pgvector_available
 # Import sanitization function to prevent prompt injection
 from .memory_operations import sanitize_user_input
 
@@ -176,19 +176,20 @@ class FactNetwork:
         self.db.add(fact)
         await self.db.flush()
 
-        # Generate and store embedding
-        embedding = embedding_service.embed(content)
-        if embedding:
-            vector_str = embedding_service.to_pgvector_str(embedding)
-            await self.db.execute(
-                text(
-                    """
-                    UPDATE memory_facts
-                    SET embedding_vector = :vector::vector
-                    WHERE id = :fact_id
-                    """
-                ).bindparams(vector=vector_str, fact_id=str(fact.id))
-            )
+        # Generate and store embedding (only if pgvector is available)
+        if await check_pgvector_available(self.db):
+            embedding = embedding_service.embed(content)
+            if embedding:
+                vector_str = embedding_service.to_pgvector_str(embedding)
+                await self.db.execute(
+                    text(
+                        """
+                        UPDATE memory_facts
+                        SET embedding_vector = :vector::vector
+                        WHERE id = :fact_id
+                        """
+                    ).bindparams(vector=vector_str, fact_id=str(fact.id))
+                )
 
         logger.info(f"Added fact: {content[:50]}... (type={fact_type}, confidence={confidence})")
         return fact
@@ -216,6 +217,11 @@ class FactNetwork:
         Returns:
             List of facts with similarity scores
         """
+        # Check if pgvector is available
+        if not await check_pgvector_available(self.db):
+            # Fallback to text search when pgvector is not available
+            return await self._text_search(query, limit)
+
         embedding = embedding_service.embed(query)
         if not embedding:
             # Fallback to text search

@@ -31,10 +31,10 @@ async function fetchApi<T>(
     }
   }
 
-  // Build headers
-  const headers: HeadersInit = {
+  // Build headers - use Record<string, string> to allow indexing
+  const headers: Record<string, string> = {
     'Content-Type': 'application/json',
-    ...fetchOptions.headers,
+    ...(fetchOptions.headers as Record<string, string> | undefined),
   };
 
   // Add authentication header if token exists
