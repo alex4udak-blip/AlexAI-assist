@@ -1,42 +1,43 @@
+import { ClaudeCode } from 'claude-code-js';
 import express from 'express';
 
 const app = express();
 app.use(express.json());
 
-const CLAUDE_TOKEN = process.env.CLAUDE_OAUTH_TOKEN;
-const API_URL = 'https://api.anthropic.com/v1/messages';
+const claude = new ClaudeCode({
+  oauth: {
+    accessToken: process.env.CLAUDE_OAUTH_TOKEN,
+    refreshToken: process.env.CLAUDE_REFRESH_TOKEN || '',
+    expiresAt: parseInt(process.env.CLAUDE_EXPIRES_AT || '0')
+  }
+});
 
 app.post('/v1/messages', async (req, res) => {
   try {
-    const response = await fetch(API_URL, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${CLAUDE_TOKEN}`,
-        'anthropic-version': '2023-06-01'
-      },
-      body: JSON.stringify(req.body)
+    const { messages, system } = req.body;
+    const userMessage = messages.find(m => m.role === 'user')?.content || '';
+
+    const response = await claude.chat({
+      prompt: userMessage,
+      systemPrompt: system || 'You are a helpful assistant.'
     });
 
-    const data = await response.json();
-
-    if (!response.ok) {
-      console.error('Claude API error:', data);
-      return res.status(response.status).json(data);
+    if (response.success) {
+      res.json({
+        content: [{ type: 'text', text: response.message.result }],
+        model: 'claude-sonnet-4-20250514',
+        role: 'assistant'
+      });
+    } else {
+      res.status(500).json({ error: response.error });
     }
-
-    res.json(data);
   } catch (error) {
-    console.error('Proxy error:', error);
+    console.error('Claude error:', error);
     res.status(500).json({ error: { message: error.message } });
   }
 });
 
-app.get('/health', (req, res) => {
-  res.json({ status: 'healthy' });
-});
+app.get('/health', (req, res) => res.json({ status: 'healthy' }));
 
 const PORT = process.env.PORT || 3001;
-app.listen(PORT, () => {
-  console.log(`Claude proxy running on port ${PORT}`);
-});
+app.listen(PORT, () => console.log(`Proxy on ${PORT}`));
