@@ -147,7 +147,7 @@ export default function Main() {
           </h2>
           {stats.topApps.length > 0 ? (
             <div className="space-y-2">
-              {stats.topApps.slice(0, 5).map((app, i) => (
+              {stats.topApps.slice(0, 5).map((app) => (
                 <div
                   key={app.name}
                   className="flex items-center justify-between"
