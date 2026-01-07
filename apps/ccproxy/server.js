@@ -8,7 +8,6 @@ const app = express();
 app.use(express.json());
 
 // Configuration
-const SPAWN_TIMEOUT = parseInt(process.env.SPAWN_TIMEOUT || '120000', 10);
 const INTERNAL_TOKEN = process.env.CCPROXY_INTERNAL_TOKEN;
 
 // Setup Claude credentials at startup
@@ -34,7 +33,6 @@ function setupCredentials() {
 
 // Auth middleware for internal requests
 function authMiddleware(req, res, next) {
-  // Skip auth if no token configured (internal network only)
   if (!INTERNAL_TOKEN) {
     return next();
   }
@@ -47,6 +45,117 @@ function authMiddleware(req, res, next) {
 }
 
 setupCredentials();
+
+// Persistent Claude CLI session
+let claudeProcess = null;
+let responseResolve = null;
+let currentResponse = '';
+
+function startClaudeSession() {
+  console.log('Starting persistent Claude session...');
+
+  claudeProcess = spawn('claude', [
+    '--input-format', 'stream-json',
+    '--output-format', 'stream-json',
+    '--dangerously-skip-permissions',
+    '--verbose'
+  ], {
+    env: {
+      ...process.env,
+      CLAUDE_CODE_OAUTH_TOKEN: process.env.CLAUDE_OAUTH_TOKEN
+    }
+  });
+
+  claudeProcess.stdout.on('data', (data) => {
+    const lines = data.toString().split('\n').filter(l => l.trim());
+
+    for (const line of lines) {
+      try {
+        const parsed = JSON.parse(line);
+
+        // Collect text deltas
+        if (parsed.type === 'assistant' && parsed.message?.content) {
+          for (const block of parsed.message.content) {
+            if (block.type === 'text') {
+              currentResponse += block.text;
+            }
+          }
+        }
+
+        // End of message
+        if (parsed.type === 'result') {
+          if (responseResolve) {
+            responseResolve(currentResponse || parsed.result);
+            responseResolve = null;
+            currentResponse = '';
+          }
+        }
+      } catch (e) {
+        // Not JSON, skip
+      }
+    }
+  });
+
+  claudeProcess.stderr.on('data', (data) => {
+    console.log('Claude stderr:', data.toString());
+  });
+
+  claudeProcess.on('close', (code) => {
+    console.log('Claude process closed with code:', code);
+    claudeProcess = null;
+    // Restart after 1 sec
+    setTimeout(startClaudeSession, 1000);
+  });
+
+  claudeProcess.on('error', (err) => {
+    console.error('Claude process error:', err);
+  });
+}
+
+function sendMessage(prompt) {
+  return new Promise((resolve, reject) => {
+    if (!claudeProcess) {
+      reject(new Error('Claude session not ready'));
+      return;
+    }
+
+    currentResponse = '';
+    responseResolve = resolve;
+
+    // Timeout 180 sec
+    const timeout = setTimeout(() => {
+      if (responseResolve) {
+        responseResolve = null;
+        reject(new Error('Timeout waiting for Claude response'));
+      }
+    }, 180000);
+
+    // Wrap resolve to clear timeout
+    const originalResolve = responseResolve;
+    responseResolve = (result) => {
+      clearTimeout(timeout);
+      originalResolve(result);
+    };
+
+    // Send to stdin
+    const message = JSON.stringify({
+      type: 'user',
+      message: {
+        role: 'user',
+        content: prompt
+      }
+    }) + '\n';
+
+    console.log('Writing to Claude stdin...');
+    claudeProcess.stdin.write(message);
+  });
+}
+
+// Increase Express timeout
+app.use((req, res, next) => {
+  res.setTimeout(180000); // 3 minutes
+  next();
+});
 
 app.post('/v1/messages', authMiddleware, async (req, res) => {
   try {
@@ -63,13 +172,15 @@ app.post('/v1/messages', authMiddleware, async (req, res) => {
       return res.status(400).json({ error: { message: 'user message required' } });
     }
 
-    // Build prompt
     const fullPrompt = system
       ? `${system}\n\nUser: ${userMessage}`
       : userMessage;
 
-    // Run Claude CLI
-    const result = await runClaude(fullPrompt);
+    console.log('Sending to persistent session:', userMessage.substring(0, 50) + '...');
+
+    const result = await sendMessage(fullPrompt);
+
+    console.log('Got response, length:', result.length);
 
     res.json({
       content: [{ type: 'text', text: result }],
@@ -77,72 +188,23 @@ app.post('/v1/messages', authMiddleware, async (req, res) => {
       role: 'assistant'
     });
   } catch (error) {
-    console.error('Claude error:', error);
+    console.error('Error:', error.message);
     const statusCode = error.message?.includes('timeout') ? 504 : 500;
     res.status(statusCode).json({ error: { message: error.message } });
   }
 });
 
-function runClaude(prompt) {
-  return new Promise((resolve, reject) => {
-    const args = [
-      '-p', prompt,
-      '--dangerously-skip-permissions',
-      '--output-format', 'json'
-    ];
-
-    const claude = spawn('claude', args, {
-      env: { ...process.env },
-      stdio: ['pipe', 'pipe', 'pipe']
-    });
-
-    let output = '';
-    let errorOutput = '';
-    let killed = false;
-
-    // Timeout handler
-    const timeout = setTimeout(() => {
-      killed = true;
-      claude.kill('SIGTERM');
-      reject(new Error(`Claude process timeout after ${SPAWN_TIMEOUT}ms`));
-    }, SPAWN_TIMEOUT);
-
-    claude.stdout.on('data', (data) => {
-      output += data.toString();
-    });
-
-    claude.stderr.on('data', (data) => {
-      errorOutput += data.toString();
-    });
-
-    claude.on('close', (code) => {
-      clearTimeout(timeout);
-      if (killed) return;
-
-      if (code === 0) {
-        try {
-          // Parse JSON output
-          const jsonResult = JSON.parse(output);
-          // Extract text from result
-          const text = jsonResult.result || jsonResult.message || output;
-          resolve(text);
-        } catch {
-          // If not JSON, return raw output
-          resolve(output.trim());
-        }
-      } else {
-        reject(new Error(errorOutput || `Claude exited with code ${code}`));
-      }
-    });
-
-    claude.on('error', (err) => {
-      clearTimeout(timeout);
-      if (!killed) reject(err);
-    });
+app.get('/health', (req, res) => {
+  res.json({
+    status: 'healthy',
+    claudeSession: claudeProcess ? 'active' : 'inactive'
   });
-}
+});
 
-app.get('/health', (req, res) => res.json({ status: 'healthy' }));
+// Start session on startup
+startClaudeSession();
 
 const PORT = process.env.PORT || 3001;
-app.listen(PORT, () => console.log(`Claude proxy on port ${PORT}`));
+app.listen(PORT, () => {
+  console.log(`Claude proxy on port ${PORT}`);
+});
