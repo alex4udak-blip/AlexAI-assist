@@ -3,6 +3,10 @@
  * Uses environment variables if available, otherwise derives from current hostname.
  */
 
+// Track if we've already warned (to avoid spam)
+let warnedApi = false;
+let warnedWs = false;
+
 function getApiUrl(): string {
   // First try environment variable (set at build time on Railway)
   const envUrl = import.meta.env.VITE_API_URL;
@@ -14,23 +18,26 @@ function getApiUrl(): string {
   }
 
   // In production - derive from current hostname
-  // Assume server is on same domain with /api prefix or separate subdomain
   if (typeof window !== 'undefined') {
     const protocol = window.location.protocol;
     const hostname = window.location.hostname;
 
-    // If on Railway, try environment variable first (should be set)
-    // Otherwise construct URL dynamically
+    // If on Railway, env vars MUST be set during build
     if (hostname.includes('.up.railway.app')) {
-      // Use VITE_API_URL env var - MUST be set in Railway build variables
-      console.warn('VITE_API_URL not set - API calls may fail');
-      return '';
+      if (!warnedApi) {
+        warnedApi = true;
+        console.error('VITE_API_URL not set in Railway build variables');
+      }
+      // Try to derive from server service name pattern
+      // This is a fallback - proper fix is to set env vars
+      const serverUrl = hostname.replace('web-', 'server-');
+      return `${protocol}//${serverUrl}`;
     }
 
     return `${protocol}//${hostname}:8000`;
   }
 
-  return '';
+  return 'http://localhost:8000';
 }
 
 function getWsUrl(): string {
@@ -49,15 +56,19 @@ function getWsUrl(): string {
     const hostname = window.location.hostname;
 
     if (hostname.includes('.up.railway.app')) {
-      // Use VITE_WS_URL env var - MUST be set in Railway build variables
-      console.warn('VITE_WS_URL not set - WebSocket may fail');
-      return '';
+      if (!warnedWs) {
+        warnedWs = true;
+        console.error('VITE_WS_URL not set in Railway build variables');
+      }
+      // Try to derive from server service name pattern
+      const serverUrl = hostname.replace('web-', 'server-');
+      return `${wsProtocol}//${serverUrl}`;
     }
 
     return `${wsProtocol}//${hostname}:8000`;
   }
 
-  return '';
+  return 'ws://localhost:8000';
 }
 
 export const config = {

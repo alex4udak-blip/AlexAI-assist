@@ -40,8 +40,9 @@ class WebSocketClient {
         this.attemptReconnect();
       };
 
-      this.ws.onerror = () => {
-        this.emit('error', null);
+      this.ws.onerror = (event) => {
+        console.error('WebSocket error:', event);
+        this.emit('error', { type: 'connection_error', message: 'WebSocket connection failed' });
       };
     } catch {
       this.attemptReconnect();
