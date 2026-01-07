@@ -3,8 +3,15 @@ import react from '@vitejs/plugin-react';
 import { resolve } from 'path';
 
 export default defineConfig(({ mode }) => {
-  // Load env variables
-  const env = loadEnv(mode, process.cwd(), '');
+  // Load from .env files
+  const fileEnv = loadEnv(mode, process.cwd(), '');
+
+  // Merge with process.env (Railway sets env vars here)
+  // process.env takes priority over .env files
+  const env = {
+    ...fileEnv,
+    ...process.env,
+  };
 
   return {
     plugins: [react()],
@@ -14,8 +21,9 @@ export default defineConfig(({ mode }) => {
       },
     },
     define: {
-      'import.meta.env.VITE_API_URL': JSON.stringify(env.VITE_API_URL),
-      'import.meta.env.VITE_WS_URL': JSON.stringify(env.VITE_WS_URL),
+      // Inject env vars at build time
+      'import.meta.env.VITE_API_URL': JSON.stringify(env.VITE_API_URL || ''),
+      'import.meta.env.VITE_WS_URL': JSON.stringify(env.VITE_WS_URL || ''),
     },
     server: {
       port: 5173,
@@ -32,7 +40,7 @@ export default defineConfig(({ mode }) => {
     },
     build: {
       outDir: 'dist',
-      sourcemap: process.env.NODE_ENV !== 'production',
+      sourcemap: mode !== 'production',
     },
   };
 });
