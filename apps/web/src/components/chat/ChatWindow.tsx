@@ -83,7 +83,7 @@ export function ChatWindow() {
               </p>
 
               {/* Quick prompts */}
-              <div className="flex flex-wrap justify-center gap-2">
+              <div className="flex flex-col sm:flex-row items-center justify-center gap-3 w-full max-w-2xl">
                 {[
                   'Как прошёл мой день?',
                   'Какие паттерны ты заметил?',
@@ -94,13 +94,13 @@ export function ChatWindow() {
                     onClick={() => {
                       setInput(prompt);
                     }}
-                    className="flex items-center gap-2 px-4 py-2 rounded-xl
+                    className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl
                                border border-border-subtle bg-white/[0.02]
-                               text-sm text-text-secondary
+                               text-sm text-text-secondary whitespace-nowrap
                                hover:bg-white/[0.05] hover:border-border-default
-                               transition-all duration-150"
+                               transition-all duration-150 w-full sm:w-auto"
                   >
-                    <Sparkles className="w-4 h-4 text-accent-primary" />
+                    <Sparkles className="w-4 h-4 text-accent-primary shrink-0" />
                     {prompt}
                   </button>
                 ))}

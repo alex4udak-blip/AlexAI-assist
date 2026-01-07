@@ -9,6 +9,7 @@ import {
   Settings,
   Download,
   X,
+  Eye,
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -70,7 +71,7 @@ export default function Sidebar({ isOpen = false, onClose }: SidebarProps) {
         {/* Logo */}
         <div className="h-14 flex items-center px-4 border-b border-border-subtle">
           <div className="w-8 h-8 rounded-lg bg-accent-gradient flex items-center justify-center shadow-glow-sm">
-            <span className="text-white font-bold text-sm">O</span>
+            <Eye className="w-4 h-4 text-white" />
           </div>
           <span className="ml-3 font-semibold text-text-primary tracking-tight">Observer</span>
         </div>
@@ -117,7 +118,7 @@ export default function Sidebar({ isOpen = false, onClose }: SidebarProps) {
               <div className="h-14 flex items-center justify-between px-4 border-b border-border-subtle">
                 <div className="flex items-center">
                   <div className="w-8 h-8 rounded-lg bg-accent-gradient flex items-center justify-center shadow-glow-sm">
-                    <span className="text-white font-bold text-sm">O</span>
+                    <Eye className="w-4 h-4 text-white" />
                   </div>
                   <span className="ml-3 font-semibold text-text-primary tracking-tight">Observer</span>
                 </div>
