@@ -1,13 +1,13 @@
 import express from 'express';
 import { spawn } from 'child_process';
-import { writeFileSync, unlinkSync, mkdirSync, existsSync } from 'fs';
+import { writeFileSync, mkdirSync, existsSync } from 'fs';
 import { join } from 'path';
 import { homedir } from 'os';
 
 const app = express();
 app.use(express.json());
 
-// Setup Claude credentials
+// Setup Claude credentials at startup
 const CLAUDE_DIR = join(homedir(), '.claude');
 const CREDENTIALS_FILE = join(CLAUDE_DIR, '.credentials.json');
 
@@ -33,12 +33,14 @@ setupCredentials();
 app.post('/v1/messages', async (req, res) => {
   try {
     const { messages, system } = req.body;
-    const userMessage = messages.find(m => m.role === 'user')?.content || '';
+    const userMessage = messages?.find(m => m.role === 'user')?.content || '';
 
+    // Build prompt
     const fullPrompt = system
-      ? `System: ${system}\n\nUser: ${userMessage}`
+      ? `${system}\n\nUser: ${userMessage}`
       : userMessage;
 
+    // Run Claude CLI
     const result = await runClaude(fullPrompt);
 
     res.json({
@@ -54,7 +56,13 @@ app.post('/v1/messages', async (req, res) => {
 
 function runClaude(prompt) {
   return new Promise((resolve, reject) => {
-    const claude = spawn('claude', ['-p', prompt, '--no-input'], {
+    const args = [
+      '-p', prompt,
+      '--dangerously-skip-permissions',
+      '--output-format', 'json'
+    ];
+
+    const claude = spawn('claude', args, {
       env: { ...process.env },
       stdio: ['pipe', 'pipe', 'pipe']
     });
@@ -72,7 +80,16 @@ function runClaude(prompt) {
 
     claude.on('close', (code) => {
       if (code === 0) {
-        resolve(output.trim());
+        try {
+          // Parse JSON output
+          const jsonResult = JSON.parse(output);
+          // Extract text from result
+          const text = jsonResult.result || jsonResult.message || output;
+          resolve(text);
+        } catch {
+          // If not JSON, return raw output
+          resolve(output.trim());
+        }
       } else {
         reject(new Error(errorOutput || `Claude exited with code ${code}`));
       }
