@@ -55,18 +55,17 @@ class CORSDebugMiddleware(BaseHTTPMiddleware):
             return response
 
         try:
-            response = await call_next(request)
-            return response
+            return await call_next(request)
         except Exception as e:
             logger.error(f"Error in request: {e}")
-            response = JSONResponse(
+            error_response = JSONResponse(
                 content={"detail": "Internal server error"},
                 status_code=500
             )
             if is_allowed:
-                response.headers["Access-Control-Allow-Origin"] = origin
-                response.headers["Access-Control-Allow-Credentials"] = "true"
-            return response
+                error_response.headers["Access-Control-Allow-Origin"] = origin
+                error_response.headers["Access-Control-Allow-Credentials"] = "true"
+            return error_response
 
 
 @asynccontextmanager
