@@ -1,7 +1,7 @@
 """Chat endpoints with PostgreSQL storage and Redis caching."""
 
 import json
-from datetime import UTC, datetime
+from datetime import datetime
 from typing import Any
 from uuid import uuid4
 
@@ -72,7 +72,8 @@ async def chat(
     """Chat with Observer AI."""
     message_id = str(uuid4())
     session_id = data.context.get("session_id", "default")
-    timestamp = datetime.now(UTC)
+    # Use naive datetime for PostgreSQL TIMESTAMP WITHOUT TIME ZONE column
+    timestamp = datetime.utcnow()
 
     # Get context from recent activity
     analyzer = AnalyzerService(db)
