@@ -1,3 +1,6 @@
+use crate::collector::{
+    get_current_focus, has_accessibility_permission, request_accessibility_permission, FocusInfo,
+};
 use crate::sync::get_dashboard_url;
 use crate::AppState;
 use serde::Serialize;
@@ -102,4 +105,22 @@ pub async fn sync_now(state: State<'_, Arc<Mutex<AppState>>>) -> Result<(), Stri
 #[tauri::command]
 pub async fn open_dashboard() -> Result<(), String> {
     open::that(get_dashboard_url()).map_err(|e| e.to_string())
+}
+
+/// Check if the app has accessibility permission (macOS)
+#[tauri::command]
+pub fn check_permissions() -> bool {
+    has_accessibility_permission()
+}
+
+/// Request accessibility permission (macOS) - opens System Preferences
+#[tauri::command]
+pub fn request_permissions() -> bool {
+    request_accessibility_permission()
+}
+
+/// Get current focused application and window information
+#[tauri::command]
+pub fn get_focus() -> Option<FocusInfo> {
+    get_current_focus()
 }

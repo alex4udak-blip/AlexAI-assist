@@ -83,7 +83,8 @@ class MemScheduler:
 
             # Update heat score in the appropriate table
             table = self._get_table_for_type(memory_type)
-            if table:
+            # Extra safety: verify table is in whitelist
+            if table and table in self.ALLOWED_TABLES:
                 await self.db.execute(
                     text(
                         f"""
@@ -96,15 +97,22 @@ class MemScheduler:
                     ).bindparams(memory_id=str(memory_id))
                 )
 
+    # Whitelist of allowed memory types and their corresponding tables
+    TYPE_TO_TABLE: dict[str, str] = {
+        "fact": "memory_facts",
+        "experience": "memory_experiences",
+        "entity": "memory_entities",
+        "belief": "memory_beliefs",
+    }
+
+    # Frozen set for fast lookup
+    ALLOWED_TABLES = frozenset(TYPE_TO_TABLE.values())
+
     def _get_table_for_type(self, memory_type: str | None) -> str | None:
-        """Get table name for memory type."""
-        type_to_table = {
-            "fact": "memory_facts",
-            "experience": "memory_experiences",
-            "entity": "memory_entities",
-            "belief": "memory_beliefs",
-        }
-        return type_to_table.get(memory_type)
+        """Get table name for memory type from whitelist."""
+        if memory_type is None:
+            return None
+        return self.TYPE_TO_TABLE.get(memory_type)
 
     async def predict_and_preload(self, query: str) -> list[dict[str, Any]]:
         """
@@ -323,7 +331,10 @@ class MemScheduler:
     ) -> None:
         """Manually boost a memory's heat score."""
         table = self._get_table_for_type(memory_type)
-        if table:
+        # Extra safety: verify table is in whitelist (should always pass)
+        if table and table in self.ALLOWED_TABLES:
+            # Validate boost_amount
+            boost_amount = max(0.0, min(1.0, float(boost_amount)))
             await self.db.execute(
                 text(
                     f"""

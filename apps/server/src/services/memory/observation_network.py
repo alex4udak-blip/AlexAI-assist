@@ -140,6 +140,12 @@ class ObservationNetwork:
         )
         return result.scalar_one_or_none()
 
+    # Allowed entity types for validation
+    ALLOWED_ENTITY_TYPES = frozenset({
+        "person", "app", "project", "concept", "location",
+        "org", "tool", "website", "file", "event",
+    })
+
     async def search_entities(
         self,
         query: str,
@@ -163,10 +169,30 @@ class ObservationNetwork:
 
         vector_str = embedding_service.to_pgvector_str(embedding)
 
-        type_filter = ""
+        # Validate and sanitize inputs
+        limit = max(1, min(100, int(limit)))
+
+        # Build parameterized query
+        params = {
+            "session_id": self.session_id,
+            "limit": limit,
+            "vector": vector_str,
+        }
+
+        # Build WHERE clause
+        where_parts = [
+            "session_id = :session_id",
+            "embedding_vector IS NOT NULL",
+        ]
+
+        # Validate entity_types against whitelist
         if entity_types:
-            types_str = ",".join(f"'{t}'" for t in entity_types)
-            type_filter = f"AND entity_type IN ({types_str})"
+            valid_types = [t for t in entity_types if t in self.ALLOWED_ENTITY_TYPES]
+            if valid_types:
+                where_parts.append("entity_type = ANY(:entity_types)")
+                params["entity_types"] = valid_types
+
+        where_clause = " AND ".join(where_parts)
 
         result = await self.db.execute(
             text(
@@ -178,15 +204,13 @@ class ObservationNetwork:
                     summary,
                     key_facts,
                     mention_count,
-                    1 - (embedding_vector <=> '{vector_str}'::vector) as score
+                    1 - (embedding_vector <=> :vector::vector) as score
                 FROM memory_entities
-                WHERE session_id = :session_id
-                    AND embedding_vector IS NOT NULL
-                    {type_filter}
-                ORDER BY embedding_vector <=> '{vector_str}'::vector
+                WHERE {where_clause}
+                ORDER BY embedding_vector <=> :vector::vector
                 LIMIT :limit
                 """
-            ).bindparams(session_id=self.session_id, limit=limit)
+            ).bindparams(**params)
         )
 
         entities = []
@@ -210,16 +234,27 @@ class ObservationNetwork:
         entity_types: list[str] | None = None,
     ) -> list[dict[str, Any]]:
         """Fallback text search for entities."""
+        # Sanitize query for LIKE pattern - escape special characters
+        sanitized_query = (
+            query.replace("\\", "\\\\")
+            .replace("%", "\\%")
+            .replace("_", "\\_")
+        )
+        limit = max(1, min(100, int(limit)))
+
         filters = [
             MemoryEntity.session_id == self.session_id,
             or_(
-                MemoryEntity.name.ilike(f"%{query}%"),
-                MemoryEntity.summary.ilike(f"%{query}%"),
+                MemoryEntity.name.ilike(f"%{sanitized_query}%"),
+                MemoryEntity.summary.ilike(f"%{sanitized_query}%"),
             ),
         ]
 
+        # Validate entity_types against whitelist
         if entity_types:
-            filters.append(MemoryEntity.entity_type.in_(entity_types))
+            valid_types = [t for t in entity_types if t in self.ALLOWED_ENTITY_TYPES]
+            if valid_types:
+                filters.append(MemoryEntity.entity_type.in_(valid_types))
 
         result = await self.db.execute(
             select(MemoryEntity)

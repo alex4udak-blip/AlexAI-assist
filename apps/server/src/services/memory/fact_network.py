@@ -114,6 +114,17 @@ class FactNetwork:
         logger.info(f"Added fact: {content[:50]}... (type={fact_type}, confidence={confidence})")
         return fact
 
+    # Allowed fact types for validation
+    ALLOWED_FACT_TYPES = frozenset({
+        "fact", "preference", "habit", "goal", "demographic",
+        "skill", "opinion", "world_fact", "persona_attribute", "persona_event",
+    })
+
+    # Allowed categories for validation
+    ALLOWED_CATEGORIES = frozenset({
+        "work", "personal", "health", "finance", "learning", "other",
+    })
+
     async def search(
         self,
         query: str,
@@ -144,24 +155,51 @@ class FactNetwork:
 
         vector_str = embedding_service.to_pgvector_str(embedding)
 
-        # Build query with filters
-        filters = [f"session_id = '{self.session_id}'"]
-        filters.append(f"confidence >= {min_confidence}")
+        # Validate and sanitize inputs
+        limit = max(1, min(100, int(limit)))
+        min_confidence = max(0.0, min(1.0, float(min_confidence)))
+
+        # Validate fact_types against whitelist
+        valid_fact_types = None
+        if fact_types:
+            valid_fact_types = [t for t in fact_types if t in self.ALLOWED_FACT_TYPES]
+
+        # Validate categories against whitelist
+        valid_categories = None
+        if categories:
+            valid_categories = [c for c in categories if c in self.ALLOWED_CATEGORIES]
+
+        # Build parameterized query
+        params = {
+            "session_id": self.session_id,
+            "min_confidence": min_confidence,
+            "vector": vector_str,
+            "limit": limit,
+        }
+
+        # Build WHERE clause with proper parameterization
+        where_parts = [
+            "session_id = :session_id",
+            "confidence >= :min_confidence",
+            "embedding_vector IS NOT NULL",
+        ]
 
         if not include_invalid:
-            filters.append("(valid_to IS NULL OR valid_to > NOW())")
+            where_parts.append("(valid_to IS NULL OR valid_to > NOW())")
 
-        if fact_types:
-            types_str = ",".join(f"'{t}'" for t in fact_types)
-            filters.append(f"fact_type IN ({types_str})")
+        if valid_fact_types:
+            # Use ANY() with array parameter for safe IN clause
+            where_parts.append("fact_type = ANY(:fact_types)")
+            params["fact_types"] = valid_fact_types
 
-        if categories:
-            cats_str = ",".join(f"'{c}'" for c in categories)
-            filters.append(f"category IN ({cats_str})")
+        if valid_categories:
+            # Use ANY() with array parameter for safe IN clause
+            where_parts.append("category = ANY(:categories)")
+            params["categories"] = valid_categories
 
-        where_clause = " AND ".join(filters)
+        where_clause = " AND ".join(where_parts)
 
-        # Vector similarity search
+        # Vector similarity search with parameterized query
         result = await self.db.execute(
             text(
                 f"""
@@ -174,14 +212,13 @@ class FactNetwork:
                     heat_score,
                     valid_from,
                     valid_to,
-                    1 - (embedding_vector <=> '{vector_str}'::vector) as score
+                    1 - (embedding_vector <=> :vector::vector) as score
                 FROM memory_facts
                 WHERE {where_clause}
-                    AND embedding_vector IS NOT NULL
-                ORDER BY embedding_vector <=> '{vector_str}'::vector
-                LIMIT {limit}
+                ORDER BY embedding_vector <=> :vector::vector
+                LIMIT :limit
                 """
-            )
+            ).bindparams(**params)
         )
 
         rows = result.fetchall()
@@ -207,12 +244,20 @@ class FactNetwork:
 
     async def _text_search(self, query: str, limit: int = 10) -> list[dict[str, Any]]:
         """Fallback text search when embeddings unavailable."""
+        # Sanitize query for LIKE pattern - escape special characters
+        sanitized_query = (
+            query.replace("\\", "\\\\")
+            .replace("%", "\\%")
+            .replace("_", "\\_")
+        )
+        limit = max(1, min(100, int(limit)))
+
         result = await self.db.execute(
             select(MemoryFact)
             .where(
                 and_(
                     MemoryFact.session_id == self.session_id,
-                    MemoryFact.content.ilike(f"%{query}%"),
+                    MemoryFact.content.ilike(f"%{sanitized_query}%"),
                     or_(
                         MemoryFact.valid_to.is_(None),
                         MemoryFact.valid_to > datetime.utcnow(),

@@ -76,16 +76,25 @@ class BeliefNetwork:
         logger.info(f"Formed belief: {belief[:50]}... (confidence={initial_confidence})")
         return new_belief
 
+    def _sanitize_for_like(self, text: str) -> str:
+        """Sanitize text for LIKE pattern - escape special characters."""
+        return (
+            text.replace("\\", "\\\\")
+            .replace("%", "\\%")
+            .replace("_", "\\_")
+        )
+
     async def _find_similar(self, belief: str) -> MemoryBelief | None:
         """Find similar existing active belief."""
         # Simple substring matching for now
         # Could be enhanced with semantic similarity
+        sanitized_belief = self._sanitize_for_like(belief[:50])
         result = await self.db.execute(
             select(MemoryBelief).where(
                 and_(
                     MemoryBelief.session_id == self.session_id,
                     MemoryBelief.status == "active",
-                    MemoryBelief.belief.ilike(f"%{belief[:50]}%"),
+                    MemoryBelief.belief.ilike(f"%{sanitized_belief}%"),
                 )
             )
         )
@@ -365,13 +374,14 @@ class BeliefNetwork:
 
     async def count_by_domain(self, domain: str) -> int:
         """Count beliefs related to a domain."""
-        # Simple text matching for domain
+        # Simple text matching for domain - sanitize input
+        sanitized_domain = self._sanitize_for_like(domain)
         result = await self.db.execute(
             select(func.count(MemoryBelief.id)).where(
                 and_(
                     MemoryBelief.session_id == self.session_id,
                     MemoryBelief.status == "active",
-                    MemoryBelief.belief.ilike(f"%{domain}%"),
+                    MemoryBelief.belief.ilike(f"%{sanitized_domain}%"),
                 )
             )
         )
