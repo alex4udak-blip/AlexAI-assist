@@ -1,5 +1,13 @@
 FROM node:18-alpine AS builder
 
+# Build args from Railway
+ARG VITE_API_URL
+ARG VITE_WS_URL
+
+# Make them available as env vars during build
+ENV VITE_API_URL=$VITE_API_URL
+ENV VITE_WS_URL=$VITE_WS_URL
+
 WORKDIR /app
 
 # Copy package files
@@ -11,7 +19,7 @@ RUN npm ci
 # Copy source code
 COPY . .
 
-# Build the app
+# Build the app (env vars are now available)
 RUN npm run build
 
 # Production stage
