@@ -1,4 +1,4 @@
-import { Send } from 'lucide-react';
+import { SendHorizontal } from 'lucide-react';
 
 interface ChatInputProps {
   value: string;
@@ -42,7 +42,7 @@ export function ChatInput({ value, onChange, onSend, disabled }: ChatInputProps)
                          : 'bg-white/[0.05] text-text-muted cursor-not-allowed'
                        }`}
           >
-            <Send className="w-4 h-4 -rotate-45" />
+            <SendHorizontal className="w-4 h-4" />
           </button>
         </div>
         <p className="text-xs text-text-muted mt-2 text-center">
