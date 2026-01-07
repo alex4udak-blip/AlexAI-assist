@@ -1,9 +1,8 @@
 """Event analyzer service."""
 
 from collections import defaultdict
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
 from typing import Any
-from uuid import UUID
 
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -25,9 +24,9 @@ class AnalyzerService:
     ) -> dict[str, Any]:
         """Get activity summary statistics."""
         if not start_date:
-            start_date = datetime.now(timezone.utc) - timedelta(days=7)
+            start_date = datetime.utcnow() - timedelta(days=7)
         if not end_date:
-            end_date = datetime.now(timezone.utc)
+            end_date = datetime.utcnow()
 
         query = select(Event).where(
             Event.timestamp >= start_date,
@@ -74,7 +73,7 @@ class AnalyzerService:
         days: int = 7,
     ) -> list[dict[str, Any]]:
         """Get time spent by category."""
-        start_date = datetime.now(timezone.utc) - timedelta(days=days)
+        start_date = datetime.utcnow() - timedelta(days=days)
 
         query = (
             select(
@@ -103,7 +102,7 @@ class AnalyzerService:
         limit: int = 20,
     ) -> list[dict[str, Any]]:
         """Get app usage statistics."""
-        start_date = datetime.now(timezone.utc) - timedelta(days=days)
+        start_date = datetime.utcnow() - timedelta(days=days)
 
         query = (
             select(
@@ -135,7 +134,7 @@ class AnalyzerService:
         device_id: str | None = None,
     ) -> dict[str, Any]:
         """Calculate productivity score based on activity patterns."""
-        today = datetime.now(timezone.utc).replace(
+        today = datetime.utcnow().replace(
             hour=0, minute=0, second=0, microsecond=0
         )
 
@@ -169,7 +168,7 @@ class AnalyzerService:
         days: int = 30,
     ) -> list[dict[str, Any]]:
         """Get activity trends over time."""
-        start_date = datetime.now(timezone.utc) - timedelta(days=days)
+        start_date = datetime.utcnow() - timedelta(days=days)
 
         query = (
             select(

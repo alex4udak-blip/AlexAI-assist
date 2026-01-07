@@ -4,7 +4,10 @@ import logging
 from contextlib import asynccontextmanager
 from typing import AsyncGenerator
 
-from fastapi import FastAPI, Request
+import asyncio
+from typing import Set
+
+from fastapi import FastAPI, Request, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from starlette.middleware.base import BaseHTTPMiddleware
@@ -131,3 +134,29 @@ async def test_db():
     except Exception as e:
         logger.error(f"DB connection error: {e}")
         return {"status": "error", "error": str(e)}
+
+
+# WebSocket connections store
+active_connections: Set[WebSocket] = set()
+
+
+@app.websocket("/ws")
+async def websocket_endpoint(websocket: WebSocket):
+    """WebSocket endpoint for real-time updates."""
+    await websocket.accept()
+    active_connections.add(websocket)
+    logger.info(f"WebSocket connected. Total connections: {len(active_connections)}")
+
+    try:
+        while True:
+            # Keep connection alive and receive messages
+            data = await websocket.receive_text()
+            logger.info(f"WebSocket received: {data}")
+            # Echo back for now
+            await websocket.send_json({"type": "echo", "data": data})
+    except WebSocketDisconnect:
+        active_connections.discard(websocket)
+        logger.info(f"WebSocket disconnected. Total connections: {len(active_connections)}")
+    except Exception as e:
+        logger.error(f"WebSocket error: {e}")
+        active_connections.discard(websocket)
