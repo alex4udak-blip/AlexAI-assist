@@ -9,6 +9,7 @@ export function ChatWindow() {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
+  const [historyLoaded, setHistoryLoaded] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const scrollToBottom = () => {
@@ -19,10 +20,26 @@ export function ChatWindow() {
     scrollToBottom();
   }, [messages]);
 
+  // Load history and merge with any pending messages
   useEffect(() => {
-    api.getChatHistory().then(setMessages).catch((err) => {
-      console.error('Failed to load chat history:', err);
-    });
+    api.getChatHistory()
+      .then((history) => {
+        setMessages((currentMessages) => {
+          // Get IDs from history to avoid duplicates
+          const historyIds = new Set(history.map((m) => m.id));
+          // Keep local messages that aren't in history (sent before history loaded)
+          const localOnlyMessages = currentMessages.filter(
+            (m) => !historyIds.has(m.id)
+          );
+          // Merge: history first, then any local messages
+          return [...history, ...localOnlyMessages];
+        });
+        setHistoryLoaded(true);
+      })
+      .catch((err) => {
+        console.error('Failed to load chat history:', err);
+        setHistoryLoaded(true); // Allow sending even if history fails
+      });
   }, []);
 
   const handleSend = async () => {
