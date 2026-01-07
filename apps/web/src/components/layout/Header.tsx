@@ -1,5 +1,5 @@
 import { useLocation } from 'react-router-dom';
-import { Menu, Bell } from 'lucide-react';
+import { Menu } from 'lucide-react';
 import { useWebSocket } from '../../hooks/useWebSocket';
 
 interface HeaderProps {
@@ -51,12 +51,6 @@ export default function Header({ onMenuClick }: HeaderProps) {
           </span>
         </div>
 
-        {/* Notifications */}
-        <button className="relative p-2 rounded-lg text-text-tertiary hover:text-text-primary
-                          hover:bg-white/[0.05] transition-colors">
-          <Bell className="w-5 h-5" />
-          <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-accent-primary rounded-full" />
-        </button>
       </div>
     </header>
   );
