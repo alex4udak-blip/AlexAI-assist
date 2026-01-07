@@ -94,10 +94,27 @@ async def chat(
         "Respond in Russian. When appropriate, suggest creating automation agents."
     )
 
-    # Get response from Claude
+    # Load conversation history from database
+    history_query = (
+        select(ChatMessage)
+        .where(ChatMessage.session_id == session_id)
+        .order_by(ChatMessage.timestamp.asc())
+        .limit(20)  # Last 20 messages for context
+    )
+    history_result = await db.execute(history_query)
+    history_messages = history_result.scalars().all()
+
+    # Build messages array with history + new message
+    messages = [
+        {"role": msg.role, "content": msg.content}
+        for msg in history_messages
+    ]
+    messages.append({"role": "user", "content": data.message})
+
+    # Get response from Claude with full conversation history
     try:
         response = await claude_client.complete(
-            prompt=data.message,
+            messages=messages,
             system=system_prompt,
         )
     except Exception as e:

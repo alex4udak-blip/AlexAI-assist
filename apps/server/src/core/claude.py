@@ -36,12 +36,21 @@ class ClaudeClient:
 
     async def complete(
         self,
-        prompt: str,
+        prompt: str | None = None,
         system: str | None = None,
         max_tokens: int = 4096,
         model: str | None = None,
+        messages: list[dict[str, str]] | None = None,
     ) -> str:
         """Generate a completion from Claude via proxy."""
+        # Build messages array
+        if messages is not None:
+            msg_array = messages
+        elif prompt is not None:
+            msg_array = [{"role": "user", "content": prompt}]
+        else:
+            raise ClaudeClientError("Either 'prompt' or 'messages' must be provided")
+
         try:
             async with httpx.AsyncClient(timeout=180) as client:
                 response = await client.post(
@@ -54,7 +63,7 @@ class ClaudeClient:
                             "You are Observer, a helpful AI assistant that analyzes "
                             "user behavior patterns and suggests automations."
                         ),
-                        "messages": [{"role": "user", "content": prompt}],
+                        "messages": msg_array,
                     },
                 )
                 response.raise_for_status()
