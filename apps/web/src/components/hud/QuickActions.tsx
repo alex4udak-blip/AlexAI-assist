@@ -57,10 +57,10 @@ export function QuickActions({
     <motion.div
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
-      className="p-5 rounded-xl bg-bg-secondary/60 backdrop-blur-md border border-border-subtle
-                 shadow-inner-glow"
+      className="p-4 rounded-xl bg-bg-secondary/60 backdrop-blur-md border border-border-subtle
+                 shadow-inner-glow overflow-hidden"
     >
-      <h3 className="text-xs text-text-muted uppercase tracking-wider font-mono mb-4">
+      <h3 className="text-xs text-text-muted uppercase tracking-wider font-mono mb-3">
         Quick Actions
       </h3>
 
@@ -76,35 +76,35 @@ export function QuickActions({
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
               onClick={action.action}
-              className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg border
+              className={`w-full flex items-center gap-2 px-3 py-2.5 rounded-lg border
                          transition-all duration-200 ${variantStyles[action.variant]}`}
             >
-              <Icon className="w-5 h-5" />
-              <span className="font-medium">{action.label}</span>
+              <Icon className="w-4 h-4 flex-shrink-0" />
+              <span className="font-medium text-sm truncate">{action.label}</span>
             </motion.button>
           );
         })}
       </div>
 
       {/* Secondary actions */}
-      <div className="flex gap-2 mt-4 pt-4 border-t border-border-subtle">
+      <div className="flex gap-2 mt-3 pt-3 border-t border-border-subtle">
         <button
           onClick={() => navigate('/agents')}
-          className="flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-lg
+          className="flex-1 flex items-center justify-center gap-1.5 px-2 py-2 rounded-lg
                      text-xs text-text-muted hover:text-text-primary hover:bg-bg-tertiary
-                     transition-colors"
+                     transition-colors min-w-0"
         >
-          <Bot className="w-4 h-4" />
-          Все агенты
+          <Bot className="w-3.5 h-3.5 flex-shrink-0" />
+          <span className="truncate">Агенты</span>
         </button>
         <button
           onClick={() => navigate('/settings')}
-          className="flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-lg
+          className="flex-1 flex items-center justify-center gap-1.5 px-2 py-2 rounded-lg
                      text-xs text-text-muted hover:text-text-primary hover:bg-bg-tertiary
-                     transition-colors"
+                     transition-colors min-w-0"
         >
-          <Settings className="w-4 h-4" />
-          Настройки
+          <Settings className="w-3.5 h-3.5 flex-shrink-0" />
+          <span className="truncate">Настройки</span>
         </button>
       </div>
     </motion.div>

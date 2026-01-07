@@ -66,7 +66,7 @@ export function ActivityRings({ productivity, focus, automation }: ActivityRings
       strokeWidth: 12,
       color: '#f97316',
       glowColor: 'rgba(249, 115, 22, 0.5)',
-      label: 'Продуктивность',
+      label: 'Прод.',
       displayValue: `${productivity}%`,
       delay: 0,
     },
@@ -88,7 +88,7 @@ export function ActivityRings({ productivity, focus, automation }: ActivityRings
       strokeWidth: 12,
       color: '#10b981',
       glowColor: 'rgba(16, 185, 129, 0.5)',
-      label: 'Автоматизация',
+      label: 'Авто.',
       displayValue: `${automation}%`,
       delay: 0.4,
     },
@@ -98,17 +98,17 @@ export function ActivityRings({ productivity, focus, automation }: ActivityRings
     <motion.div
       initial={{ opacity: 0, scale: 0.9 }}
       animate={{ opacity: 1, scale: 1 }}
-      className="p-5 rounded-xl bg-bg-secondary/60 backdrop-blur-md border border-border-subtle
-                 shadow-inner-glow"
+      className="p-4 rounded-xl bg-bg-secondary/60 backdrop-blur-md border border-border-subtle
+                 shadow-inner-glow overflow-hidden"
     >
-      <h3 className="text-xs text-text-muted uppercase tracking-wider font-mono mb-4">
+      <h3 className="text-xs text-text-muted uppercase tracking-wider font-mono mb-3">
         Activity Rings
       </h3>
 
-      <div className="flex items-center gap-6">
+      <div className="flex items-center gap-4">
         {/* SVG Rings */}
-        <div className="relative">
-          <svg width="180" height="180" viewBox="0 0 180 180">
+        <div className="relative flex-shrink-0">
+          <svg width="140" height="140" viewBox="0 0 180 180">
             {rings.map((ring, i) => (
               <Ring key={i} {...ring} />
             ))}
@@ -123,18 +123,18 @@ export function ActivityRings({ productivity, focus, automation }: ActivityRings
         </div>
 
         {/* Legend */}
-        <div className="space-y-3">
+        <div className="flex-1 min-w-0 space-y-2">
           {rings.map((ring, i) => (
-            <div key={i} className="flex items-center gap-3">
+            <div key={i} className="flex items-center gap-2 min-w-0">
               <div
-                className="w-3 h-3 rounded-full"
+                className="w-2.5 h-2.5 rounded-full flex-shrink-0"
                 style={{
                   backgroundColor: ring.color,
-                  boxShadow: `0 0 10px ${ring.glowColor}`,
+                  boxShadow: `0 0 8px ${ring.glowColor}`,
                 }}
               />
-              <div>
-                <p className="text-xs text-text-muted">{ring.label}</p>
+              <div className="min-w-0 flex-1">
+                <p className="text-[10px] text-text-muted truncate">{ring.label}</p>
                 <p className="text-sm font-mono font-medium text-text-primary">
                   {ring.displayValue}
                 </p>

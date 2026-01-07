@@ -48,13 +48,13 @@ export function MobileHeader({
       initial={{ opacity: 0, y: -20 }}
       animate={{ opacity: 1, y: 0 }}
       className="sticky top-0 z-40 px-4 py-3 bg-bg-primary/95 backdrop-blur-lg border-b border-border-subtle
-                 safe-area-top"
+                 safe-area-top overflow-hidden"
     >
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between gap-3">
         {/* Compact Activity Rings */}
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5 flex-shrink-0">
           {rings.map((ring, index) => (
-            <div key={index} className="relative w-10 h-10">
+            <div key={index} className="relative w-9 h-9">
               <svg className="w-full h-full -rotate-90" viewBox="0 0 36 36">
                 {/* Background circle */}
                 <circle
@@ -82,7 +82,7 @@ export function MobileHeader({
                 />
               </svg>
               <span
-                className="absolute inset-0 flex items-center justify-center text-[10px] font-mono font-bold"
+                className="absolute inset-0 flex items-center justify-center text-[9px] font-mono font-bold"
                 style={{ color: ring.color }}
               >
                 {ring.label}
@@ -92,15 +92,15 @@ export function MobileHeader({
         </div>
 
         {/* Focus Status */}
-        <div className="flex items-center gap-3">
-          <div className="text-right">
-            <p className="text-xs text-text-muted">В фокусе</p>
+        <div className="flex items-center gap-2 min-w-0">
+          <div className="text-right min-w-0">
+            <p className="text-[10px] text-text-muted">В фокусе</p>
             <p className="text-sm font-mono font-bold text-hud-cyan">
               {formatTime(focusTime)}
             </p>
           </div>
-          <div className="w-10 h-10 rounded-lg bg-bg-tertiary flex items-center justify-center">
-            <AppIcon className="w-5 h-5 text-hud-cyan" />
+          <div className="w-9 h-9 rounded-lg bg-bg-tertiary flex items-center justify-center flex-shrink-0">
+            <AppIcon className="w-4 h-4 text-hud-cyan" />
           </div>
         </div>
       </div>
@@ -110,9 +110,9 @@ export function MobileHeader({
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
-          className="mt-2 text-center"
+          className="mt-1.5 text-center overflow-hidden"
         >
-          <span className="text-xs text-text-muted">
+          <span className="text-[10px] text-text-muted truncate block">
             {currentApp}
           </span>
         </motion.div>

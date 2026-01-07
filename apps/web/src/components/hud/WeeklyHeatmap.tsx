@@ -43,18 +43,18 @@ export function WeeklyHeatmap({ data = [] }: WeeklyHeatmapProps) {
     <motion.div
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
-      className="p-5 rounded-xl bg-bg-secondary/60 backdrop-blur-md border border-border-subtle
-                 shadow-inner-glow"
+      className="p-4 rounded-xl bg-bg-secondary/60 backdrop-blur-md border border-border-subtle
+                 shadow-inner-glow overflow-hidden"
     >
-      <div className="flex items-center justify-between mb-4">
-        <h3 className="text-xs text-text-muted uppercase tracking-wider font-mono">
+      <div className="flex items-center justify-between mb-3 gap-2">
+        <h3 className="text-xs text-text-muted uppercase tracking-wider font-mono flex-shrink-0">
           Weekly Activity
         </h3>
         {hoveredValue !== null && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
-            className="text-xs font-mono text-hud-cyan"
+            className="text-[10px] font-mono text-hud-cyan truncate"
           >
             {DAYS[hoveredCell!.day]} {hoveredCell!.hour}:00 — {hoveredValue}%
           </motion.div>

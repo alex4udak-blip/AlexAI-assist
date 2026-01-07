@@ -45,19 +45,19 @@ export function AIInsights({ insights }: AIInsightsProps) {
       <motion.div
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
-        className="p-5 rounded-xl bg-bg-secondary/60 backdrop-blur-md border border-border-subtle
-                   shadow-inner-glow"
+        className="p-4 rounded-xl bg-bg-secondary/60 backdrop-blur-md border border-border-subtle
+                   shadow-inner-glow overflow-hidden"
       >
-        <h3 className="text-xs text-text-muted uppercase tracking-wider font-mono mb-4">
+        <h3 className="text-xs text-text-muted uppercase tracking-wider font-mono mb-3">
           AI Insights
         </h3>
-        <div className="flex flex-col items-center justify-center py-6">
-          <Lightbulb className="w-8 h-8 text-text-muted mb-2" />
+        <div className="flex flex-col items-center justify-center py-4">
+          <Lightbulb className="w-7 h-7 text-text-muted mb-2" />
           <p className="text-sm text-text-muted text-center">
-            Недостаточно данных для анализа
+            Недостаточно данных
           </p>
-          <p className="text-xs text-text-muted mt-1">
-            Продолжайте работать, и AI найдет паттерны
+          <p className="text-xs text-text-muted mt-1 text-center">
+            AI найдет паттерны
           </p>
         </div>
       </motion.div>
@@ -68,17 +68,17 @@ export function AIInsights({ insights }: AIInsightsProps) {
     <motion.div
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
-      className="p-5 rounded-xl bg-bg-secondary/60 backdrop-blur-md border border-border-subtle
-                 shadow-inner-glow"
+      className="p-4 rounded-xl bg-bg-secondary/60 backdrop-blur-md border border-border-subtle
+                 shadow-inner-glow overflow-hidden"
     >
-      <div className="flex items-center gap-2 mb-4">
-        <Lightbulb className="w-4 h-4 text-hud-cyan" />
+      <div className="flex items-center gap-2 mb-3">
+        <Lightbulb className="w-4 h-4 text-hud-cyan flex-shrink-0" />
         <h3 className="text-xs text-text-muted uppercase tracking-wider font-mono">
           AI Insights
         </h3>
       </div>
 
-      <div className="space-y-3">
+      <div className="space-y-2">
         {insights.map((insight, index) => {
           const config = insightConfig[insight.type];
           const Icon = config.icon;
@@ -89,26 +89,26 @@ export function AIInsights({ insights }: AIInsightsProps) {
               initial={{ opacity: 0, x: -10 }}
               animate={{ opacity: 1, x: 0 }}
               transition={{ delay: index * 0.1 }}
-              className={`p-3 rounded-lg border ${config.bg} ${config.border}
-                         hover:shadow-hud-sm transition-shadow cursor-pointer group`}
+              className={`p-2.5 rounded-lg border ${config.bg} ${config.border}
+                         hover:shadow-hud-sm transition-shadow cursor-pointer group overflow-hidden`}
             >
-              <div className="flex items-start gap-3">
-                <div className={`w-8 h-8 rounded-lg ${config.bg} flex items-center justify-center
-                                shrink-0`}>
-                  <Icon className={`w-4 h-4 ${config.color}`} />
+              <div className="flex items-start gap-2">
+                <div className={`w-7 h-7 rounded-lg ${config.bg} flex items-center justify-center
+                                flex-shrink-0`}>
+                  <Icon className={`w-3.5 h-3.5 ${config.color}`} />
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm text-text-primary leading-relaxed">
+                  <p className="text-xs text-text-primary leading-relaxed line-clamp-2">
                     {insight.message}
                   </p>
                   {insight.metric && (
-                    <p className={`text-xs font-mono mt-1 ${config.color}`}>
+                    <p className={`text-[10px] font-mono mt-0.5 ${config.color} truncate`}>
                       {insight.metric}
                     </p>
                   )}
                 </div>
-                <ArrowRight className="w-4 h-4 text-text-muted opacity-0 group-hover:opacity-100
-                                       transition-opacity shrink-0" />
+                <ArrowRight className="w-3.5 h-3.5 text-text-muted opacity-0 group-hover:opacity-100
+                                       transition-opacity flex-shrink-0" />
               </div>
             </motion.div>
           );
