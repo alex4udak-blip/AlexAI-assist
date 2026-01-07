@@ -87,7 +87,7 @@ jobs:
           workspaces: './apps/desktop/src-tauri -> target'
 
       - name: Install dependencies
-        run: npm ci
+        run: npm install
 
       - name: Check Rust
         run: |
