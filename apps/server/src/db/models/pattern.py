@@ -31,6 +31,7 @@ class Pattern(Base):
     first_seen_at: Mapped[datetime | None] = mapped_column()
     last_seen_at: Mapped[datetime | None] = mapped_column()
     automatable: Mapped[bool] = mapped_column(default=False)
+    agent_created: Mapped[bool] = mapped_column(default=False)
     complexity: Mapped[str] = mapped_column(String(20), default="medium")
     time_saved_minutes: Mapped[float] = mapped_column(Float, default=0)
     status: Mapped[str] = mapped_column(String(20), default="active")
