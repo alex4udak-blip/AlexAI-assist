@@ -5,6 +5,7 @@ on:
     branches: [main]
     paths:
       - 'apps/desktop/**'
+      - '.github/workflows/build-mac.yml'
   workflow_dispatch:
 
 permissions:
