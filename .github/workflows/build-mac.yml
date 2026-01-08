@@ -37,6 +37,12 @@ jobs:
           cd apps/desktop
           npm install
 
+      - name: Generate macOS icon
+        run: |
+          cd apps/desktop/src-tauri
+          chmod +x generate_icons.sh
+          ./generate_icons.sh
+
       - name: Build Tauri app (aarch64)
         run: |
           cd apps/desktop
