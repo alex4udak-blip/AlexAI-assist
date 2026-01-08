@@ -265,15 +265,13 @@ pub async fn start_sync_service(state: Arc<Mutex<AppState>>) {
             events = state.events_buffer.drain(..).collect();
         }
 
-        // Try to sync
-        match sync_events(&events).await {
+        // Try to sync - convert error to String immediately to make future Send
+        match sync_events(&events).await.map_err(|e| e.to_string()) {
             Ok(_) => {
                 let mut state = state.lock().await;
                 state.last_sync = format_relative_time(Utc::now());
             }
-            Err(e) => {
-                let error_msg = e.to_string(); // Convert to String before await
-                drop(e); // Drop error to make future Send
+            Err(error_msg) => {
                 eprintln!("Sync failed: {}", error_msg);
                 // Put events back in buffer with bounds checking
                 let mut state = state.lock().await;
@@ -410,16 +408,14 @@ pub async fn manual_sync(state: Arc<Mutex<AppState>>) -> Result<(), String> {
         return Ok(());
     }
 
-    match sync_events(&events).await {
+    // Convert error to String immediately to make future Send
+    match sync_events(&events).await.map_err(|e| e.to_string()) {
         Ok(_) => {
             let mut state = state.lock().await;
             state.last_sync = "Just now".to_string();
             Ok(())
         }
-        Err(e) => {
-            let error_msg = e.to_string(); // Convert to String before await
-            drop(e); // Drop error to make future Send
-
+        Err(error_msg) => {
             // Put events back in buffer with bounds checking
             let mut state = state.lock().await;
             let mut dropped_count = 0;
