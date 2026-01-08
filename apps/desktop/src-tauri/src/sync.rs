@@ -417,6 +417,9 @@ pub async fn manual_sync(state: Arc<Mutex<AppState>>) -> Result<(), String> {
             Ok(())
         }
         Err(e) => {
+            let error_msg = e.to_string(); // Convert to String before await
+            drop(e); // Drop error to make future Send
+
             // Put events back in buffer with bounds checking
             let mut state = state.lock().await;
             let mut dropped_count = 0;
@@ -442,7 +445,7 @@ pub async fn manual_sync(state: Arc<Mutex<AppState>>) -> Result<(), String> {
                 state.buffer_warnings_logged = true;
             }
 
-            Err(e.to_string())
+            Err(error_msg)
         }
     }
 }
