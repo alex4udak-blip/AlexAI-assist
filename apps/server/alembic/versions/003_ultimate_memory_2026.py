@@ -70,7 +70,9 @@ def try_enable_pgvector() -> bool:
         return False
 
 
-def add_vector_column_if_available(table_name: str, column_name: str = "embedding_vector", dimensions: int = 1536) -> None:
+def add_vector_column_if_available(
+    table_name: str, column_name: str = "embedding_vector", dimensions: int = 1536
+) -> None:
     """Add vector column to table if pgvector is available."""
     if not _pgvector_available:
         logger.info(f"Skipping vector column for {table_name} (pgvector not available)")
@@ -155,8 +157,10 @@ def upgrade() -> None:
         sa.Column("session_id", sa.String(64), nullable=False, index=True),
         # Content
         sa.Column("content", sa.Text, nullable=False),
-        sa.Column("fact_type", sa.String(50), nullable=False),  # preference, habit, goal, demographic, skill, world_fact
-        sa.Column("category", sa.String(100)),  # work, personal, health, finance, learning
+        # fact_type: preference, habit, goal, demographic, skill, world_fact
+        sa.Column("fact_type", sa.String(50), nullable=False),
+        # category: work, personal, health, finance, learning
+        sa.Column("category", sa.String(100)),
         # O-Mem style persona attributes
         sa.Column("is_persona_attribute", sa.Boolean, default=False),  # Pa in O-Mem
         sa.Column("is_persona_event", sa.Boolean, default=False),  # Pf in O-Mem
@@ -262,8 +266,14 @@ def upgrade() -> None:
         sa.Column("id", UUID(as_uuid=True), primary_key=True),
         sa.Column("session_id", sa.String(64), index=True),
         # Nodes
-        sa.Column("source_id", UUID(as_uuid=True), sa.ForeignKey("memory_entities.id", ondelete="CASCADE"), nullable=False),
-        sa.Column("target_id", UUID(as_uuid=True), sa.ForeignKey("memory_entities.id", ondelete="CASCADE"), nullable=False),
+        sa.Column(
+            "source_id", UUID(as_uuid=True),
+            sa.ForeignKey("memory_entities.id", ondelete="CASCADE"), nullable=False
+        ),
+        sa.Column(
+            "target_id", UUID(as_uuid=True),
+            sa.ForeignKey("memory_entities.id", ondelete="CASCADE"), nullable=False
+        ),
         # Relationship
         sa.Column("relation_type", sa.String(100), nullable=False),  # uses, prefers, works_on, knows
         sa.Column("description", sa.Text),

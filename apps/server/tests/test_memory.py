@@ -1,6 +1,6 @@
 """Tests for Memory System 2026."""
 
-from datetime import datetime
+from datetime import datetime, timedelta
 from unittest.mock import AsyncMock, MagicMock
 from uuid import uuid4
 

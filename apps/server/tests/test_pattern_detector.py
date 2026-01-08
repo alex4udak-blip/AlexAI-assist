@@ -257,7 +257,7 @@ class TestPatternScoring:
         # Create multiple sequences with different frequencies
         events = []
         # High frequency sequence
-        for i in range(15):
+        for _ in range(15):
             events.extend([
                 Event(
                     id=uuid4(),
@@ -270,7 +270,7 @@ class TestPatternScoring:
                 for j, app in enumerate(["High1", "High2", "High3"])
             ])
         # Low frequency sequence
-        for i in range(3):
+        for _ in range(3):
             events.extend([
                 Event(
                     id=uuid4(),
@@ -335,7 +335,7 @@ class TestPatternScoring:
         # Create many different sequences
         events = []
         for seq_num in range(20):
-            for i in range(5):  # Each sequence repeats 5 times
+            for _ in range(5):  # Each sequence repeats 5 times
                 events.extend([
                     Event(
                         id=uuid4(),

@@ -142,7 +142,7 @@ class TestRateLimiterMiddleware:
         client = TestClient(app_with_rate_limiter)
 
         # Make requests up to the limit
-        for i in range(RateLimitConfig.API_LIMIT):
+        for _ in range(RateLimitConfig.API_LIMIT):
             response = client.get("/api/v1/test")
             assert response.status_code == 200
             assert "X-RateLimit-Limit" in response.headers
