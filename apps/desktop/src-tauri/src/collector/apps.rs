@@ -57,6 +57,7 @@ pub fn get_active_window() -> (Option<String>, Option<String>) {
     (None, None)
 }
 
+#[allow(dead_code)]
 pub fn get_running_apps() -> Vec<String> {
     #[cfg(target_os = "macos")]
     {
