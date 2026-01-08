@@ -1,13 +1,15 @@
 """Background scheduler for periodic tasks."""
 
 import logging
+from datetime import datetime, timedelta
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
 from apscheduler.triggers.interval import IntervalTrigger
 
-from src.db.session import async_session_maker
+from src.db.session import async_session_maker, get_db_session
 from src.services.pattern_detector import PatternDetectorService
+from src.services.evolution.orchestrator import EvolutionOrchestrator
 
 logger = logging.getLogger(__name__)
 
@@ -98,6 +100,22 @@ async def belief_evolution_job() -> None:
         logger.error(f"Belief evolution job failed: {e}")
 
 
+async def run_evolution_cycle() -> None:
+    """Run the full evolution cycle."""
+    logger.info("Starting evolution cycle...")
+    try:
+        async with get_db_session() as db:
+            orchestrator = EvolutionOrchestrator(db)
+            results = await orchestrator.run_evolution_cycle()
+
+            logger.info(f"Evolution cycle complete: {results}")
+
+            if results.get("proposals"):
+                logger.warning(f"New code proposals pending review: {len(results['proposals'])}")
+    except Exception as e:
+        logger.error(f"Evolution cycle failed: {e}")
+
+
 def start_scheduler() -> None:
     """Start the background scheduler."""
     # Run pattern detection every 5 minutes
@@ -133,6 +151,16 @@ def start_scheduler() -> None:
         trigger=CronTrigger(day_of_week="sun", hour=4, minute=0),
         id="belief_evolution",
         name="Evolve beliefs from evidence",
+        replace_existing=True,
+    )
+
+    # Run evolution cycle every 6 hours, starting 5 minutes from now
+    scheduler.add_job(
+        run_evolution_cycle,
+        trigger=IntervalTrigger(hours=6),
+        id="evolution_cycle",
+        name="Run evolution cycle",
+        next_run_time=datetime.utcnow() + timedelta(minutes=5),
         replace_existing=True,
     )
 
