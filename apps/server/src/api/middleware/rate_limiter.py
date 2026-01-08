@@ -2,7 +2,7 @@
 
 import logging
 import time
-from typing import Callable
+from collections.abc import Callable
 
 import redis.asyncio as redis
 from fastapi import Request, Response, status

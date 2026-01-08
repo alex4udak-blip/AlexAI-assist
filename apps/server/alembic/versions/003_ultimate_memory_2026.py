@@ -7,11 +7,13 @@ Revises: 002
 Create Date: 2026-01-07
 """
 
-from alembic import op
-import sqlalchemy as sa
-from sqlalchemy.dialects.postgresql import UUID, JSONB, ARRAY
-from datetime import datetime
 import logging
+from datetime import datetime
+
+import sqlalchemy as sa
+from sqlalchemy.dialects.postgresql import ARRAY, JSONB, UUID
+
+from alembic import op
 
 logger = logging.getLogger(__name__)
 

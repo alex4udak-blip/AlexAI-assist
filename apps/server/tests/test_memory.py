@@ -1,7 +1,7 @@
 """Tests for Memory System 2026."""
 
 from datetime import datetime
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 from uuid import uuid4
 
 import pytest
@@ -377,8 +377,8 @@ class TestFactNetwork:
     @pytest.mark.asyncio
     async def test_add_fact_success(self):
         """Test adding a valid fact."""
-        from src.services.memory.fact_network import FactNetwork
         from src.db.models.memory import MemoryFact
+        from src.services.memory.fact_network import FactNetwork
 
         db_mock = AsyncMock()
 
@@ -525,8 +525,8 @@ class TestFactNetwork:
     @pytest.mark.asyncio
     async def test_update_confidence(self):
         """Test updating fact confidence."""
-        from src.services.memory.fact_network import FactNetwork
         from src.db.models.memory import MemoryFact
+        from src.services.memory.fact_network import FactNetwork
 
         db_mock = AsyncMock()
         network = FactNetwork(db_mock, "test_session")
@@ -564,8 +564,8 @@ class TestExperienceNetwork:
     @pytest.mark.asyncio
     async def test_add_experience_success(self):
         """Test adding a valid experience."""
-        from src.services.memory.experience_network import ExperienceNetwork
         from src.db.models.memory import MemoryExperience
+        from src.services.memory.experience_network import ExperienceNetwork
 
         db_mock = AsyncMock()
         db_mock.flush = AsyncMock()
@@ -681,8 +681,8 @@ class TestObservationNetwork:
     @pytest.mark.asyncio
     async def test_add_entity_success(self):
         """Test adding a valid entity."""
-        from src.services.memory.observation_network import ObservationNetwork
         from src.db.models.memory import MemoryEntity
+        from src.services.memory.observation_network import ObservationNetwork
 
         db_mock = AsyncMock()
         db_mock.flush = AsyncMock()
@@ -840,8 +840,8 @@ class TestBeliefNetwork:
     @pytest.mark.asyncio
     async def test_form_belief_success(self):
         """Test forming a new belief."""
-        from src.services.memory.belief_network import BeliefNetwork
         from src.db.models.memory import MemoryBelief
+        from src.services.memory.belief_network import BeliefNetwork
 
         db_mock = AsyncMock()
         db_mock.add = MagicMock()
@@ -905,8 +905,8 @@ class TestBeliefNetwork:
     @pytest.mark.asyncio
     async def test_reinforce_belief(self):
         """Test reinforcing a belief increases confidence."""
-        from src.services.memory.belief_network import BeliefNetwork
         from src.db.models.memory import MemoryBelief
+        from src.services.memory.belief_network import BeliefNetwork
 
         db_mock = AsyncMock()
         network = BeliefNetwork(db_mock, "test_session")
@@ -937,8 +937,8 @@ class TestBeliefNetwork:
     @pytest.mark.asyncio
     async def test_challenge_belief(self):
         """Test challenging a belief decreases confidence."""
-        from src.services.memory.belief_network import BeliefNetwork
         from src.db.models.memory import MemoryBelief
+        from src.services.memory.belief_network import BeliefNetwork
 
         db_mock = AsyncMock()
         network = BeliefNetwork(db_mock, "test_session")
@@ -969,8 +969,8 @@ class TestBeliefNetwork:
     @pytest.mark.asyncio
     async def test_challenge_belief_low_confidence_rejects(self):
         """Test that challenging a low-confidence belief rejects it."""
-        from src.services.memory.belief_network import BeliefNetwork
         from src.db.models.memory import MemoryBelief
+        from src.services.memory.belief_network import BeliefNetwork
 
         db_mock = AsyncMock()
         network = BeliefNetwork(db_mock, "test_session")

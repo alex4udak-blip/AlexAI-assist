@@ -9,13 +9,14 @@ from datetime import datetime
 from typing import Any
 from uuid import UUID, uuid4
 
-from sqlalchemy import and_, func, or_, select, text
+from sqlalchemy import and_, or_, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.core.security import validate_session_id
 from src.db.models.memory import MemoryEntity, MemoryRelationship
+
 from .confidence_utils import calculate_weighted_average
-from .embeddings import embedding_service, check_pgvector_available
+from .embeddings import check_pgvector_available, embedding_service
 
 logger = logging.getLogger(__name__)
 

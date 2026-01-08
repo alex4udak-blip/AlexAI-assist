@@ -10,14 +10,14 @@ from uuid import UUID, uuid4
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.core.security import validate_session_id
-from .fact_network import FactNetwork
-from .experience_network import ExperienceNetwork
-from .observation_network import ObservationNetwork
+
 from .belief_network import BeliefNetwork
-from .persona_memory import PersonaMemory
-from .memory_scheduler import MemScheduler
+from .experience_network import ExperienceNetwork
+from .fact_network import FactNetwork
 from .memory_operations import MemoryOperator
-from .embeddings import embedding_service
+from .memory_scheduler import MemScheduler
+from .observation_network import ObservationNetwork
+from .persona_memory import PersonaMemory
 
 logger = logging.getLogger(__name__)
 
@@ -124,8 +124,8 @@ class MemoryManager:
         """
         sections = []
         total_length = 0
-        MAX_SECTION_LENGTH = 2500  # Max chars per section
-        MAX_TOTAL_LENGTH = 15000   # Max total chars - generous limit
+        max_section_length = 2500  # Max chars per section
+        max_total_length = 15000   # Max total chars - generous limit
 
         def truncate(text: str, max_len: int = 200) -> str:
             """Truncate text to max_len chars."""
@@ -159,12 +159,12 @@ class MemoryManager:
                         content = e.get('content', str(e)) if isinstance(e, dict) else str(e)
                         persona_section += f"- {truncate(content, 150)}\n"
 
-                if len(persona_section) <= MAX_SECTION_LENGTH:
+                if len(persona_section) <= max_section_length:
                     sections.append(persona_section)
                     total_length += len(persona_section)
 
         # Relevant Facts (Hindsight fact network) - only if room
-        if context.get("relevant_facts") and total_length < MAX_TOTAL_LENGTH:
+        if context.get("relevant_facts") and total_length < max_total_length:
             facts = context["relevant_facts"][:10]  # More facts
             if facts:
                 facts_str = "\n".join(
@@ -172,25 +172,25 @@ class MemoryManager:
                     for f in facts
                 )
                 facts_section = f"## RELEVANT KNOWLEDGE\n{facts_str}"
-                if len(facts_section) <= MAX_SECTION_LENGTH:
+                if len(facts_section) <= max_section_length:
                     sections.append(facts_section)
                     total_length += len(facts_section)
 
         # Entity Context (observation network) - only if room
-        if context.get("entity_context") and total_length < MAX_TOTAL_LENGTH:
+        if context.get("entity_context") and total_length < max_total_length:
             entities = context["entity_context"][:7]  # More entities
             if entities:
                 ent_lines = []
                 for e in entities:
                     summary = truncate(e.get("summary") or "No summary", 120)
                     ent_lines.append(f"- **{truncate(e['name'], 50)}**: {summary}")
-                ent_section = f"## ENTITY CONTEXT\n" + "\n".join(ent_lines)
-                if len(ent_section) <= MAX_SECTION_LENGTH:
+                ent_section = "## ENTITY CONTEXT\n" + "\n".join(ent_lines)
+                if len(ent_section) <= max_section_length:
                     sections.append(ent_section)
                     total_length += len(ent_section)
 
         # Beliefs (high confidence) - only if room
-        if context.get("beliefs") and total_length < MAX_TOTAL_LENGTH:
+        if context.get("beliefs") and total_length < max_total_length:
             beliefs = context["beliefs"][:7]  # More beliefs
             if beliefs:
                 bel_str = "\n".join(
@@ -198,22 +198,22 @@ class MemoryManager:
                     for b in beliefs
                 )
                 bel_section = f"## MY UNDERSTANDING\n{bel_str}"
-                if len(bel_section) <= MAX_SECTION_LENGTH:
+                if len(bel_section) <= max_section_length:
                     sections.append(bel_section)
                     total_length += len(bel_section)
 
         # Recent Experiences - only if room
-        if context.get("recent_experiences") and total_length < MAX_TOTAL_LENGTH:
+        if context.get("recent_experiences") and total_length < max_total_length:
             exp = context["recent_experiences"][:5]  # More experiences
             if exp:
                 exp_str = "\n".join(f"- {truncate(e['description'], 150)}" for e in exp)
                 exp_section = f"## RECENT INTERACTIONS\n{exp_str}"
-                if len(exp_section) <= MAX_SECTION_LENGTH:
+                if len(exp_section) <= max_section_length:
                     sections.append(exp_section)
                     total_length += len(exp_section)
 
         # Topic context - skip if already at limit
-        if context.get("topic_history") and total_length < MAX_TOTAL_LENGTH - 300:
+        if context.get("topic_history") and total_length < max_total_length - 300:
             th = context["topic_history"]
             if th.get("summary"):
                 topic_section = f"## TOPIC: {truncate(th.get('topic', 'Unknown'), 30)}\n"
@@ -222,14 +222,14 @@ class MemoryManager:
                     topic_section += "Key points:\n"
                     for kp in th["key_points"][:2]:
                         topic_section += f"- {truncate(kp, 80)}\n"
-                if len(topic_section) <= MAX_SECTION_LENGTH:
+                if len(topic_section) <= max_section_length:
                     sections.append(topic_section)
 
         result = "\n\n".join(sections) if sections else ""
 
         # Final safety truncation
-        if len(result) > MAX_TOTAL_LENGTH:
-            result = result[:MAX_TOTAL_LENGTH - 50] + "\n\n[Context truncated]"
+        if len(result) > max_total_length:
+            result = result[:max_total_length - 50] + "\n\n[Context truncated]"
 
         return result
 
@@ -473,8 +473,9 @@ class MemoryManager:
 
     async def _update_meta_knowledge(self) -> None:
         """Update self-knowledge about what we know."""
-        from src.db.models.memory import MemoryMeta
         from sqlalchemy import select
+
+        from src.db.models.memory import MemoryMeta
 
         domains = ["work", "personal", "preferences", "habits", "goals"]
 
@@ -517,9 +518,13 @@ class MemoryManager:
     async def get_memory_stats(self) -> dict[str, Any]:
         """Get overall memory statistics."""
         from sqlalchemy import func, select
+
         from src.db.models.memory import (
-            MemoryFact, MemoryExperience, MemoryEntity,
-            MemoryBelief, MemoryTopic
+            MemoryBelief,
+            MemoryEntity,
+            MemoryExperience,
+            MemoryFact,
+            MemoryTopic,
         )
 
         stats = {}
@@ -573,12 +578,21 @@ class MemoryManager:
     async def clear_session(self) -> None:
         """Clear all memory for current session."""
         from sqlalchemy import delete
+
         from src.db.models.memory import (
-            MemoryFact, MemoryExperience, MemoryEntity,
-            MemoryRelationship, MemoryBelief, MemoryTopic,
-            MemoryKeywordIndex, MemoryCube, MemoryLink,
-            MemoryOperation, MemoryEpisode, MemoryProcedure,
-            MemoryMeta
+            MemoryBelief,
+            MemoryCube,
+            MemoryEntity,
+            MemoryEpisode,
+            MemoryExperience,
+            MemoryFact,
+            MemoryKeywordIndex,
+            MemoryLink,
+            MemoryMeta,
+            MemoryOperation,
+            MemoryProcedure,
+            MemoryRelationship,
+            MemoryTopic,
         )
 
         tables = [

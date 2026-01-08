@@ -59,14 +59,16 @@ class Settings(BaseSettings):
             if is_production:
                 raise ValueError(
                     "SECRET_KEY must be set via environment variable in production. "
-                    "Generate a secure key with: python -c 'import secrets; print(secrets.token_urlsafe(32))'"
+                    "Generate a secure key with: "
+                    "python -c 'import secrets; print(secrets.token_urlsafe(32))'"
                 )
 
             # Development: generate random key with warning
             self.secret_key = secrets.token_urlsafe(32)
             logger.warning(
                 "SECRET_KEY not set - generated random key for development. "
-                "This key will change on restart. Set SECRET_KEY environment variable for persistence."
+                "This key will change on restart. "
+                "Set SECRET_KEY environment variable for persistence."
             )
 
         return self

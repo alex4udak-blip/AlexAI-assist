@@ -4,7 +4,7 @@ Implements MemOS's MemScheduler for memory prioritization.
 """
 
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime
 from typing import Any
 from uuid import UUID, uuid4
 
@@ -13,6 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.core.security import validate_session_id
 from src.db.models.memory import MemoryCube, MemoryFact
+
 from .confidence_utils import calculate_time_decay
 
 logger = logging.getLogger(__name__)
@@ -260,7 +261,10 @@ class MemScheduler:
                 """
                 UPDATE memory_facts
                 SET heat_score = GREATEST(0.0,
-                    heat_score * EXP(-EXTRACT(EPOCH FROM (NOW() - COALESCE(last_accessed, created_at))) / (168.0 * 3600.0))
+                    heat_score * EXP(
+                        -EXTRACT(EPOCH FROM (NOW() - COALESCE(last_accessed, created_at)))
+                        / (168.0 * 3600.0)
+                    )
                 )
                 WHERE session_id = :session_id
                     AND heat_score > 0.0
@@ -279,7 +283,10 @@ class MemScheduler:
                 """
                 UPDATE memory_beliefs
                 SET confidence = GREATEST(0.1,
-                    confidence * EXP(-EXTRACT(EPOCH FROM (NOW() - COALESCE(last_reinforced, formed_at))) / (672.0 * 3600.0))
+                    confidence * EXP(
+                        -EXTRACT(EPOCH FROM (NOW() - COALESCE(last_reinforced, formed_at)))
+                        / (672.0 * 3600.0)
+                    )
                 )
                 WHERE session_id = :session_id
                     AND status = 'active'
@@ -425,8 +432,7 @@ class MemScheduler:
         if not cold:
             return 0
 
-        # Extract memory IDs and types for bulk fetch
-        memory_data = [(mem["type"], UUID(mem["id"])) for mem in cold]
+        # Extract memory IDs for bulk fetch
         memory_ids = [UUID(mem["id"]) for mem in cold]
 
         # Bulk fetch existing MemCubes

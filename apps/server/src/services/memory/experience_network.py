@@ -13,7 +13,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.core.security import validate_session_id
 from src.db.models.memory import MemoryExperience, MemoryProcedure
-from .embeddings import embedding_service, check_pgvector_available
+
+from .embeddings import check_pgvector_available, embedding_service
 
 logger = logging.getLogger(__name__)
 
@@ -111,7 +112,9 @@ class ExperienceNetwork:
         if lesson_learned is not None:
             lesson_learned = lesson_learned.strip()
             if len(lesson_learned) > 2000:
-                raise ValueError(f"lesson_learned exceeds maximum length of 2000 characters (got {len(lesson_learned)})")
+                raise ValueError(
+                    f"lesson_learned exceeds maximum length of 2000 characters (got {len(lesson_learned)})"
+                )
 
         # Validate duration_seconds if provided
         if duration_seconds is not None:

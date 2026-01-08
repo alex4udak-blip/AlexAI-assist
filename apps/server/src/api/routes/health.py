@@ -37,7 +37,7 @@ async def check_database() -> dict[str, Any]:
             "status": "healthy",
             "latency_ms": latency_ms,
         }
-    except asyncio.TimeoutError:
+    except TimeoutError:
         return {
             "status": "unhealthy",
             "error": "Database connection timeout (>5s)",
@@ -75,7 +75,7 @@ async def check_redis() -> dict[str, Any]:
             "status": "healthy",
             "latency_ms": latency_ms,
         }
-    except asyncio.TimeoutError:
+    except TimeoutError:
         return {
             "status": "degraded",
             "error": "Redis connection timeout (>5s)",
@@ -230,7 +230,7 @@ async def readiness_check() -> JSONResponse:
                 "timestamp": time.time(),
             },
         )
-    except asyncio.TimeoutError:
+    except TimeoutError:
         return JSONResponse(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             content={

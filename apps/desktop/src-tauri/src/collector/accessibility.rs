@@ -9,13 +9,10 @@
 
 #[cfg(target_os = "macos")]
 pub mod macos {
-    use core_foundation::base::{CFType, TCFType};
-    use core_foundation::boolean::CFBoolean;
+    use core_foundation::base::TCFType;
     use core_foundation::string::CFString;
     use core_graphics::display::CGWindowListCopyWindowInfo;
-    use core_graphics::window::{
-        kCGNullWindowID, kCGWindowListOptionOnScreenOnly, kCGWindowName, kCGWindowOwnerName,
-    };
+    use core_graphics::window::{kCGNullWindowID, kCGWindowListOptionOnScreenOnly};
     use std::ffi::c_void;
 
     // External C function declarations for Accessibility API
@@ -82,7 +79,6 @@ pub mod macos {
 
         // Need to dispatch to main thread
         use std::mem::ManuallyDrop;
-        use std::ptr;
 
         struct Context<F, R> {
             func: ManuallyDrop<F>,

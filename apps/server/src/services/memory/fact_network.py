@@ -13,8 +13,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.core.security import validate_session_id
 from src.db.models.memory import MemoryFact, MemoryLink
+
 from .confidence_utils import calculate_reinforcement, calculate_weighted_average
-from .embeddings import embedding_service, check_pgvector_available, is_pgvector_available
+from .embeddings import check_pgvector_available, embedding_service
+
 # Import sanitization function to prevent prompt injection
 from .memory_operations import sanitize_user_input
 

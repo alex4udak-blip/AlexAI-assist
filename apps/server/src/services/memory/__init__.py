@@ -12,16 +12,16 @@ Based on:
 - Zep Jan'25: Bi-temporal KG + Episode subgraph
 """
 
-from .memory_manager import MemoryManager
-from .fact_network import FactNetwork
-from .experience_network import ExperienceNetwork
-from .observation_network import ObservationNetwork
-from .belief_network import BeliefNetwork
-from .persona_memory import PersonaMemory
-from .memory_scheduler import MemScheduler
-from .memory_operations import MemoryOperator
-from .embeddings import EmbeddingService, embedding_service
 from . import confidence_utils
+from .belief_network import BeliefNetwork
+from .embeddings import EmbeddingService, embedding_service
+from .experience_network import ExperienceNetwork
+from .fact_network import FactNetwork
+from .memory_manager import MemoryManager
+from .memory_operations import MemoryOperator
+from .memory_scheduler import MemScheduler
+from .observation_network import ObservationNetwork
+from .persona_memory import PersonaMemory
 
 __all__ = [
     "MemoryManager",

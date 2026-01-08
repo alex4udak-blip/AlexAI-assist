@@ -88,7 +88,7 @@ class MemoryOperator:
     Decides what operations to perform on each interaction.
     """
 
-    DECISION_PROMPT = """You are a memory manager for an AI assistant. Analyze this interaction and decide what to remember.
+    DECISION_PROMPT = """You are a memory manager. Analyze interaction and decide what to remember.
 
 ## CURRENT KNOWLEDGE
 {current_context}
@@ -116,11 +116,9 @@ For each operation, specify:
 Return JSON array of operations. Be selective - only important information.
 Return [] if nothing to remember.
 
-Example output:
-[
-  {{"operation": "ADD", "memory_type": "fact", "fact_type": "preference", "content": "User prefers dark mode", "confidence": 0.9, "reason": "User explicitly mentioned preference"}},
-  {{"operation": "UPDATE", "memory_type": "belief", "memory_id": "xxx", "reinforce": true, "reason": "Confirmed user prefers concise answers"}}
-]
+Example:
+[{{"operation": "ADD", "memory_type": "fact", "fact_type": "preference",
+   "content": "User prefers dark mode", "confidence": 0.9, "reason": "Explicit"}}]
 """
 
     def __init__(self, db: AsyncSession, session_id: str = "default"):
@@ -156,7 +154,7 @@ Example output:
         try:
             response = await claude_client.complete(
                 prompt=prompt,
-                system="You are a memory manager. Return valid JSON array only. Be selective - only remember important facts.",
+                system="You are a memory manager. Return valid JSON array only. Be selective.",
             )
 
             # Parse response - handle potential markdown wrapping
@@ -199,7 +197,7 @@ Example output:
             ]
             facts = [f for f in facts if f]  # Remove empty facts
             if facts:
-                parts.append(f"Known facts:\n" + "\n".join(f"- {f}" for f in facts))
+                parts.append("Known facts:\n" + "\n".join(f"- {f}" for f in facts))
 
         if context.get("beliefs"):
             # Sanitize belief content before embedding in prompt
@@ -209,7 +207,7 @@ Example output:
             ]
             beliefs = [b for b in beliefs if b]  # Remove empty beliefs
             if beliefs:
-                parts.append(f"Current beliefs:\n" + "\n".join(f"- {b}" for b in beliefs))
+                parts.append("Current beliefs:\n" + "\n".join(f"- {b}" for b in beliefs))
 
         if context.get("persona"):
             p = context["persona"]
@@ -279,8 +277,9 @@ Example output:
         hours: int = 24,
     ) -> dict[str, Any]:
         """Get statistics about recent operations."""
-        from sqlalchemy import func, select
         from datetime import timedelta
+
+        from sqlalchemy import func, select
 
         cutoff = datetime.utcnow() - timedelta(hours=hours)
 

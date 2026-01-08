@@ -10,7 +10,6 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from src.db.base import Base
 
-
 # ===========================================
 # NETWORK 1: FACT NETWORK
 # ===========================================
@@ -26,8 +25,10 @@ class MemoryFact(Base):
 
     # Content
     content: Mapped[str] = mapped_column(Text, nullable=False)
-    fact_type: Mapped[str] = mapped_column(String(50), nullable=False)  # preference, habit, goal, demographic, skill
-    category: Mapped[str | None] = mapped_column(String(100))  # work, personal, health, finance, learning
+    # fact_type: preference, habit, goal, demographic, skill
+    fact_type: Mapped[str] = mapped_column(String(50), nullable=False)
+    # category: work, personal, health, finance, learning
+    category: Mapped[str | None] = mapped_column(String(100))
 
     # O-Mem persona attributes
     is_persona_attribute: Mapped[bool] = mapped_column(Boolean, default=False)
@@ -48,7 +49,9 @@ class MemoryFact(Base):
     confidence: Mapped[float] = mapped_column(Float, default=1.0)
     source: Mapped[str | None] = mapped_column(String(50))
     source_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True)
-    evidence_ids: Mapped[list[uuid.UUID] | None] = mapped_column(ARRAY(UUID(as_uuid=True)), server_default="'{}'")
+    evidence_ids: Mapped[list[uuid.UUID] | None] = mapped_column(
+        ARRAY(UUID(as_uuid=True)), server_default="'{}'"
+    )
 
     # MemOS scheduling
     heat_score: Mapped[float] = mapped_column(Float, default=1.0)
@@ -81,7 +84,8 @@ class MemoryExperience(Base):
     session_id: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
 
     # Content
-    experience_type: Mapped[str | None] = mapped_column(String(50))  # agent_run, user_action, conversation
+    # experience_type: agent_run, user_action, conversation
+    experience_type: Mapped[str | None] = mapped_column(String(50))
     description: Mapped[str] = mapped_column(Text, nullable=False)
 
     # What happened
@@ -99,8 +103,12 @@ class MemoryExperience(Base):
 
     # References
     agent_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True)
-    related_facts: Mapped[list[uuid.UUID] | None] = mapped_column(ARRAY(UUID(as_uuid=True)), server_default="'{}'")
-    related_entities: Mapped[list[uuid.UUID] | None] = mapped_column(ARRAY(UUID(as_uuid=True)), server_default="'{}'")
+    related_facts: Mapped[list[uuid.UUID] | None] = mapped_column(
+        ARRAY(UUID(as_uuid=True)), server_default="'{}'"
+    )
+    related_entities: Mapped[list[uuid.UUID] | None] = mapped_column(
+        ARRAY(UUID(as_uuid=True)), server_default="'{}'"
+    )
 
     # Procedural
     is_procedural: Mapped[bool] = mapped_column(Boolean, default=False)
@@ -126,7 +134,8 @@ class MemoryEntity(Base):
     # Identity
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     canonical_name: Mapped[str | None] = mapped_column(String(255))
-    entity_type: Mapped[str] = mapped_column(String(50), nullable=False)  # person, app, project, concept
+    # entity_type: person, app, project, concept
+    entity_type: Mapped[str] = mapped_column(String(50), nullable=False)
 
     # Synthesized profile
     summary: Mapped[str | None] = mapped_column(Text)
@@ -196,7 +205,9 @@ class MemoryRelationship(Base):
     confidence: Mapped[float] = mapped_column(Float, default=1.0)
 
     # Evidence
-    evidence: Mapped[list[uuid.UUID] | None] = mapped_column(ARRAY(UUID(as_uuid=True)), server_default="'{}'")
+    evidence: Mapped[list[uuid.UUID] | None] = mapped_column(
+        ARRAY(UUID(as_uuid=True)), server_default="'{}'"
+    )
 
     # Timestamps
     created_at: Mapped[datetime] = mapped_column(default=datetime.utcnow)
@@ -232,15 +243,20 @@ class MemoryBelief(Base):
 
     # Content
     belief: Mapped[str] = mapped_column(Text, nullable=False)
-    belief_type: Mapped[str | None] = mapped_column(String(50))  # preference, opinion, inference, prediction
+    # belief_type: preference, opinion, inference, prediction
+    belief_type: Mapped[str | None] = mapped_column(String(50))
 
     # Confidence evolution
     confidence: Mapped[float] = mapped_column(Float, default=0.5)
     confidence_history: Mapped[list[dict[str, Any]] | None] = mapped_column(JSONB, server_default="[]")
 
     # Evidence
-    supporting_facts: Mapped[list[uuid.UUID] | None] = mapped_column(ARRAY(UUID(as_uuid=True)), server_default="'{}'")
-    contradicting_facts: Mapped[list[uuid.UUID] | None] = mapped_column(ARRAY(UUID(as_uuid=True)), server_default="'{}'")
+    supporting_facts: Mapped[list[uuid.UUID] | None] = mapped_column(
+        ARRAY(UUID(as_uuid=True)), server_default="'{}'"
+    )
+    contradicting_facts: Mapped[list[uuid.UUID] | None] = mapped_column(
+        ARRAY(UUID(as_uuid=True)), server_default="'{}'"
+    )
 
     # Evolution
     formed_at: Mapped[datetime] = mapped_column(default=datetime.utcnow)

@@ -2,8 +2,9 @@
 
 import logging
 from collections import defaultdict
+from collections.abc import Callable
 from datetime import UTC, datetime, timedelta
-from typing import Any, Callable, TypeVar
+from typing import Any, TypeVar
 
 from httpx import ConnectError, HTTPStatusError, NetworkError, TimeoutException
 from tenacity import (
