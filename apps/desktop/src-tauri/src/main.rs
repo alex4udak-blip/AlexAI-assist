@@ -4,6 +4,7 @@ mod collector;
 mod commands;
 mod sync;
 mod tray;
+mod updater;
 
 use std::sync::Arc;
 use tokio::sync::Mutex;
@@ -51,10 +52,17 @@ fn main() {
             tauri_plugin_autostart::MacosLauncher::LaunchAgent,
             None,
         ))
+        .plugin(tauri_plugin_updater::Builder::new().build())
         .manage(state.clone())
         .setup(move |app| {
             // Create system tray
             tray::create_tray(app)?;
+
+            // Check for updates in background
+            let app_handle = app.handle().clone();
+            tauri::async_runtime::spawn(async move {
+                updater::check_for_updates(app_handle).await;
+            });
 
             // Start collector with shutdown token
             let state_clone = state.clone();
