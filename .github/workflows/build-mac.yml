@@ -7,6 +7,9 @@ on:
       - 'apps/desktop/**'
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   build:
     runs-on: macos-latest
@@ -20,29 +23,67 @@ jobs:
 
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-darwin,x86_64-apple-darwin
+
+      - name: Rust cache
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: './apps/desktop/src-tauri -> target'
 
       - name: Install dependencies
         run: |
           cd apps/desktop
           npm install
 
-      - name: Build Tauri app
+      - name: Build Tauri app (aarch64)
         run: |
           cd apps/desktop
-          npm run tauri build
+          npm run tauri build -- --target aarch64-apple-darwin
 
-      - name: Upload artifact
+      - name: Build Tauri app (x86_64)
+        run: |
+          cd apps/desktop
+          npm run tauri build -- --target x86_64-apple-darwin
+
+      - name: Upload artifact (aarch64)
         uses: actions/upload-artifact@v4
         with:
-          name: observer-mac
-          path: apps/desktop/src-tauri/target/release/bundle/dmg/*.dmg
+          name: observer-mac-aarch64
+          path: apps/desktop/src-tauri/target/aarch64-apple-darwin/release/bundle/dmg/*.dmg
+
+      - name: Upload artifact (x86_64)
+        uses: actions/upload-artifact@v4
+        with:
+          name: observer-mac-x86_64
+          path: apps/desktop/src-tauri/target/x86_64-apple-darwin/release/bundle/dmg/*.dmg
+
+      - name: Delete existing release
+        run: |
+          gh release delete v0.1.0 --yes || true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Create Release
         uses: softprops/action-gh-release@v1
-        if: github.event_name == 'workflow_dispatch'
         with:
           tag_name: v0.1.0
           name: Observer v0.1.0
-          files: apps/desktop/src-tauri/target/release/bundle/dmg/*.dmg
+          draft: false
+          prerelease: false
+          files: |
+            apps/desktop/src-tauri/target/aarch64-apple-darwin/release/bundle/dmg/*.dmg
+            apps/desktop/src-tauri/target/x86_64-apple-darwin/release/bundle/dmg/*.dmg
+          body: |
+            ## Observer Desktop App v0.1.0
+
+            ### Downloads
+            - **Apple Silicon (M1/M2/M3)**: `Observer_0.1.0_aarch64.dmg`
+            - **Intel Mac**: `Observer_0.1.0_x64.dmg`
+
+            ### Installation
+            1. Download the appropriate .dmg file for your Mac
+            2. Open the .dmg and drag Observer to Applications
+            3. Grant Accessibility permission when prompted
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
