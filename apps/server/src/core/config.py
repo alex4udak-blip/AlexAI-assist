@@ -40,11 +40,12 @@ class Settings(BaseSettings):
         """Parse allowed_origins from comma-separated string."""
         return [origin.strip() for origin in self.allowed_origins_str.split(",") if origin.strip()]
 
-    # Claude API
-    claude_oauth_token: str = ""
+    # Claude API - Direct Anthropic API
+    anthropic_api_key: str = ""
     claude_model: str = "claude-sonnet-4-20250514"
-    claude_proxy_url: str = "http://ccproxy.railway.internal:3001"
-    ccproxy_internal_token: str = ""
+
+    # OpenAI (for embeddings if needed)
+    openai_api_key: str = ""
 
     # App settings
     debug: bool = False

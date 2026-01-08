@@ -1,4 +1,4 @@
-"""Claude API client via proxy."""
+"""Claude API client - direct Anthropic API."""
 
 import json
 import logging
@@ -20,20 +20,23 @@ class ClaudeClientError(Exception):
 
 
 class ClaudeClient:
-    """Client for Claude API through ccproxy."""
+    """Client for direct Anthropic API."""
 
     def __init__(self) -> None:
-        # Use internal proxy URL on Railway
-        self.base_url = settings.claude_proxy_url
-        self.internal_token = settings.ccproxy_internal_token
-        logger.info(f"Claude client using proxy: {self.base_url}")
+        self.base_url = "https://api.anthropic.com"
+        self.api_key = settings.anthropic_api_key
+        if not self.api_key:
+            logger.warning("ANTHROPIC_API_KEY not set - Claude API calls will fail")
+        else:
+            logger.info("Claude client initialized with direct API access")
 
     def _get_headers(self) -> dict[str, str]:
-        """Get headers for proxy requests."""
-        headers = {"Content-Type": "application/json"}
-        if self.internal_token:
-            headers["Authorization"] = f"Bearer {self.internal_token}"
-        return headers
+        """Get headers for Anthropic API."""
+        return {
+            "Content-Type": "application/json",
+            "x-api-key": self.api_key,
+            "anthropic-version": "2023-06-01",
+        }
 
     @retry_with_backoff(max_attempts=3, min_wait=1, max_wait=10)
     @with_circuit_breaker(service_name="claude_api")
@@ -45,7 +48,10 @@ class ClaudeClient:
         model: str | None = None,
         messages: list[dict[str, str]] | None = None,
     ) -> str:
-        """Generate a completion from Claude via proxy."""
+        """Generate a completion from Claude API."""
+        if not self.api_key:
+            raise ClaudeClientError("ANTHROPIC_API_KEY not configured")
+
         # Build messages array
         if messages is not None:
             msg_array = messages
@@ -55,7 +61,7 @@ class ClaudeClient:
             raise ClaudeClientError("Either 'prompt' or 'messages' must be provided")
 
         try:
-            async with httpx.AsyncClient(timeout=180) as client:
+            async with httpx.AsyncClient(timeout=120) as client:
                 response = await client.post(
                     f"{self.base_url}/v1/messages",
                     headers=self._get_headers(),
@@ -87,10 +93,10 @@ class ClaudeClient:
                 return str(first_content["text"])
 
         except TimeoutException as e:
-            logger.error(f"Claude proxy timeout: {e}")
+            logger.error(f"Claude API timeout: {e}")
             raise ClaudeClientError("Request to Claude timed out") from e
         except HTTPStatusError as e:
-            logger.error(f"Claude proxy HTTP error: {e.response.status_code} - {e.response.text}")
+            logger.error(f"Claude API HTTP error: {e.response.status_code} - {e.response.text}")
             raise ClaudeClientError(f"Claude API error: {e.response.status_code}") from e
         except Exception as e:
             if isinstance(e, ClaudeClientError):
