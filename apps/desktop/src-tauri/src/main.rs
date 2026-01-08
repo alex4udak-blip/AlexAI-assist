@@ -6,7 +6,6 @@ mod sync;
 mod tray;
 
 use std::sync::Arc;
-use tauri::Manager;
 use tokio::sync::Mutex;
 use tokio_util::sync::CancellationToken;
 
