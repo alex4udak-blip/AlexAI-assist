@@ -144,16 +144,12 @@ pub fn validate_url(url_str: &str) -> Result<Url, String> {
 /// Note: Production deployments MUST set OBSERVER_SERVER_URL environment variable
 /// or configure server URL via config file
 pub fn get_server_url() -> String {
-    // Development fallback
+    // Production default URL
     let default_url = if is_dev_mode() {
         "http://localhost:8000"
     } else {
-        // Production MUST configure URL via env var or config file
-        // Using localhost as safe fallback (will fail to connect, prompting user to configure)
-        eprintln!(
-            "WARNING: OBSERVER_SERVER_URL not configured. Please set environment variable or create config file at ~/.config/observer/server.txt"
-        );
-        "http://localhost:8000"
+        // Production Railway URL
+        "https://server-production-0b14.up.railway.app"
     };
 
     // 1. Environment variable
@@ -201,16 +197,12 @@ pub fn get_server_url() -> String {
 /// Note: Production deployments MUST set OBSERVER_DASHBOARD_URL environment variable
 /// or configure dashboard URL via config file
 pub fn get_dashboard_url() -> String {
-    // Development fallback
+    // Production default URL
     let default_url = if is_dev_mode() {
         "http://localhost:5173"
     } else {
-        // Production MUST configure URL via env var or config file
-        // Using localhost as safe fallback (will fail to connect, prompting user to configure)
-        eprintln!(
-            "WARNING: OBSERVER_DASHBOARD_URL not configured. Please set environment variable or create config file at ~/.config/observer/dashboard.txt"
-        );
-        "http://localhost:5173"
+        // Production Railway URL
+        "https://web-production-20d71.up.railway.app"
     };
 
     // 1. Environment variable
