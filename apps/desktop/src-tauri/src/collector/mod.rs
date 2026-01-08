@@ -1,7 +1,13 @@
 mod accessibility;
 mod apps;
+mod browser;
+mod messenger;
+mod screenshots;
 
 pub use accessibility::macos::*;
+pub use browser::{BrowserMonitor, BrowserState, BrowserTab};
+pub use messenger::{Message, MessengerMonitor, MessengerState};
+pub use screenshots::{Screenshot, ScreenshotConfig, ScreenshotManager, ScreenshotStats};
 
 use crate::AppState;
 use chrono::{DateTime, Utc};
@@ -32,6 +38,10 @@ pub struct Event {
     pub url: Option<String>,
     pub data: serde_json::Value,
     pub category: Option<String>,
+    // Full monitoring fields
+    pub browser_tab: Option<BrowserTab>,
+    pub messages: Option<Vec<Message>>,
+    pub screenshot_path: Option<String>,
 }
 
 impl Event {
@@ -50,6 +60,9 @@ impl Event {
             url: None,
             data: serde_json::json!({}),
             category: None,
+            browser_tab: None,
+            messages: None,
+            screenshot_path: None,
         }
     }
 
