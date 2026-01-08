@@ -154,8 +154,8 @@ async def chat(
 
     # Build messages array with smart truncation to prevent 413
     # Keep recent messages (last 20) in full, truncate older ones
-    MAX_TOTAL_HISTORY_CHARS = 30000  # ~30k chars for history
-    MAX_MESSAGE_CHARS = 2000  # Max chars per message
+    max_total_history_chars = 30000  # ~30k chars for history
+    max_message_chars = 2000  # Max chars per message
 
     messages = []
     total_chars = 0
@@ -173,11 +173,11 @@ async def chat(
                 content = content[:500] + "..."
 
         # Ensure no single message is too long
-        if len(content) > MAX_MESSAGE_CHARS:
-            content = content[:MAX_MESSAGE_CHARS] + "..."
+        if len(content) > max_message_chars:
+            content = content[:max_message_chars] + "..."
 
         # Skip if we've exceeded total limit (but always keep last 10)
-        if total_chars + len(content) > MAX_TOTAL_HISTORY_CHARS and i < len(msg_list) - 10:
+        if total_chars + len(content) > max_total_history_chars and i < len(msg_list) - 10:
             continue
 
         messages.append({"role": msg.role, "content": content})
@@ -213,7 +213,8 @@ async def chat(
             retry_count += 1
 
             # On 413, reduce context and retry
-            if ("413" in error_str or "too large" in error_str.lower()) and retry_count < max_retries:
+            is_too_large = "413" in error_str or "too large" in error_str.lower()
+            if is_too_large and retry_count < max_retries:
                 logger.warning(
                     f"Context too large, reducing and retrying ({retry_count}/{max_retries})",
                     extra={"event_type": "context_reduction", "session_id": session_id},
@@ -224,7 +225,8 @@ async def chat(
                     current_messages = current_messages[half:]
                 # Reduce system prompt
                 if len(current_system) > 2000:
-                    current_system = current_system[:2000] + "\n[Context reduced due to size limits]"
+                    truncated = current_system[:2000]
+                    current_system = truncated + "\n[Context reduced]"
                 continue
 
             log_error(
@@ -239,13 +241,25 @@ async def chat(
             )
             # Provide user-friendly error message
             if "413" in error_str or "too large" in error_str.lower():
-                response = "Извините, контекст беседы слишком большой. Попробуйте очистить историю чата."
+                response = (
+                    "Извините, контекст беседы слишком большой. "
+                    "Попробуйте очистить историю чата."
+                )
             elif "rate" in error_str.lower() or "429" in error_str:
-                response = "Превышен лимит запросов. Пожалуйста, подождите немного и попробуйте снова."
+                response = (
+                    "Превышен лимит запросов. "
+                    "Пожалуйста, подождите немного и попробуйте снова."
+                )
             elif "timeout" in error_str.lower():
-                response = "Превышено время ожидания ответа. Пожалуйста, попробуйте снова."
+                response = (
+                    "Превышено время ожидания ответа. "
+                    "Пожалуйста, попробуйте снова."
+                )
             else:
-                response = "Извините, произошла ошибка при подключении к AI. Пожалуйста, попробуйте снова."
+                response = (
+                    "Извините, произошла ошибка при подключении к AI. "
+                    "Пожалуйста, попробуйте снова."
+                )
 
     # Store user message in database
     user_msg = ChatMessage(
@@ -289,7 +303,9 @@ async def chat(
             },
         )
         await db.rollback()
-        raise HTTPException(status_code=500, detail="Failed to save chat messages")
+        raise HTTPException(
+            status_code=500, detail="Failed to save chat messages"
+        ) from e
 
     # Invalidate cache for this session
     r = await get_redis()

@@ -2,10 +2,10 @@
 
 import asyncio
 import time
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
-from fastapi import FastAPI, Request, Response
+from fastapi import FastAPI, Request
 from fastapi.testclient import TestClient
 
 from src.api.middleware.rate_limiter import (

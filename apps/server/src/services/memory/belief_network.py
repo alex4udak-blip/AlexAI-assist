@@ -13,6 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.core.security import validate_session_id
 from src.db.models.memory import MemoryBelief, MemoryFact
+
 from .confidence_utils import calculate_challenge, calculate_reinforcement
 
 logger = logging.getLogger(__name__)
@@ -353,7 +354,6 @@ class BeliefNetwork:
         Evolve beliefs based on accumulated evidence.
         Returns number of beliefs modified.
         """
-        from src.db.models.memory import MemoryFact
 
         # Get active beliefs
         result = await self.db.execute(

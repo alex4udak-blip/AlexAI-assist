@@ -1,20 +1,18 @@
 """Comprehensive API endpoint tests."""
 
 import asyncio
+from collections.abc import AsyncGenerator
 from datetime import datetime, timedelta
-from typing import Any, AsyncGenerator
 from unittest.mock import AsyncMock, MagicMock, patch
 from uuid import UUID, uuid4
 
 import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy import delete
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from src.db.base import Base
 from src.db.models import Agent, ChatMessage, Device, Event, Suggestion
 from src.main import app
-
 
 # ===========================================
 # FIXTURES

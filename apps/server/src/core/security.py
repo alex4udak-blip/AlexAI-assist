@@ -108,7 +108,10 @@ def validate_session_id(session_id: str) -> str:
         )
         raise HTTPException(
             status_code=400,
-            detail="Invalid session ID format. Only alphanumeric characters, underscores, and hyphens are allowed (max 64 chars)"
+            detail=(
+                "Invalid session ID format. "
+                "Only alphanumeric characters, underscores, and hyphens are allowed (max 64 chars)"
+            )
         )
 
     # Check for SQL injection attempts

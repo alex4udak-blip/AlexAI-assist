@@ -1,7 +1,6 @@
 """Background scheduler for periodic tasks."""
 
 import logging
-from datetime import datetime
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
@@ -47,7 +46,9 @@ async def detect_patterns_job() -> None:
                 )
 
             await db.commit()
-            logger.info(f"Pattern detection complete. Found {len(patterns.get('app_sequences', []))} app sequences, {len(patterns.get('time_patterns', []))} time patterns")
+            seq_count = len(patterns.get('app_sequences', []))
+            time_count = len(patterns.get('time_patterns', []))
+            logger.info(f"Pattern detection complete. Found {seq_count} app sequences, {time_count} time patterns")
     except Exception as e:
         logger.error(f"Pattern detection job failed: {e}")
 

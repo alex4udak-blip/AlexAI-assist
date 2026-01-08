@@ -21,6 +21,7 @@ from src.api.routes import (
 )
 from src.core.config import settings
 from src.core.logging import get_logger, log_error, setup_logging
+from src.core.websocket import active_connections
 from src.db.session import engine
 
 # Configure structured logging
@@ -156,10 +157,6 @@ async def test_db() -> dict[str, str]:
             extra={"event_type": "db_error"},
         )
         return {"status": "error", "detail": "Database connection failed"}
-
-
-# Import shared WebSocket connections
-from src.core.websocket import active_connections
 
 
 @app.websocket("/ws")

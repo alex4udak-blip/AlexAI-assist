@@ -1,8 +1,7 @@
 """Tests for retry logic and circuit breaker."""
 
 import asyncio
-from datetime import UTC, datetime, timedelta
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import MagicMock
 
 import httpx
 import pytest
