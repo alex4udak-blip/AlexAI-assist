@@ -27,8 +27,8 @@ class SensitiveDataFilter(logging.Filter):
         "secret_key",
         "access_token",
         "refresh_token",
-        "claude_oauth_token",
-        "ccproxy_internal_token",
+        "anthropic_api_key",
+        "openai_api_key",
     }
 
     def filter(self, record: logging.LogRecord) -> bool:
