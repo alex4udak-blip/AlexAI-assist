@@ -397,6 +397,7 @@ fn format_relative_time(time: chrono::DateTime<Utc>) -> String {
     }
 }
 
+#[allow(dead_code)]
 pub async fn manual_sync(state: Arc<Mutex<AppState>>) -> Result<(), String> {
     let events: Vec<Event>;
     {

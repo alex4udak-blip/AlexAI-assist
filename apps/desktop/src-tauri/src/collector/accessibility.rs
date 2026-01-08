@@ -13,7 +13,9 @@ pub mod macos {
     use core_foundation::string::CFString;
     use core_graphics::display::CGWindowListCopyWindowInfo;
     use core_graphics::window::{kCGNullWindowID, kCGWindowListOptionOnScreenOnly};
+    use dispatch::Queue;
     use std::ffi::c_void;
+    use std::sync::mpsc;
 
     // External C function declarations for Accessibility API
     #[link(name = "ApplicationServices", kind = "framework")]
@@ -28,15 +30,8 @@ pub mod macos {
         fn CFRelease(cf: *mut c_void);
     }
 
-    // External C function declarations for GCD (Grand Central Dispatch)
-    #[link(name = "System", kind = "dylib")]
+    // External C function for checking main thread
     extern "C" {
-        fn dispatch_get_main_queue() -> *mut c_void;
-        fn dispatch_sync_f(
-            queue: *mut c_void,
-            context: *mut c_void,
-            work: unsafe extern "C" fn(*mut c_void),
-        );
         fn pthread_main_np() -> i32;
     }
 
@@ -64,52 +59,25 @@ pub mod macos {
     ///
     /// If already on the main thread, executes immediately.
     /// Otherwise, dispatches to main thread and waits for completion.
-    ///
-    /// # Safety
-    /// Uses GCD (Grand Central Dispatch) FFI calls
     fn run_on_main_thread<F, R>(f: F) -> R
     where
-        F: FnOnce() -> R + Send,
-        R: Send,
+        F: FnOnce() -> R + Send + 'static,
+        R: Send + 'static,
     {
         if is_main_thread() {
             // Already on main thread, execute directly
             return f();
         }
 
-        // Need to dispatch to main thread
-        use std::mem::ManuallyDrop;
+        // Need to dispatch to main thread using dispatch crate
+        let (tx, rx) = mpsc::channel();
 
-        struct Context<F, R> {
-            func: ManuallyDrop<F>,
-            result: ManuallyDrop<Option<R>>,
-        }
+        Queue::main().exec_sync(move || {
+            let result = f();
+            let _ = tx.send(result);
+        });
 
-        unsafe extern "C" fn trampoline<F, R>(ctx: *mut c_void)
-        where
-            F: FnOnce() -> R,
-        {
-            let ctx = &mut *(ctx as *mut Context<F, R>);
-            let func = ManuallyDrop::take(&mut ctx.func);
-            let result = func();
-            ctx.result = ManuallyDrop::new(Some(result));
-        }
-
-        unsafe {
-            let mut ctx = Context {
-                func: ManuallyDrop::new(f),
-                result: ManuallyDrop::new(None),
-            };
-
-            let main_queue = dispatch_get_main_queue();
-            dispatch_sync_f(
-                main_queue,
-                &mut ctx as *mut _ as *mut c_void,
-                trampoline::<F, R>,
-            );
-
-            ManuallyDrop::take(&mut ctx.result).unwrap()
-        }
+        rx.recv().expect("Failed to receive result from main thread")
     }
 
     // AX error codes
@@ -120,7 +88,9 @@ pub mod macos {
     const K_AX_TITLE_ATTRIBUTE: &str = "AXTitle";
     const K_AX_FOCUSED_UI_ELEMENT_ATTRIBUTE: &str = "AXFocusedUIElement";
     const K_AX_SELECTED_TEXT_ATTRIBUTE: &str = "AXSelectedText";
+    #[allow(dead_code)]
     const K_AX_VALUE_ATTRIBUTE: &str = "AXValue";
+    #[allow(dead_code)]
     const K_AX_ROLE_ATTRIBUTE: &str = "AXRole";
 
     /// Get information about the currently focused UI element (internal implementation)
@@ -439,6 +409,7 @@ pub mod macos {
     ///
     /// # Safety
     /// Uses unsafe FFI calls to Core Graphics and Core Foundation APIs
+    #[allow(dead_code)]
     fn get_all_windows_impl() -> Vec<(String, String)> {
         assert_main_thread();
 
@@ -494,6 +465,7 @@ pub mod macos {
     /// # Thread Safety
     /// This function is thread-safe. It can be called from any thread.
     /// If not on the main thread, it will automatically dispatch to the main thread.
+    #[allow(dead_code)]
     pub fn get_all_windows() -> Vec<(String, String)> {
         run_on_main_thread(|| get_all_windows_impl())
     }
