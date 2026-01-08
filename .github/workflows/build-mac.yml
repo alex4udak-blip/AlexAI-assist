@@ -47,11 +47,17 @@ jobs:
         run: |
           cd apps/desktop
           npm run tauri build -- --target aarch64-apple-darwin
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
 
       - name: Build Tauri app (x86_64)
         run: |
           cd apps/desktop
           npm run tauri build -- --target x86_64-apple-darwin
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
 
       - name: Upload artifact (aarch64)
         uses: actions/upload-artifact@v4
@@ -64,6 +70,49 @@ jobs:
         with:
           name: observer-mac-x86_64
           path: apps/desktop/src-tauri/target/x86_64-apple-darwin/release/bundle/dmg/*.dmg
+
+      - name: Generate latest.json for updater
+        run: |
+          VERSION="0.1.0"
+          AARCH64_DMG="Observer_${VERSION}_aarch64.dmg"
+          X64_DMG="Observer_${VERSION}_x64.dmg"
+          REPO_URL="https://github.com/alex4udak-blip/AlexAI-assist/releases/download/v${VERSION}"
+
+          # Get signatures if they exist
+          AARCH64_SIG=""
+          X64_SIG=""
+
+          AARCH64_SIG_FILE="apps/desktop/src-tauri/target/aarch64-apple-darwin/release/bundle/dmg/${AARCH64_DMG}.sig"
+          X64_SIG_FILE="apps/desktop/src-tauri/target/x86_64-apple-darwin/release/bundle/dmg/${X64_DMG}.sig"
+
+          if [ -f "$AARCH64_SIG_FILE" ]; then
+            AARCH64_SIG=$(cat "$AARCH64_SIG_FILE")
+          fi
+
+          if [ -f "$X64_SIG_FILE" ]; then
+            X64_SIG=$(cat "$X64_SIG_FILE")
+          fi
+
+          # Create latest.json
+          cat > latest.json << EOF
+          {
+            "version": "${VERSION}",
+            "notes": "Observer Desktop App v${VERSION}",
+            "pub_date": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+            "platforms": {
+              "darwin-aarch64": {
+                "signature": "${AARCH64_SIG}",
+                "url": "${REPO_URL}/${AARCH64_DMG}"
+              },
+              "darwin-x86_64": {
+                "signature": "${X64_SIG}",
+                "url": "${REPO_URL}/${X64_DMG}"
+              }
+            }
+          }
+          EOF
+
+          cat latest.json
 
       - name: Delete existing release
         run: |
@@ -81,6 +130,7 @@ jobs:
           files: |
             apps/desktop/src-tauri/target/aarch64-apple-darwin/release/bundle/dmg/*.dmg
             apps/desktop/src-tauri/target/x86_64-apple-darwin/release/bundle/dmg/*.dmg
+            latest.json
           body: |
             ## Observer Desktop App v0.1.0
 
@@ -92,5 +142,8 @@ jobs:
             1. Download the appropriate .dmg file for your Mac
             2. Open the .dmg and drag Observer to Applications
             3. Grant Accessibility permission when prompted
+
+            ### Auto-Updates
+            This version includes automatic updates. The app will check for new versions on startup.
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
