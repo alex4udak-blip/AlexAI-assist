@@ -4,8 +4,6 @@ use core_foundation::base::{CFRelease, TCFType};
 use core_foundation::string::{CFString, CFStringRef};
 #[cfg(target_os = "macos")]
 use core_foundation::array::{CFArray, CFArrayRef};
-#[cfg(target_os = "macos")]
-use core_foundation::number::CFNumber;
 
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
@@ -346,7 +344,7 @@ impl MessengerMonitor {
 
                 for i in 0..children_array.len() {
                     if let Some(child) = children_array.get(i) {
-                        self.traverse_for_messages(child, app_name, messages, depth + 1);
+                        self.traverse_for_messages(*child, app_name, messages, depth + 1);
                     }
                 }
             }

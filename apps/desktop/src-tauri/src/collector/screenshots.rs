@@ -6,9 +6,7 @@ use std::path::PathBuf;
 use uuid::Uuid;
 
 #[cfg(target_os = "macos")]
-use core_graphics::display::{CGDisplay, CGMainDisplayID};
-#[cfg(target_os = "macos")]
-use core_graphics::image::CGImageRef;
+use core_graphics::display::CGMainDisplayID;
 #[cfg(target_os = "macos")]
 use image::{DynamicImage, ImageBuffer, Rgb};
 
@@ -145,79 +143,78 @@ impl ScreenshotManager {
     /// Capture the screen using macOS Core Graphics
     #[cfg(target_os = "macos")]
     fn capture_screen(&self) -> Option<DynamicImage> {
-        use core_graphics::display::CGDisplayCreateImage;
+        use core_graphics::display::CGDisplay;
 
         unsafe {
             // Get main display
             let display_id = CGMainDisplayID();
+            let display = CGDisplay::new(display_id);
 
             // Capture display image
-            let cg_image = CGDisplayCreateImage(display_id)?;
+            let cg_image = display.image()?;
 
             // Convert CGImage to DynamicImage
-            self.cgimage_to_dynamic_image(cg_image)
+            self.cgimage_to_dynamic_image(&cg_image)
         }
     }
 
-    /// Convert CGImageRef to DynamicImage
+    /// Convert CGImage to DynamicImage
     #[cfg(target_os = "macos")]
-    fn cgimage_to_dynamic_image(&self, cg_image: CGImageRef) -> Option<DynamicImage> {
-        use core_graphics::base::CGFloat;
-        use core_graphics::geometry::CGRect;
+    fn cgimage_to_dynamic_image(
+        &self,
+        cg_image: &core_graphics::image::CGImage,
+    ) -> Option<DynamicImage> {
+        let width = cg_image.width();
+        let height = cg_image.height();
+        let bits_per_component = cg_image.bits_per_component();
+        let bits_per_pixel = cg_image.bits_per_pixel();
+        let bytes_per_row = cg_image.bytes_per_row();
 
-        unsafe {
-            let width = cg_image.width();
-            let height = cg_image.height();
-            let bits_per_component = cg_image.bits_per_component();
-            let bits_per_pixel = cg_image.bits_per_pixel();
-            let bytes_per_row = cg_image.bytes_per_row();
+        // Get pixel data
+        let data_provider = cg_image.data_provider()?;
+        let data = data_provider.copy_data()?;
+        let bytes: &[u8] = &data;
 
-            // Get pixel data
-            let data_provider = cg_image.data_provider()?;
-            let data = data_provider.copy_data()?;
-            let bytes = std::slice::from_raw_parts(
-                data.as_ptr() as *const u8,
-                data.len(),
-            );
+        // Create image buffer
+        let mut img_buffer = ImageBuffer::<Rgb<u8>, Vec<u8>>::new(width as u32, height as u32);
 
-            // Create image buffer
-            let mut img_buffer = ImageBuffer::<Rgb<u8>, Vec<u8>>::new(width as u32, height as u32);
-
-            // Convert based on bits per pixel
-            if bits_per_pixel == 32 && bits_per_component == 8 {
-                // RGBA or BGRA format
-                for y in 0..height {
-                    for x in 0..width {
-                        let offset = y * bytes_per_row + x * 4;
-                        if offset + 3 <= bytes.len() {
-                            // Assuming BGRA format (common on macOS)
-                            let b = bytes[offset];
-                            let g = bytes[offset + 1];
-                            let r = bytes[offset + 2];
-                            img_buffer.put_pixel(x as u32, y as u32, Rgb([r, g, b]));
-                        }
+        // Convert based on bits per pixel
+        if bits_per_pixel == 32 && bits_per_component == 8 {
+            // RGBA or BGRA format
+            for y in 0..height {
+                for x in 0..width {
+                    let offset = y * bytes_per_row + x * 4;
+                    if offset + 3 <= bytes.len() {
+                        // Assuming BGRA format (common on macOS)
+                        let b = bytes[offset];
+                        let g = bytes[offset + 1];
+                        let r = bytes[offset + 2];
+                        img_buffer.put_pixel(x as u32, y as u32, Rgb([r, g, b]));
                     }
                 }
-            } else {
-                eprintln!("Unsupported pixel format: {} bits per pixel", bits_per_pixel);
-                return None;
             }
-
-            // Scale down if needed
-            let scaled_image = if self.config.scale_factor < 1.0 {
-                let new_width = ((width as f32) * self.config.scale_factor) as u32;
-                let new_height = ((height as f32) * self.config.scale_factor) as u32;
-                DynamicImage::ImageRgb8(img_buffer).resize(
-                    new_width,
-                    new_height,
-                    image::imageops::FilterType::Lanczos3,
-                )
-            } else {
-                DynamicImage::ImageRgb8(img_buffer)
-            };
-
-            Some(scaled_image)
+        } else {
+            eprintln!(
+                "Unsupported pixel format: {} bits per pixel",
+                bits_per_pixel
+            );
+            return None;
         }
+
+        // Scale down if needed
+        let scaled_image = if self.config.scale_factor < 1.0 {
+            let new_width = ((width as f32) * self.config.scale_factor) as u32;
+            let new_height = ((height as f32) * self.config.scale_factor) as u32;
+            DynamicImage::ImageRgb8(img_buffer).resize(
+                new_width,
+                new_height,
+                image::imageops::FilterType::Lanczos3,
+            )
+        } else {
+            DynamicImage::ImageRgb8(img_buffer)
+        };
+
+        Some(scaled_image)
     }
 
     /// Compute a perceptual hash of the image for similarity comparison
