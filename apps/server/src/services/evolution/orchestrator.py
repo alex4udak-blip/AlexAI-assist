@@ -16,7 +16,7 @@ from enum import Enum
 from typing import Any
 from uuid import UUID, uuid4
 
-from sqlalchemy import select, text
+from sqlalchemy import func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.core.claude import claude_client
@@ -281,8 +281,8 @@ class EvolutionOrchestrator:
         one_day_ago = datetime.now(UTC) - timedelta(days=1)
         result = await self.db.execute(
             select(AgentLog)
-            .where(AgentLog.status == "error")
-            .where(AgentLog.executed_at >= one_day_ago)
+            .where(AgentLog.level == "error")
+            .where(AgentLog.created_at >= one_day_ago)
             .limit(50)
         )
         failed_logs = result.scalars().all()
@@ -293,11 +293,11 @@ class EvolutionOrchestrator:
                     source_type="agent_error",
                     priority=EvolutionPriority.HIGH,
                     subsystem=EvolutionSubsystem.AGENTS,
-                    content=f"Agent execution failed: {log.error}",
+                    content=f"Agent execution failed: {log.message}",
                     metadata={
                         "agent_id": str(log.agent_id),
                         "log_id": str(log.id),
-                        "error": log.error,
+                        "error": log.message,
                     },
                 )
             )
@@ -365,7 +365,7 @@ class EvolutionOrchestrator:
 
         # Get recent patterns that could benefit from automation
         result = await self.db.execute(
-            select(Pattern).where(Pattern.frequency >= 5).limit(20)
+            select(Pattern).where(Pattern.occurrences >= 5).limit(20)
         )
         patterns = result.scalars().all()
 
@@ -383,7 +383,7 @@ class EvolutionOrchestrator:
                         content=f"Pattern '{pattern.name}' could benefit from automation",
                         metadata={
                             "pattern_id": str(pattern.id),
-                            "frequency": pattern.frequency,
+                            "occurrences": pattern.occurrences,
                         },
                     )
                 )
@@ -527,10 +527,10 @@ Respond with JSON:
             if subsystem == EvolutionSubsystem.MEMORY:
                 # Snapshot key memory metrics
                 fact_count = await self.db.scalar(
-                    select(text("COUNT(*)")).select_from(MemoryFact)
+                    select(func.count()).select_from(MemoryFact)
                 )
                 experience_count = await self.db.scalar(
-                    select(text("COUNT(*)")).select_from(MemoryExperience)
+                    select(func.count()).select_from(MemoryExperience)
                 )
                 snapshot_data = {
                     "fact_count": fact_count,
@@ -546,7 +546,7 @@ Respond with JSON:
                         {
                             "id": str(a.id),
                             "status": a.status,
-                            "version": a.version,
+                            "run_count": a.run_count,
                         }
                         for a in agents
                     ]
@@ -766,15 +766,15 @@ Suggest specific behavior adjustments as JSON:
         try:
             one_day_ago = datetime.now(UTC) - timedelta(days=1)
             total_logs = await self.db.scalar(
-                select(text("COUNT(*)"))
+                select(func.count())
                 .select_from(AgentLog)
-                .where(AgentLog.executed_at >= one_day_ago)
+                .where(AgentLog.created_at >= one_day_ago)
             )
             error_logs = await self.db.scalar(
-                select(text("COUNT(*)"))
+                select(func.count())
                 .select_from(AgentLog)
-                .where(AgentLog.executed_at >= one_day_ago)
-                .where(AgentLog.status == "error")
+                .where(AgentLog.created_at >= one_day_ago)
+                .where(AgentLog.level == "error")
             )
 
             if total_logs and total_logs > 0:
@@ -904,7 +904,9 @@ Suggest specific behavior adjustments as JSON:
 
                     if agent:
                         agent.status = agent_data["status"]
-                        agent.version = agent_data["version"]
+                        # Restore run_count if available
+                        if "run_count" in agent_data:
+                            agent.run_count = agent_data["run_count"]
 
                 await self.db.commit()
 
@@ -959,8 +961,8 @@ Suggest specific behavior adjustments as JSON:
         logs_result = await self.db.execute(
             select(AgentLog)
             .where(AgentLog.agent_id == agent_id)
-            .where(AgentLog.status == "error")
-            .order_by(AgentLog.executed_at.desc())
+            .where(AgentLog.level == "error")
+            .order_by(AgentLog.created_at.desc())
             .limit(5)
         )
         error_logs = logs_result.scalars().all()
@@ -969,7 +971,7 @@ Suggest specific behavior adjustments as JSON:
             return {"status": "no_errors_found"}
 
         # Use LLM to analyze errors and suggest fixes
-        errors_summary = "\n".join([f"- {log.error}" for log in error_logs])
+        errors_summary = "\n".join([f"- {log.message}" for log in error_logs])
 
         try:
             prompt = f"""This agent is failing with these errors:
@@ -1029,11 +1031,13 @@ Suggest a fix as JSON:
         # Create suggestion for this pattern
         suggestion = Suggestion(
             title=f"Automate: {pattern.name}",
-            description=f"Detected pattern occurs {pattern.frequency} times - consider automation",
-            category="automation",
-            confidence=min(0.5 + (pattern.frequency / 20), 0.95),
+            description=f"Detected pattern occurs {pattern.occurrences} times - consider automation",
+            agent_type="automation",
+            agent_config={"auto_generated": True, "evolution_orchestrator": True},
+            confidence=min(0.5 + (pattern.occurrences / 20), 0.95),
             pattern_id=pattern_id,
-            metadata={"auto_generated": True, "evolution_orchestrator": True},
+            impact="medium",
+            time_saved_minutes=pattern.time_saved_minutes or 0,
         )
 
         self.db.add(suggestion)

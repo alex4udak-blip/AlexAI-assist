@@ -11,7 +11,7 @@ import logging
 import re
 from datetime import datetime
 from typing import Any
-from uuid import UUID
+from uuid import uuid4
 
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -402,7 +402,7 @@ class FeedbackCollector:
             - timestamp: When feedback was added
         """
         feedback_record = {
-            "id": str(UUID.uuid4()),
+            "id": str(uuid4()),
             "type": feedback_type,
             "content": content,
             "category": category,
