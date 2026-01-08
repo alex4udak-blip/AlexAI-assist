@@ -48,8 +48,8 @@ ANDROID
 ```
 DATABASE_URL=             # Автоматически от Railway PostgreSQL
 REDIS_URL=                # Автоматически от Railway Redis
-CLAUDE_OAUTH_TOKEN=       # Ваш Claude API токен
-ALLOWED_ORIGINS=          # URL вашего веб-дашборда
+ANTHROPIC_API_KEY=        # API ключ от console.anthropic.com
+ALLOWED_ORIGINS_STR=      # URL вашего веб-дашборда
 SECRET_KEY=               # Генерация: openssl rand -hex 32
 ```
 
