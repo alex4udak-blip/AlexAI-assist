@@ -273,6 +273,7 @@ pub async fn start_sync_service(state: Arc<Mutex<AppState>>) {
             }
             Err(e) => {
                 eprintln!("Sync failed: {}", e);
+                drop(e); // Drop before await to make future Send
                 // Put events back in buffer with bounds checking
                 let mut state = state.lock().await;
                 let mut dropped_count = 0;
