@@ -7,7 +7,7 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
 from apscheduler.triggers.interval import IntervalTrigger
 
-from src.db.session import async_session_maker, get_db_session
+from src.db.session import async_session_maker
 from src.services.pattern_detector import PatternDetectorService
 from src.services.evolution.orchestrator import EvolutionOrchestrator
 
@@ -104,9 +104,10 @@ async def run_evolution_cycle() -> None:
     """Run the full evolution cycle."""
     logger.info("Starting evolution cycle...")
     try:
-        async with get_db_session() as db:
+        async with async_session_maker() as db:
             orchestrator = EvolutionOrchestrator(db)
             results = await orchestrator.run_evolution_cycle()
+            await db.commit()
 
             logger.info(f"Evolution cycle complete: {results}")
 
