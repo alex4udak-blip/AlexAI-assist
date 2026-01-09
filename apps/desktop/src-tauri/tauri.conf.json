@@ -21,13 +21,13 @@
         "label": "main",
         "title": "Observer",
         "width": 320,
-        "height": 400,
+        "height": 440,
         "visible": true,
         "resizable": false,
-        "decorations": true,
-        "transparent": false,
-        "skipTaskbar": false,
-        "alwaysOnTop": false,
+        "decorations": false,
+        "transparent": true,
+        "skipTaskbar": true,
+        "alwaysOnTop": true,
         "center": true
       }
     ],
