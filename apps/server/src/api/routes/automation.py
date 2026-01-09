@@ -255,6 +255,29 @@ async def automation_websocket(websocket: WebSocket, device_id: str) -> None:
                         },
                     )
 
+            elif message_type == "task_result":
+                # Store task result from desktop (WsMessage::TaskResult format)
+                # Desktop sends: {"type": "task_result", "result": {"task_id": "...", "success": bool, "error": Option<String>, "output": Option<Value>}}
+                result_data = data.get("result", {})
+                task_id = result_data.get("task_id")
+                if task_id:
+                    command_results[task_id] = {
+                        "success": result_data.get("success", False),
+                        "result": result_data.get("output"),
+                        "error": result_data.get("error"),
+                        "screenshot_url": result_data.get("screenshot_url"),
+                        "duration_ms": result_data.get("duration_ms"),
+                        "completed_at": utc_now(),
+                    }
+                    logger.info(
+                        "Task result received from desktop",
+                        extra={
+                            "device_id": device_id,
+                            "task_id": task_id,
+                            "success": result_data.get("success"),
+                        },
+                    )
+
             elif message_type == "ping":
                 # Respond to ping
                 await websocket.send_json({"type": "pong"})

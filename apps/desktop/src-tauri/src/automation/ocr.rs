@@ -190,26 +190,42 @@ do {{
     })
 }
 
-/// Extract text using cloud OCR service (fallback)
+/// Extract text using cloud OCR service via Observer server
 pub async fn extract_text_cloud(image_base64: &str, api_key: &str) -> Result<OcrResult, String> {
-    // Placeholder for cloud OCR integration
-    // Could integrate with Google Cloud Vision, AWS Textract, or Azure Computer Vision
+    // Get server URL from configuration
+    let server_url = crate::sync::get_server_url();
+
+    // Validate that we have a proper server URL (not localhost in production)
+    if server_url.contains("localhost") && !crate::sync::is_dev_mode() {
+        return Err(
+            "Cloud OCR requires Observer server configuration. \
+            Please set OBSERVER_SERVER_URL environment variable or \
+            configure server URL in ~/.config/observer/server.txt".to_string()
+        );
+    }
 
     let client = reqwest::Client::new();
+    let ocr_endpoint = format!("{}/api/v1/ocr", server_url);
 
-    // Example using a generic OCR API endpoint
+    // Make request to Observer server's OCR endpoint
     let response = client
-        .post("https://api.example.com/ocr")
+        .post(&ocr_endpoint)
         .header("Authorization", format!("Bearer {}", api_key))
         .json(&serde_json::json!({
             "image": image_base64,
+            "options": {
+                "language": "auto",
+                "return_bounding_boxes": true
+            }
         }))
         .send()
         .await
         .map_err(|e| format!("Cloud OCR request failed: {}", e))?;
 
     if !response.status().is_success() {
-        return Err(format!("Cloud OCR failed with status: {}", response.status()));
+        let status = response.status();
+        let error_body = response.text().await.unwrap_or_default();
+        return Err(format!("Cloud OCR failed with status {}: {}", status, error_body));
     }
 
     let result: serde_json::Value = response
@@ -217,17 +233,43 @@ pub async fn extract_text_cloud(image_base64: &str, api_key: &str) -> Result<Ocr
         .await
         .map_err(|e| format!("Failed to parse cloud OCR response: {}", e))?;
 
-    // Parse response (format depends on provider)
+    // Parse Observer server's OCR response format
     let text = result.get("text")
         .and_then(|v| v.as_str())
         .unwrap_or("")
         .to_string();
 
+    let confidence = result.get("confidence")
+        .and_then(|v| v.as_f64())
+        .unwrap_or(1.0) as f32;
+
+    let language = result.get("language")
+        .and_then(|v| v.as_str())
+        .map(|s| s.to_string());
+
+    let bounding_boxes: Vec<BoundingBox> = result.get("bounding_boxes")
+        .and_then(|v| v.as_array())
+        .map(|arr| {
+            arr.iter()
+                .filter_map(|box_val| {
+                    Some(BoundingBox {
+                        text: box_val.get("text")?.as_str()?.to_string(),
+                        confidence: box_val.get("confidence")?.as_f64()? as f32,
+                        x: box_val.get("x")?.as_f64()? as f32,
+                        y: box_val.get("y")?.as_f64()? as f32,
+                        width: box_val.get("width")?.as_f64()? as f32,
+                        height: box_val.get("height")?.as_f64()? as f32,
+                    })
+                })
+                .collect()
+        })
+        .unwrap_or_default();
+
     Ok(OcrResult {
         text,
-        confidence: 1.0,
-        language: None,
-        bounding_boxes: Vec::new(),
+        confidence,
+        language,
+        bounding_boxes,
     })
 }
 

@@ -1,15 +1,18 @@
 /// WebSocket sync module for remote automation commands
 /// Connects to Observer server for receiving automation tasks
 
-use futures_util::{SinkExt, StreamExt};
+use futures_util::{stream::SplitSink, SinkExt, StreamExt};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use tokio::sync::Mutex;
 use tokio::time::{sleep, Duration};
-use tokio_tungstenite::{connect_async, tungstenite::Message};
+use tokio_tungstenite::{connect_async, tungstenite::Message, MaybeTlsStream, WebSocketStream};
 
 const RECONNECT_DELAY: Duration = Duration::from_secs(5);
 const PING_INTERVAL: Duration = Duration::from_secs(30);
+
+/// Type alias for WebSocket write handle
+type WsWriter = SplitSink<WebSocketStream<MaybeTlsStream<tokio::net::TcpStream>>, Message>;
 
 /// WebSocket message types
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -57,6 +60,7 @@ pub struct AutomationSync {
     auth_token: Option<String>,
     is_connected: Arc<Mutex<bool>>,
     queue: Arc<crate::automation::queue::AutomationQueue>,
+    ws_writer: Arc<Mutex<Option<WsWriter>>>,
 }
 
 impl AutomationSync {
@@ -67,6 +71,7 @@ impl AutomationSync {
             auth_token: None,
             is_connected: Arc::new(Mutex::new(false)),
             queue,
+            ws_writer: Arc::new(Mutex::new(None)),
         }
     }
 
@@ -111,7 +116,19 @@ impl AutomationSync {
             .await
             .map_err(|e| format!("Failed to connect: {}", e))?;
 
-        let (mut write, mut read) = ws_stream.split();
+        let (write, mut read) = ws_stream.split();
+
+        // Store write handle in struct for send_result/send_status
+        {
+            let mut writer = self.ws_writer.lock().await;
+            *writer = Some(write);
+        }
+
+        // Get a reference to use locally
+        let mut write = {
+            let writer = self.ws_writer.lock().await;
+            writer.as_ref().unwrap().clone()
+        };
 
         // Update connection status
         {
@@ -174,6 +191,12 @@ impl AutomationSync {
             }
         }
 
+        // Clear write handle on disconnect
+        {
+            let mut writer = self.ws_writer.lock().await;
+            *writer = None;
+        }
+
         Ok(())
     }
 
@@ -222,16 +245,43 @@ impl AutomationSync {
 
     /// Send task result to server
     pub async fn send_result(&self, result: crate::automation::queue::TaskResult) -> Result<(), String> {
-        // This would need to maintain a write handle reference
-        // For now, results are logged locally
-        println!("Task result: {:?}", result);
+        let mut writer_guard = self.ws_writer.lock().await;
+
+        let writer = writer_guard
+            .as_mut()
+            .ok_or_else(|| "WebSocket not connected".to_string())?;
+
+        let msg = WsMessage::TaskResult { result };
+        let json = serde_json::to_string(&msg)
+            .map_err(|e| format!("Failed to serialize result: {}", e))?;
+
+        writer
+            .send(Message::Text(json))
+            .await
+            .map_err(|e| format!("Failed to send result: {}", e))?;
+
         Ok(())
     }
 
     /// Send status update to server
     pub async fn send_status(&self, status: crate::automation::queue::QueueStatus) -> Result<(), String> {
-        // This would need to maintain a write handle reference
-        println!("Queue status: {:?}", status);
+        let mut writer_guard = self.ws_writer.lock().await;
+
+        let writer = writer_guard
+            .as_mut()
+            .ok_or_else(|| "WebSocket not connected".to_string())?;
+
+        let msg = WsMessage::Status {
+            queue_status: status,
+        };
+        let json = serde_json::to_string(&msg)
+            .map_err(|e| format!("Failed to serialize status: {}", e))?;
+
+        writer
+            .send(Message::Text(json))
+            .await
+            .map_err(|e| format!("Failed to send status: {}", e))?;
+
         Ok(())
     }
 }

@@ -92,25 +92,33 @@ fn main() {
                 queue_clone.process().await;
             });
 
-            // Handle automation task results
-            let app_handle = app.handle().clone();
-            tauri::async_runtime::spawn(async move {
-                while let Some(result) = result_rx.recv().await {
-                    println!("Task {} completed: {}", result.task_id, result.success);
-                    if let Some(error) = &result.error {
-                        eprintln!("Task error: {}", error);
-                        // Optionally send notification
-                        let _ = notifications::notify_error(&app_handle, error);
-                    }
-                }
-            });
-
-            // Start WebSocket automation sync
+            // Create WebSocket automation sync
             let ws_url = automation::sync::get_websocket_url();
             let sync = Arc::new(automation::sync::AutomationSync::new(
                 ws_url,
                 automation_queue.clone(),
             ));
+
+            // Handle automation task results
+            let app_handle = app.handle().clone();
+            let sync_for_results = sync.clone();
+            tauri::async_runtime::spawn(async move {
+                while let Some(result) = result_rx.recv().await {
+                    println!("Task {} completed: {}", result.task_id, result.success);
+                    if let Some(error) = &result.error {
+                        eprintln!("Task error: {}", error);
+                        // Send notification
+                        let _ = notifications::notify_error(&app_handle, error);
+                    }
+
+                    // Send result back to server via WebSocket
+                    if let Err(e) = sync_for_results.send_result(result).await {
+                        eprintln!("Failed to send result to server: {}", e);
+                    }
+                }
+            });
+
+            // Start WebSocket automation sync
             tauri::async_runtime::spawn(async move {
                 sync.start().await;
             });
