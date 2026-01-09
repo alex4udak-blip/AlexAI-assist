@@ -158,47 +158,55 @@ impl ScreenshotManager {
         }
     }
 
-    /// Convert CGImage to DynamicImage
+    /// Convert CGImage to DynamicImage using CGBitmapContext
     #[cfg(target_os = "macos")]
     fn cgimage_to_dynamic_image(
         &self,
         cg_image: &core_graphics::image::CGImage,
     ) -> Option<DynamicImage> {
+        use core_graphics::context::CGContext;
+        use core_graphics::color_space::CGColorSpace;
+
         let width = cg_image.width();
         let height = cg_image.height();
-        let bits_per_component = cg_image.bits_per_component();
-        let bits_per_pixel = cg_image.bits_per_pixel();
-        let bytes_per_row = cg_image.bytes_per_row();
 
-        // Get pixel data
-        let data_provider = cg_image.data_provider()?;
-        let data = data_provider.copy_data()?;
-        let bytes: &[u8] = &data;
+        // Create a buffer to hold the pixel data (RGBA format)
+        let bytes_per_row = width * 4;
+        let mut buffer: Vec<u8> = vec![0; height * bytes_per_row];
 
-        // Create image buffer
+        // Create a bitmap context to render the image
+        let color_space = CGColorSpace::create_device_rgb();
+        let context = CGContext::create_bitmap_context(
+            Some(buffer.as_mut_ptr() as *mut _),
+            width,
+            height,
+            8,                  // bits per component
+            bytes_per_row,
+            &color_space,
+            core_graphics::base::kCGImageAlphaPremultipliedLast, // RGBA
+        );
+
+        // Draw the CGImage into the context
+        let rect = core_graphics::geometry::CGRect::new(
+            &core_graphics::geometry::CGPoint::new(0.0, 0.0),
+            &core_graphics::geometry::CGSize::new(width as f64, height as f64),
+        );
+        context.draw_image(rect, cg_image);
+
+        // Create image buffer from RGBA data
         let mut img_buffer = ImageBuffer::<Rgb<u8>, Vec<u8>>::new(width as u32, height as u32);
 
-        // Convert based on bits per pixel
-        if bits_per_pixel == 32 && bits_per_component == 8 {
-            // RGBA or BGRA format
-            for y in 0..height {
-                for x in 0..width {
-                    let offset = y * bytes_per_row + x * 4;
-                    if offset + 3 <= bytes.len() {
-                        // Assuming BGRA format (common on macOS)
-                        let b = bytes[offset];
-                        let g = bytes[offset + 1];
-                        let r = bytes[offset + 2];
-                        img_buffer.put_pixel(x as u32, y as u32, Rgb([r, g, b]));
-                    }
+        for y in 0..height {
+            for x in 0..width {
+                let offset = y * bytes_per_row + x * 4;
+                if offset + 3 <= buffer.len() {
+                    // RGBA format
+                    let r = buffer[offset];
+                    let g = buffer[offset + 1];
+                    let b = buffer[offset + 2];
+                    img_buffer.put_pixel(x as u32, y as u32, Rgb([r, g, b]));
                 }
             }
-        } else {
-            eprintln!(
-                "Unsupported pixel format: {} bits per pixel",
-                bits_per_pixel
-            );
-            return None;
         }
 
         // Scale down if needed
@@ -260,8 +268,6 @@ impl ScreenshotManager {
         window_title: String,
         hash: u64,
     ) -> Option<Screenshot> {
-        use image::ImageFormat;
-        use std::io::Write;
 
         // Create date-based subdirectory
         let now = Utc::now();
