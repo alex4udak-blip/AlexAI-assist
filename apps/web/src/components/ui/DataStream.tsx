@@ -1,4 +1,4 @@
-import { type HTMLAttributes, forwardRef, useEffect, useState } from 'react';
+import { type HTMLAttributes, forwardRef, useEffect, useState, useCallback } from 'react';
 import { cn } from '../../lib/utils';
 
 interface DataStreamProps extends HTMLAttributes<HTMLDivElement> {
@@ -8,6 +8,12 @@ interface DataStreamProps extends HTMLAttributes<HTMLDivElement> {
   lines?: number;
   decorative?: boolean;
 }
+
+const speedConfig = {
+  slow: 2000,
+  normal: 1000,
+  fast: 500,
+};
 
 export const DataStream = forwardRef<HTMLDivElement, DataStreamProps>(
   (
@@ -24,13 +30,7 @@ export const DataStream = forwardRef<HTMLDivElement, DataStreamProps>(
   ) => {
     const [streamData, setStreamData] = useState<string[]>([]);
 
-    const speedConfig = {
-      slow: 2000,
-      normal: 1000,
-      fast: 500,
-    };
-
-    const generateRandomData = (): string => {
+    const generateRandomData = useCallback((): string => {
       switch (mode) {
         case 'hex':
           return `0x${Math.random().toString(16).substring(2, 10).toUpperCase()}`;
@@ -38,16 +38,17 @@ export const DataStream = forwardRef<HTMLDivElement, DataStreamProps>(
           return `0b${Math.random().toString(2).substring(2, 18)}`;
         case 'numbers':
           return `${Math.floor(Math.random() * 1000000)}`;
-        case 'text':
+        case 'text': {
           const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
           return Array.from(
             { length: 12 },
             () => chars[Math.floor(Math.random() * chars.length)]
           ).join('');
+        }
         default:
           return '';
       }
-    };
+    }, [mode]);
 
     useEffect(() => {
       if (data) {
@@ -66,7 +67,7 @@ export const DataStream = forwardRef<HTMLDivElement, DataStreamProps>(
       setStreamData(Array.from({ length: lines }, () => generateRandomData()));
 
       return () => clearInterval(interval);
-    }, [data, lines, mode, speed]);
+    }, [data, lines, speed, generateRandomData]);
 
     return (
       <div

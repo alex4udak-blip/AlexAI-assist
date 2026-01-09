@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import { Card, CardHeader, CardTitle, CardContent } from '../ui/Card';
 import { Badge } from '../ui/Badge';
@@ -37,13 +37,7 @@ export function AuditLogList() {
   const [filterResult, setFilterResult] = useState<string>('');
   const [expandedLog, setExpandedLog] = useState<string | null>(null);
 
-  useEffect(() => {
-    fetchLogs();
-    const interval = setInterval(fetchLogs, 10000);
-    return () => clearInterval(interval);
-  }, [filterDevice, filterActionType, filterResult]);
-
-  const fetchLogs = async () => {
+  const fetchLogs = useCallback(async () => {
     try {
       const params: Record<string, string | number> = { limit: 50 };
       if (filterDevice) params.device_id = filterDevice;
@@ -57,7 +51,13 @@ export function AuditLogList() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [filterDevice, filterActionType, filterResult]);
+
+  useEffect(() => {
+    fetchLogs();
+    const interval = setInterval(fetchLogs, 10000);
+    return () => clearInterval(interval);
+  }, [fetchLogs]);
 
   const getResultBadge = (result: string) => {
     switch (result) {

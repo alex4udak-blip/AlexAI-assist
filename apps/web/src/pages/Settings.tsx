@@ -48,7 +48,8 @@ export default function Settings() {
           if (serverSettings.settings && Object.keys(serverSettings.settings).length > 0) {
             // Validate server settings
             if (StorageValidator.validateSettings(serverSettings.settings)) {
-              setSettings(serverSettings.settings as SettingsData);
+              const validatedSettings = serverSettings.settings as unknown as SettingsData;
+              setSettings(validatedSettings);
               // Also update local storage to match server
               secureStorage.setItem('observer-settings', serverSettings.settings, {
                 type: 'local',
@@ -99,7 +100,7 @@ export default function Settings() {
 
       // Sync to server
       try {
-        await api.saveSettings(deviceId, settings);
+        await api.saveSettings(deviceId, settings as unknown as Record<string, unknown>);
         console.log('Settings saved to server successfully');
       } catch (serverErr) {
         console.error('Failed to save settings to server:', serverErr);

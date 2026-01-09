@@ -270,8 +270,9 @@ export default function Dashboard() {
 
     // Count consecutive days from today backwards
     let streak = 0;
-    let checkDate = new Date(today);
+    const checkDate = new Date(today);
 
+    // eslint-disable-next-line no-constant-condition
     while (true) {
       if (daysWithActivity.has(checkDate.toISOString())) {
         streak++;
