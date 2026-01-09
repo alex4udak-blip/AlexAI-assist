@@ -10,6 +10,7 @@ import {
   Download,
   X,
   Eye,
+  Cpu,
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -23,6 +24,7 @@ const navItems = [
   { icon: BarChart3, label: 'Аналитика', href: '/analytics' },
   { icon: Clock, label: 'История', href: '/history' },
   { icon: MessageSquare, label: 'Чат', href: '/chat' },
+  { icon: Cpu, label: 'Автоматизация', href: '/automation' },
 ];
 
 const bottomItems = [
