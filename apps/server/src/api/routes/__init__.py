@@ -3,6 +3,7 @@
 from src.api.routes import (
     agents,
     analytics,
+    automation,
     chat,
     events,
     health,
@@ -14,6 +15,7 @@ from src.api.routes import (
 __all__ = [
     "agents",
     "analytics",
+    "automation",
     "chat",
     "events",
     "health",

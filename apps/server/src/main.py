@@ -12,6 +12,7 @@ from src.api.middleware.rate_limiter import RateLimiter
 from src.api.routes import (
     agents,
     analytics,
+    automation,
     chat,
     events,
     health,
@@ -117,6 +118,7 @@ app.include_router(agents.router, prefix="/api/v1/agents", tags=["Agents"])
 app.include_router(analytics.router, prefix="/api/v1/analytics", tags=["Analytics"])
 app.include_router(chat.router, prefix="/api/v1/chat", tags=["Chat"])
 app.include_router(memory.router, prefix="/api/v1/memory", tags=["Memory"])
+app.include_router(automation.router, prefix="/api/v1/automation", tags=["Automation"])
 
 
 @app.exception_handler(Exception)
