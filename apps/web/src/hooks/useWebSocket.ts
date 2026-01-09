@@ -15,6 +15,7 @@ export function useWebSocket() {
     return () => {
       unsubConnect();
       unsubDisconnect();
+      wsClient.disconnect();
     };
   }, []);
 
