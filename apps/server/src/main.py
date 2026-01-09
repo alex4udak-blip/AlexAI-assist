@@ -18,6 +18,7 @@ from src.api.routes import (
     health,
     memory,
     patterns,
+    sessions,
     suggestions,
 )
 from src.core.config import settings
@@ -113,6 +114,7 @@ app.add_middleware(
 app.include_router(health.router, tags=["Health"])
 app.include_router(events.router, prefix="/api/v1/events", tags=["Events"])
 app.include_router(patterns.router, prefix="/api/v1/patterns", tags=["Patterns"])
+app.include_router(sessions.router, prefix="/api/v1/sessions", tags=["Sessions"])
 app.include_router(suggestions.router, prefix="/api/v1/suggestions", tags=["Suggestions"])
 app.include_router(agents.router, prefix="/api/v1/agents", tags=["Agents"])
 app.include_router(analytics.router, prefix="/api/v1/analytics", tags=["Analytics"])

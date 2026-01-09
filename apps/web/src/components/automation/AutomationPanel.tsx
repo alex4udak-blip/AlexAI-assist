@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import { Card, CardHeader, CardTitle, CardContent } from '../ui/Card';
 import { Button } from '../ui/Button';
@@ -7,6 +7,8 @@ import { DeviceCard, type DeviceStatus } from './DeviceCard';
 import { CommandHistory, type CommandRecord } from './CommandHistory';
 import { AIUsageCard, type AIUsage } from './AIUsageCard';
 import { apiFetch } from '../../lib/config';
+import { useDeviceUpdates, useCommandResults } from '../../hooks/useWebSocketSync';
+import { useWebSocket } from '../../hooks/useWebSocket';
 import {
   Camera,
   ScanText,
@@ -18,6 +20,9 @@ import {
   XCircle,
   Loader2,
   Image as ImageIcon,
+  Copy,
+  Check,
+  X,
 } from 'lucide-react';
 
 interface CommandResult {
@@ -58,31 +63,126 @@ export function AutomationPanel() {
     data?: Record<string, unknown>;
   } | null>(null);
 
+  // Copy state for OCR results
+  const [copied, setCopied] = useState(false);
+
+  // Screenshot history
+  const [screenshots, setScreenshots] = useState<
+    Array<{
+      screenshot: string;
+      timestamp: string;
+      command_id: string;
+    }>
+  >([]);
+  const [selectedScreenshot, setSelectedScreenshot] = useState<string | null>(
+    null
+  );
+
   // Input states
   const [urlInput, setUrlInput] = useState('');
   const [textInput, setTextInput] = useState('');
   const [coordX, setCoordX] = useState('');
   const [coordY, setCoordY] = useState('');
 
-  // Fetch devices
+  // Connect to WebSocket
+  const { isConnected } = useWebSocket();
+
+  // Fetch devices on mount and when WebSocket connects
   useEffect(() => {
     fetchDevices();
     fetchAIUsage();
-    const interval = setInterval(() => {
-      fetchDevices();
-      fetchAIUsage();
-    }, 5000);
-    return () => clearInterval(interval);
+  }, [isConnected]);
+
+  // Handle real-time device updates via WebSocket
+  const handleDeviceUpdate = useCallback((update: { device_id: string; status: Record<string, unknown> }) => {
+    setDevices((prev) => {
+      const existing = prev.find((d) => d.device_id === update.device_id);
+      if (existing) {
+        return prev.map((d) =>
+          d.device_id === update.device_id
+            ? { ...d, ...update.status, status_data: update.status }
+            : d
+        );
+      }
+      // New device connected
+      return [
+        ...prev,
+        {
+          device_id: update.device_id,
+          connected: update.status.connected as boolean,
+          last_seen_at: update.status.last_seen_at as string,
+          status_data: update.status,
+        },
+      ];
+    });
   }, []);
+
+  // Handle real-time command results via WebSocket
+  const handleCommandResult = useCallback((result: { command_id: string; device_id: string; result: Record<string, unknown> }) => {
+    const { command_id, result: resultData } = result;
+
+    // Update command history
+    setCommandHistory((prev) => {
+      const existing = prev.find((c) => c.command_id === command_id);
+      if (existing) {
+        return prev;
+      }
+
+      const newRecord: CommandRecord = {
+        command_id,
+        command_type: 'unknown',
+        timestamp: new Date().toISOString(),
+        success: resultData.success as boolean,
+        duration_ms: (resultData.duration_ms as number) ?? 0,
+        error_message: resultData.error as string | undefined,
+        result: resultData.result,
+      };
+
+      return [newRecord, ...prev.slice(0, 19)];
+    });
+
+    // Update last result display
+    setLastResult({
+      success: resultData.success as boolean,
+      duration: resultData.duration_ms as number | undefined,
+      error: resultData.error as string | undefined,
+      data: resultData.result as Record<string, unknown> | undefined,
+    });
+
+    setLoading(false);
+  }, []);
+
+  // Subscribe to WebSocket updates
+  useDeviceUpdates(handleDeviceUpdate);
+  useCommandResults(handleCommandResult);
 
   const fetchDevices = async () => {
     try {
       const response = await apiFetch('/api/v1/automation/devices');
       if (response.ok) {
         const data = await response.json();
-        setDevices(data);
-        if (!selectedDevice && data.length > 0) {
-          setSelectedDevice(data[0].device_id);
+
+        // Fetch sync status for each device
+        const devicesWithSync = await Promise.all(
+          data.map(async (device: DeviceStatus) => {
+            try {
+              const syncResponse = await apiFetch(
+                `/api/v1/automation/devices/${device.device_id}/sync-status`
+              );
+              if (syncResponse.ok) {
+                const syncData = await syncResponse.json();
+                return { ...device, sync_status: syncData };
+              }
+            } catch (error) {
+              console.error(`Failed to fetch sync status for ${device.device_id}:`, error);
+            }
+            return device;
+          })
+        );
+
+        setDevices(devicesWithSync);
+        if (!selectedDevice && devicesWithSync.length > 0) {
+          setSelectedDevice(devicesWithSync[0].device_id);
         }
       }
     } catch (error) {
@@ -104,6 +204,39 @@ export function AutomationPanel() {
     }
   };
 
+  const fetchScreenshots = async (deviceId: string) => {
+    try {
+      const response = await apiFetch(
+        `/api/v1/automation/devices/${deviceId}/screenshots`
+      );
+      if (response.ok) {
+        const data = await response.json();
+        setScreenshots(data);
+      }
+    } catch (error) {
+      console.error('Failed to fetch screenshots:', error);
+    }
+  };
+
+  // Fetch screenshots when selected device changes
+  useEffect(() => {
+    if (selectedDevice) {
+      fetchScreenshots(selectedDevice);
+    } else {
+      setScreenshots([]);
+    }
+  }, [selectedDevice]);
+
+  const copyToClipboard = async (text: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch (error) {
+      console.error('Failed to copy text:', error);
+    }
+  };
+
   const executeCommand = async (
     commandType: string,
     params: Record<string, unknown> = {}
@@ -115,6 +248,7 @@ export function AutomationPanel() {
 
     setLoading(true);
     setLastResult(null);
+    setCopied(false);
 
     try {
       const response = await apiFetch(
@@ -134,55 +268,28 @@ export function AutomationPanel() {
 
       const result: CommandResult = await response.json();
 
-      // Poll for result
-      const commandId = result.command_id;
-      let attempts = 0;
-      const maxAttempts = 30;
-
-      const pollResult = async () => {
-        attempts++;
-        const resultResponse = await apiFetch(
-          `/api/v1/automation/result/${commandId}`
-        );
-
-        if (resultResponse.ok) {
-          const resultData: CommandResult = await resultResponse.json();
-
-          if (resultData.status === 'completed' || resultData.status === 'failed') {
-            const newRecord: CommandRecord = {
-              command_id: commandId,
-              command_type: commandType,
-              timestamp: new Date().toISOString(),
-              success: resultData.success ?? false,
-              duration_ms: resultData.duration_ms ?? 0,
-              error_message: resultData.error_message,
-              result: resultData.data,
-            };
-
-            setCommandHistory((prev) => [newRecord, ...prev.slice(0, 19)]);
-            setLastResult({
-              success: resultData.success ?? false,
-              duration: resultData.duration_ms,
-              error: resultData.error_message,
-              data: resultData.data,
-            });
-            setLoading(false);
-            return;
-          }
-        }
-
-        if (attempts < maxAttempts) {
-          setTimeout(pollResult, 1000);
-        } else {
-          setLastResult({
-            success: false,
-            error: 'Command timeout - result not received',
-          });
-          setLoading(false);
-        }
+      // Command sent successfully - result will arrive via WebSocket
+      // Store the command in history with pending status
+      const newRecord: CommandRecord = {
+        command_id: result.command_id,
+        command_type: commandType,
+        timestamp: new Date().toISOString(),
+        success: false,
+        duration_ms: 0,
       };
+      setCommandHistory((prev) => [newRecord, ...prev.slice(0, 19)]);
 
-      await pollResult();
+      // Set a timeout in case WebSocket result doesn't arrive
+      const timeout = setTimeout(() => {
+        setLastResult({
+          success: false,
+          error: 'Command timeout - result not received via WebSocket',
+        });
+        setLoading(false);
+      }, 30000);
+
+      // Cleanup will happen when WebSocket result arrives (in handleCommandResult)
+      return () => clearTimeout(timeout);
     } catch (error) {
       console.error('Command execution failed:', error);
       setLastResult({
@@ -400,12 +507,64 @@ export function AutomationPanel() {
                   )}
 
                   {lastResult.data && (
-                    <div>
-                      <span className="text-xs text-text-tertiary block mb-1">
-                        Result Data
-                      </span>
+                    <div className="space-y-3">
+                      {/* OCR Results Section */}
+                      {(lastResult.data.text || lastResult.data.ocr_text) && (
+                        <div>
+                          <div className="flex items-center justify-between mb-2">
+                            <div className="flex items-center gap-2">
+                              <ScanText className="w-4 h-4 text-accent-primary" />
+                              <span className="text-sm font-medium text-text-primary">
+                                OCR Text
+                              </span>
+                            </div>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() =>
+                                copyToClipboard(
+                                  (lastResult.data?.text as string) ||
+                                    (lastResult.data?.ocr_text as string) ||
+                                    ''
+                                )
+                              }
+                              className="h-7 px-2"
+                            >
+                              {copied ? (
+                                <>
+                                  <Check className="w-3 h-3" />
+                                  Copied
+                                </>
+                              ) : (
+                                <>
+                                  <Copy className="w-3 h-3" />
+                                  Copy
+                                </>
+                              )}
+                            </Button>
+                          </div>
+                          <div className="bg-bg-tertiary rounded-lg p-3 border border-border-default">
+                            <p className="text-sm text-text-secondary whitespace-pre-wrap font-mono">
+                              {(lastResult.data.text as string) ||
+                                (lastResult.data.ocr_text as string)}
+                            </p>
+                            {lastResult.data.confidence && (
+                              <div className="mt-2 pt-2 border-t border-border-default">
+                                <span className="text-xs text-text-tertiary">
+                                  Confidence:{' '}
+                                  {typeof lastResult.data.confidence === 'number'
+                                    ? `${(lastResult.data.confidence * 100).toFixed(1)}%`
+                                    : lastResult.data.confidence}
+                                </span>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Screenshot Section */}
                       {lastResult.data.screenshot && (
-                        <div className="mb-3">
+                        <div>
                           <div className="flex items-center gap-2 mb-2">
                             <ImageIcon className="w-4 h-4 text-accent-primary" />
                             <span className="text-sm font-medium text-text-primary">
@@ -419,9 +578,34 @@ export function AutomationPanel() {
                           />
                         </div>
                       )}
-                      <pre className="text-xs text-text-secondary bg-bg-tertiary rounded p-3 overflow-x-auto">
-                        {JSON.stringify(lastResult.data, null, 2)}
-                      </pre>
+
+                      {/* Other Result Data */}
+                      {Object.keys(lastResult.data).some(
+                        (key) =>
+                          !['text', 'ocr_text', 'screenshot', 'confidence'].includes(
+                            key
+                          )
+                      ) && (
+                        <div>
+                          <span className="text-xs text-text-tertiary block mb-1">
+                            Additional Data
+                          </span>
+                          <pre className="text-xs text-text-secondary bg-bg-tertiary rounded p-3 overflow-x-auto">
+                            {JSON.stringify(
+                              Object.fromEntries(
+                                Object.entries(lastResult.data).filter(
+                                  ([key]) =>
+                                    !['text', 'ocr_text', 'screenshot', 'confidence'].includes(
+                                      key
+                                    )
+                                )
+                              ),
+                              null,
+                              2
+                            )}
+                          </pre>
+                        </div>
+                      )}
                     </div>
                   )}
                 </>
@@ -436,6 +620,84 @@ export function AutomationPanel() {
         <AIUsageCard usage={aiUsage} loading={aiUsageLoading} />
         <CommandHistory commands={commandHistory} />
       </motion.div>
+
+      {/* Screenshot History */}
+      {selectedDevice && screenshots.length > 0 && (
+        <motion.div variants={item}>
+          <Card>
+            <CardHeader>
+              <div className="flex items-center gap-2">
+                <ImageIcon className="w-4 h-4 text-accent-primary" />
+                <CardTitle>Screenshot History</CardTitle>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
+                {screenshots.map((screenshot, index) => {
+                  const timestamp = new Date(screenshot.timestamp);
+                  const timeAgo = Math.floor(
+                    (Date.now() - timestamp.getTime()) / 1000
+                  );
+                  const timeLabel =
+                    timeAgo < 60
+                      ? `${timeAgo}s ago`
+                      : timeAgo < 3600
+                        ? `${Math.floor(timeAgo / 60)}m ago`
+                        : `${Math.floor(timeAgo / 3600)}h ago`;
+
+                  return (
+                    <div
+                      key={screenshot.command_id}
+                      className="group relative cursor-pointer rounded-lg overflow-hidden border border-border-default hover:border-accent-primary transition-colors"
+                      onClick={() => setSelectedScreenshot(screenshot.screenshot)}
+                    >
+                      <img
+                        src={`data:image/png;base64,${screenshot.screenshot}`}
+                        alt={`Screenshot ${index + 1}`}
+                        className="w-full h-32 object-cover"
+                      />
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity">
+                        <div className="absolute bottom-0 left-0 right-0 p-2">
+                          <p className="text-xs text-white font-medium">
+                            {timeLabel}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </CardContent>
+          </Card>
+        </motion.div>
+      )}
+
+      {/* Screenshot Modal */}
+      {selectedScreenshot && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4"
+          onClick={() => setSelectedScreenshot(null)}
+        >
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="relative max-w-6xl max-h-[90vh] overflow-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              onClick={() => setSelectedScreenshot(null)}
+              className="absolute top-4 right-4 p-2 rounded-full bg-bg-primary/90 hover:bg-bg-secondary border border-border-default transition-colors z-10"
+            >
+              <X className="w-5 h-5 text-text-primary" />
+            </button>
+            <img
+              src={`data:image/png;base64,${selectedScreenshot}`}
+              alt="Screenshot"
+              className="rounded-lg border border-border-default max-w-full h-auto"
+            />
+          </motion.div>
+        </div>
+      )}
     </motion.div>
   );
 }

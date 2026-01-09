@@ -9,6 +9,7 @@ from src.api.routes import (
     health,
     memory,
     patterns,
+    sessions,
     suggestions,
 )
 
@@ -21,5 +22,6 @@ __all__ = [
     "health",
     "memory",
     "patterns",
+    "sessions",
     "suggestions",
 ]
