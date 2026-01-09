@@ -3,9 +3,9 @@ import { Card, CardContent } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { Badge } from '../components/ui/Badge';
 
-// GitHub Release download URLs
+// GitHub Release download URLs - version auto-synced from package.json via Vite
 const REPO = 'alex4udak-blip/AlexAI-assist';
-const VERSION = '0.1.0';
+const VERSION = __APP_VERSION__;
 const DOWNLOAD_URL_ARM = `https://github.com/${REPO}/releases/download/v${VERSION}/Observer_${VERSION}_aarch64.dmg`;
 const DOWNLOAD_URL_INTEL = `https://github.com/${REPO}/releases/download/v${VERSION}/Observer_${VERSION}_x64.dmg`;
 const RELEASES_URL = `https://github.com/${REPO}/releases/latest`;
