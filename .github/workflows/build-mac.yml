@@ -149,9 +149,12 @@ jobs:
 
           cat latest.json
 
-      - name: Delete existing release
+      - name: Delete existing release and tag
         run: |
-          gh release delete v0.1.0 --yes || true
+          # Delete release first (if exists)
+          gh release delete v0.1.0 --yes --cleanup-tag || true
+          # Also delete tag manually if it still exists
+          git push origin :refs/tags/v0.1.0 || true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -162,6 +165,7 @@ jobs:
           name: Observer v0.1.0
           draft: false
           prerelease: false
+          fail_on_unmatched_files: false
           files: |
             apps/desktop/src-tauri/target/aarch64-apple-darwin/release/bundle/dmg/*.dmg
             apps/desktop/src-tauri/target/x86_64-apple-darwin/release/bundle/dmg/*.dmg
