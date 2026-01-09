@@ -63,7 +63,7 @@ export default function Dashboard() {
   const isTablet = useIsTablet();
 
   // Connect to WebSocket for real-time updates
-  const { isConnected } = useWebSocket();
+  useWebSocket();
 
   const { data: summary } = useAnalyticsSummary();
   const { data: productivity } = useProductivity();

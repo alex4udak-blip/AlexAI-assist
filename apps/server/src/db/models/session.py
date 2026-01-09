@@ -38,7 +38,7 @@ class Session(Base):
     apps_used: Mapped[list[str]] = mapped_column(ARRAY(String), default=list)
     events_count: Mapped[int] = mapped_column(Integer, default=0)
     productivity_score: Mapped[float | None] = mapped_column(Float)
-    metadata: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict)
+    session_metadata: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(),
         default=lambda: datetime.now(timezone.utc).replace(tzinfo=None),

@@ -100,20 +100,29 @@ export function AutomationPanel() {
       if (existing) {
         return prev.map((d) =>
           d.device_id === update.device_id
-            ? { ...d, ...update.status, status_data: update.status }
+            ? {
+                ...d,
+                connected: (update.status.connected as boolean) ?? d.connected,
+                active_app: (update.status.active_app as string | null) ?? d.active_app,
+                queue_size: (update.status.queue_size as number) ?? d.queue_size,
+                last_seen: (update.status.last_seen_at as string) ?? d.last_seen,
+              }
             : d
         );
       }
-      // New device connected
-      return [
-        ...prev,
-        {
-          device_id: update.device_id,
-          connected: update.status.connected as boolean,
-          last_seen_at: update.status.last_seen_at as string,
-          status_data: update.status,
+      // New device connected - create with required defaults
+      const newDevice: DeviceStatus = {
+        device_id: update.device_id,
+        connected: (update.status.connected as boolean) ?? true,
+        active_app: (update.status.active_app as string | null) ?? null,
+        queue_size: (update.status.queue_size as number) ?? 0,
+        permissions: {
+          accessibility: (update.status.accessibility as boolean) ?? false,
+          screen_recording: (update.status.screen_recording as boolean) ?? false,
         },
-      ];
+        last_seen: update.status.last_seen_at as string,
+      };
+      return [...prev, newDevice];
     });
   }, []);
 
@@ -132,10 +141,10 @@ export function AutomationPanel() {
         command_id,
         command_type: 'unknown',
         timestamp: new Date().toISOString(),
-        success: resultData.success as boolean,
-        duration_ms: (resultData.duration_ms as number) ?? 0,
-        error_message: resultData.error as string | undefined,
-        result: resultData.result,
+        success: Boolean(resultData.success),
+        duration_ms: Number(resultData.duration_ms) || 0,
+        error_message: resultData.error ? String(resultData.error) : undefined,
+        result: resultData.result as Record<string, unknown> | undefined,
       };
 
       return [newRecord, ...prev.slice(0, 19)];
@@ -143,9 +152,9 @@ export function AutomationPanel() {
 
     // Update last result display
     setLastResult({
-      success: resultData.success as boolean,
-      duration: resultData.duration_ms as number | undefined,
-      error: resultData.error as string | undefined,
+      success: Boolean(resultData.success),
+      duration: resultData.duration_ms ? Number(resultData.duration_ms) : undefined,
+      error: resultData.error ? String(resultData.error) : undefined,
       data: resultData.result as Record<string, unknown> | undefined,
     });
 
@@ -523,9 +532,7 @@ export function AutomationPanel() {
                               size="sm"
                               onClick={() =>
                                 copyToClipboard(
-                                  (lastResult.data?.text as string) ||
-                                    (lastResult.data?.ocr_text as string) ||
-                                    ''
+                                  String(lastResult.data?.text || lastResult.data?.ocr_text || '')
                                 )
                               }
                               className="h-7 px-2"
@@ -545,16 +552,15 @@ export function AutomationPanel() {
                           </div>
                           <div className="bg-bg-tertiary rounded-lg p-3 border border-border-default">
                             <p className="text-sm text-text-secondary whitespace-pre-wrap font-mono">
-                              {(lastResult.data.text as string) ||
-                                (lastResult.data.ocr_text as string)}
+                              {String(lastResult.data.text || lastResult.data.ocr_text)}
                             </p>
-                            {lastResult.data.confidence && (
+                            {lastResult.data.confidence != null && (
                               <div className="mt-2 pt-2 border-t border-border-default">
                                 <span className="text-xs text-text-tertiary">
                                   Confidence:{' '}
                                   {typeof lastResult.data.confidence === 'number'
                                     ? `${(lastResult.data.confidence * 100).toFixed(1)}%`
-                                    : lastResult.data.confidence}
+                                    : String(lastResult.data.confidence)}
                                 </span>
                               </div>
                             )}

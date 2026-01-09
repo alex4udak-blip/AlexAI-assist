@@ -15,9 +15,7 @@ export function StatusBar({
   focusTime = 0,
   activeAgents = 0,
   totalAgents = 0,
-  systemHealth = 'healthy',
   lastEventMinutesAgo = 0,
-  syncStatus = 'synced',
 }: StatusBarProps) {
   const { isConnected } = useWebSocket();
 
