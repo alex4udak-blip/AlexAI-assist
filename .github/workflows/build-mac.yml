@@ -226,10 +226,20 @@ jobs:
       - name: Delete existing release and tag
         run: |
           VERSION="${{ steps.version.outputs.version }}"
-          # Delete release first (if exists)
-          gh release delete "v${VERSION}" --yes --cleanup-tag || true
-          # Also delete tag manually if it still exists
-          git push origin ":refs/tags/v${VERSION}" || true
+
+          # Delete release if exists (ignore errors)
+          gh release delete "v${VERSION}" --yes 2>/dev/null || echo "No existing release to delete"
+
+          # Delete tag from remote (ignore errors)
+          git push origin --delete "v${VERSION}" 2>/dev/null || echo "No existing tag to delete"
+
+          # Also delete local tag if exists
+          git tag -d "v${VERSION}" 2>/dev/null || true
+
+          # Wait for GitHub to process deletion
+          sleep 5
+
+          echo "Cleaned up existing release/tag for v${VERSION}"
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -241,6 +251,8 @@ jobs:
           draft: false
           prerelease: false
           fail_on_unmatched_files: false
+          make_latest: true
+          generate_release_notes: false
           files: |
             apps/desktop/src-tauri/target/aarch64-apple-darwin/release/bundle/dmg/*.dmg
             apps/desktop/src-tauri/target/x86_64-apple-darwin/release/bundle/dmg/*.dmg
@@ -257,7 +269,8 @@ jobs:
             ### Installation
             1. Download the appropriate .dmg file for your Mac
             2. Open the .dmg and drag Observer to Applications
-            3. Grant Accessibility permission when prompted
+            3. Run: `sudo xattr -cr /Applications/Observer.app`
+            4. Grant Accessibility permission when prompted
 
             ### Auto-Updates
             This version includes automatic updates. The app will check for new versions on startup.
