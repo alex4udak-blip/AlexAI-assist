@@ -94,6 +94,7 @@ def upgrade() -> None:
         sa.Column("first_seen_at", sa.DateTime(timezone=True)),
         sa.Column("last_seen_at", sa.DateTime(timezone=True)),
         sa.Column("automatable", sa.Boolean, server_default=sa.text("false")),
+        sa.Column("agent_created", sa.Boolean, server_default=sa.text("false")),
         sa.Column("complexity", sa.String(20), server_default=sa.text("'medium'")),
         sa.Column("time_saved_minutes", sa.Float, server_default=sa.text("0")),
         sa.Column("status", sa.String(20), server_default=sa.text("'active'")),

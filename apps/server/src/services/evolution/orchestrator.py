@@ -22,9 +22,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from src.core.claude import claude_client
 from src.db.models import Agent, AgentLog, Pattern, Suggestion
 from src.db.models.memory import (
+    MemoryBelief,
     MemoryExperience,
     MemoryFact,
     MemoryOperation,
+    MemoryRelationship,
 )
 
 logger = logging.getLogger(__name__)
@@ -931,21 +933,185 @@ Suggest specific behavior adjustments as JSON:
         """Consolidate redundant or similar memories."""
         logger.info("Consolidating redundant memories")
 
-        # Placeholder implementation
-        # In production, this would use embeddings to find similar memories
-        # and merge them intelligently
+        try:
+            consolidated_count = 0
 
-        return {"consolidated": 0, "status": "placeholder"}
+            # Get recent facts (last 30 days) for consolidation
+            thirty_days_ago = datetime.now(UTC) - timedelta(days=30)
+            result = await self.db.execute(
+                select(MemoryFact)
+                .where(MemoryFact.created_at >= thirty_days_ago)
+                .order_by(MemoryFact.fact_type, MemoryFact.created_at.desc())
+            )
+            facts = result.scalars().all()
+
+            if not facts:
+                return {"consolidated": 0, "status": "no_memories_to_consolidate"}
+
+            # Group facts by type for comparison
+            facts_by_type: dict[str, list[MemoryFact]] = {}
+            for fact in facts:
+                if fact.fact_type not in facts_by_type:
+                    facts_by_type[fact.fact_type] = []
+                facts_by_type[fact.fact_type].append(fact)
+
+            # Find and consolidate duplicates within each type
+            facts_to_delete = []
+
+            for fact_type, type_facts in facts_by_type.items():
+                # Compare facts pairwise for similarity
+                seen_indices = set()
+
+                for i, fact1 in enumerate(type_facts):
+                    if i in seen_indices:
+                        continue
+
+                    duplicates = []
+
+                    for j, fact2 in enumerate(type_facts[i + 1:], start=i + 1):
+                        if j in seen_indices:
+                            continue
+
+                        # Simple similarity check: exact match or very similar content
+                        content1 = fact1.content.lower().strip()
+                        content2 = fact2.content.lower().strip()
+
+                        # Check for exact or near-exact duplicates
+                        if content1 == content2 or self._is_similar_content(content1, content2):
+                            duplicates.append((j, fact2))
+
+                    if duplicates:
+                        # Found duplicates - keep the one with highest confidence
+                        # or most recent if confidence is equal
+                        all_versions = [(i, fact1)] + duplicates
+
+                        # Sort by confidence (desc) then by created_at (desc)
+                        best_idx, best_fact = max(
+                            all_versions,
+                            key=lambda x: (x[1].confidence, x[1].created_at)
+                        )
+
+                        # Mark others for deletion
+                        for idx, dup_fact in all_versions:
+                            if idx != best_idx:
+                                facts_to_delete.append(dup_fact)
+                                seen_indices.add(idx)
+
+                        # Update the kept fact with consolidated metadata
+                        best_fact.access_count += sum(
+                            f.access_count for _, f in all_versions if _ != best_idx
+                        )
+                        best_fact.heat_score = max(
+                            best_fact.heat_score,
+                            max((f.heat_score for _, f in all_versions), default=1.0)
+                        )
+
+            # Delete redundant facts
+            for fact in facts_to_delete:
+                await self.db.delete(fact)
+                consolidated_count += 1
+
+            if consolidated_count > 0:
+                await self.db.commit()
+                logger.info(f"Consolidated {consolidated_count} redundant memories")
+
+            return {
+                "consolidated": consolidated_count,
+                "status": "success",
+                "fact_types_processed": len(facts_by_type),
+            }
+
+        except Exception as e:
+            logger.error(f"Memory consolidation failed: {e}", exc_info=True)
+            await self.db.rollback()
+            return {"consolidated": 0, "status": "error", "error": str(e)}
+
+    def _is_similar_content(self, content1: str, content2: str) -> bool:
+        """Check if two content strings are similar enough to consolidate."""
+        # Simple similarity check: if one is substring of other or
+        # they share > 80% of words
+        words1 = set(content1.split())
+        words2 = set(content2.split())
+
+        if not words1 or not words2:
+            return False
+
+        # Check substring relationship
+        if content1 in content2 or content2 in content1:
+            return True
+
+        # Check word overlap
+        overlap = len(words1 & words2)
+        min_words = min(len(words1), len(words2))
+
+        if min_words > 0 and overlap / min_words > 0.8:
+            return True
+
+        return False
 
     async def _prune_low_confidence_memories(self) -> dict[str, Any]:
         """Prune memories with consistently low confidence."""
         logger.info("Pruning low-confidence memories")
 
-        # Placeholder implementation
-        # In production, this would identify and remove memories
-        # that have low confidence scores across multiple retrievals
+        try:
+            pruned_count = 0
+            confidence_threshold = 0.3
+            min_age_days = 7
+            cutoff_date = datetime.now(UTC) - timedelta(days=min_age_days)
 
-        return {"pruned": 0, "status": "placeholder"}
+            # Prune low-confidence facts
+            facts_result = await self.db.execute(
+                select(MemoryFact)
+                .where(MemoryFact.confidence < confidence_threshold)
+                .where(MemoryFact.created_at < cutoff_date)
+            )
+            low_confidence_facts = facts_result.scalars().all()
+
+            for fact in low_confidence_facts:
+                await self.db.delete(fact)
+                pruned_count += 1
+
+            # Prune low-confidence beliefs
+            beliefs_result = await self.db.execute(
+                select(MemoryBelief)
+                .where(MemoryBelief.confidence < confidence_threshold)
+                .where(MemoryBelief.created_at < cutoff_date)
+                .where(MemoryBelief.status == "active")
+            )
+            low_confidence_beliefs = beliefs_result.scalars().all()
+
+            for belief in low_confidence_beliefs:
+                # Mark as superseded rather than deleting
+                belief.status = "pruned"
+                pruned_count += 1
+
+            # Prune low-confidence relationships
+            relationships_result = await self.db.execute(
+                select(MemoryRelationship)
+                .where(MemoryRelationship.confidence < confidence_threshold)
+                .where(MemoryRelationship.created_at < cutoff_date)
+            )
+            low_confidence_relationships = relationships_result.scalars().all()
+
+            for relationship in low_confidence_relationships:
+                await self.db.delete(relationship)
+                pruned_count += 1
+
+            if pruned_count > 0:
+                await self.db.commit()
+                logger.info(f"Pruned {pruned_count} low-confidence memories")
+
+            return {
+                "pruned": pruned_count,
+                "status": "success",
+                "confidence_threshold": confidence_threshold,
+                "min_age_days": min_age_days,
+            }
+
+        except Exception as e:
+            logger.error(f"Memory pruning failed: {e}", exc_info=True)
+            await self.db.rollback()
+            return {"pruned": 0, "status": "error", "error": str(e)}
 
     async def _fix_failing_agent(self, agent_id: UUID) -> dict[str, Any]:
         """Attempt to fix a failing agent using LLM analysis."""

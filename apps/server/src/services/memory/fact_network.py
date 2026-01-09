@@ -4,7 +4,7 @@ Implements Hindsight's Fact Network with temporal validity.
 """
 
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any
 from uuid import UUID, uuid4
 
@@ -168,8 +168,8 @@ class FactNetwork:
             is_persona_attribute=is_persona_attribute,
             is_persona_event=is_persona_event,
             event_time=event_time,
-            record_time=datetime.utcnow(),
-            valid_from=datetime.utcnow(),
+            record_time=datetime.now(timezone.utc).replace(tzinfo=None),
+            valid_from=datetime.now(timezone.utc).replace(tzinfo=None),
             keywords=keywords or [],
             tags=tags or [],
             heat_score=1.0,
@@ -349,7 +349,7 @@ class FactNetwork:
                     MemoryFact.content.ilike(f"%{sanitized_query}%"),
                     or_(
                         MemoryFact.valid_to.is_(None),
-                        MemoryFact.valid_to > datetime.utcnow(),
+                        MemoryFact.valid_to > datetime.now(timezone.utc).replace(tzinfo=None),
                     ),
                 )
             )
@@ -393,7 +393,7 @@ class FactNetwork:
             fact.confidence = calculate_reinforcement(weighted_confidence, reinforcement_strength=0.15)
             fact.heat_score = min(2.0, fact.heat_score + 0.2)
             fact.access_count += 1
-            fact.last_accessed = datetime.utcnow()
+            fact.last_accessed = datetime.now(timezone.utc).replace(tzinfo=None)
 
     async def _record_access(self, fact_id: UUID) -> None:
         """Record fact access for heat scoring."""
@@ -425,7 +425,7 @@ class FactNetwork:
                     MemoryFact.confidence >= min_confidence,
                     or_(
                         MemoryFact.valid_to.is_(None),
-                        MemoryFact.valid_to > datetime.utcnow(),
+                        MemoryFact.valid_to > datetime.now(timezone.utc).replace(tzinfo=None),
                     ),
                 )
             )
@@ -444,7 +444,7 @@ class FactNetwork:
                     MemoryFact.is_persona_attribute == True,  # noqa: E712
                     or_(
                         MemoryFact.valid_to.is_(None),
-                        MemoryFact.valid_to > datetime.utcnow(),
+                        MemoryFact.valid_to > datetime.now(timezone.utc).replace(tzinfo=None),
                     ),
                 )
             )
@@ -500,7 +500,7 @@ class FactNetwork:
         if new_confidence is not None:
             fact.confidence = new_confidence
 
-        fact.updated_at = datetime.utcnow()
+        fact.updated_at = datetime.now(timezone.utc).replace(tzinfo=None)
         return fact
 
     async def invalidate(self, fact_id: UUID) -> bool:
@@ -515,7 +515,7 @@ class FactNetwork:
         if not fact:
             return False
 
-        fact.valid_to = datetime.utcnow()
+        fact.valid_to = datetime.now(timezone.utc).replace(tzinfo=None)
         logger.info(f"Invalidated fact: {fact.content[:50]}...")
         return True
 
@@ -570,7 +570,7 @@ class FactNetwork:
                     MemoryFact.category == category,
                     or_(
                         MemoryFact.valid_to.is_(None),
-                        MemoryFact.valid_to > datetime.utcnow(),
+                        MemoryFact.valid_to > datetime.now(timezone.utc).replace(tzinfo=None),
                     ),
                 )
             )

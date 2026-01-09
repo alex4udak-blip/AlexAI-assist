@@ -8,6 +8,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.api.deps import get_db_session
+from src.services.ai_router import get_ai_router
 from src.services.analyzer import AnalyzerService
 
 router = APIRouter()
@@ -218,3 +219,42 @@ async def get_trends(
         device_id=device_id,
         days=days,
     )
+
+
+class AIUsageStats(BaseModel):
+    """AI usage statistics response."""
+
+    daily_usage: list[dict[str, Any]] = Field(
+        default_factory=list,
+        description="Daily usage breakdown",
+    )
+    total_cost: float = Field(
+        ...,
+        description="Total cost across all days",
+    )
+    total_requests: int = Field(
+        ...,
+        description="Total number of requests",
+    )
+    model_breakdown: dict[str, Any] = Field(
+        default_factory=dict,
+        description="Usage by model",
+    )
+    budget_status: dict[str, Any] = Field(
+        default_factory=dict,
+        description="Budget usage status",
+    )
+
+
+@router.get("/ai-usage", response_model=AIUsageStats)
+async def get_ai_usage(
+    days: int = Query(
+        default=7,
+        ge=1,
+        le=30,
+        description="Number of days to retrieve",
+    ),
+) -> dict[str, Any]:
+    """Get AI usage statistics and budget status."""
+    ai_router = get_ai_router()
+    return ai_router.get_usage_stats(days=days)

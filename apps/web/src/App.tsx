@@ -7,6 +7,7 @@ import History from './pages/History';
 import Chat from './pages/Chat';
 import Settings from './pages/Settings';
 import Download from './pages/Download';
+import Automation from './pages/Automation';
 
 function App() {
   return (
@@ -17,6 +18,7 @@ function App() {
         <Route path="/analytics" element={<Analytics />} />
         <Route path="/history" element={<History />} />
         <Route path="/chat" element={<Chat />} />
+        <Route path="/automation" element={<Automation />} />
         <Route path="/settings" element={<Settings />} />
         <Route path="/download" element={<Download />} />
       </Routes>

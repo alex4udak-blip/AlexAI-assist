@@ -4,7 +4,7 @@ Provides consistent confidence calculation across all memory services.
 """
 
 import math
-from datetime import datetime
+from datetime import datetime, timezone
 
 
 def calculate_reinforcement(
@@ -89,7 +89,7 @@ def calculate_time_decay(
     This ensures higher confidence values decay slower (stability of strong beliefs).
     """
     if now is None:
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc).replace(tzinfo=None)
 
     current_confidence = _clamp(current_confidence)
     decay_rate = max(0.0, min(0.1, decay_rate))

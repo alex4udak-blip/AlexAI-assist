@@ -121,14 +121,14 @@ def setup_logging(
         # JSON format for production (structured logging)
         try:
             import json
-            from datetime import datetime
+            from datetime import datetime, timezone
 
             class JsonFormatter(logging.Formatter):
                 """JSON formatter for structured logging."""
 
                 def format(self, record: logging.LogRecord) -> str:
                     log_data = {
-                        "timestamp": datetime.utcnow().isoformat() + "Z",
+                        "timestamp": datetime.now(timezone.utc).replace(tzinfo=None).isoformat() + "Z",
                         "level": record.levelname,
                         "logger": record.name,
                         "message": record.getMessage(),

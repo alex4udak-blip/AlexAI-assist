@@ -1,7 +1,7 @@
 """Background scheduler for periodic tasks."""
 
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
@@ -161,7 +161,7 @@ def start_scheduler() -> None:
         trigger=IntervalTrigger(hours=6),
         id="evolution_cycle",
         name="Run evolution cycle",
-        next_run_time=datetime.utcnow() + timedelta(minutes=5),
+        next_run_time=datetime.now(timezone.utc).replace(tzinfo=None) + timedelta(minutes=5),
         replace_existing=True,
     )
 

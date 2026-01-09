@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
-import { Activity, Pause, Play, Settings, ExternalLink, RefreshCw } from 'lucide-react';
+import { Activity, Pause, Play, Settings, ExternalLink, RefreshCw, X, Minus } from 'lucide-react';
 import { invoke } from '@tauri-apps/api/core';
+import { getCurrentWindow } from '@tauri-apps/api/window';
 
 interface Stats {
   eventsToday: number;
@@ -67,22 +68,60 @@ export default function MenuBar() {
     syncing: 'bg-status-info',
   };
 
+  const hideWindow = async () => {
+    const window = getCurrentWindow();
+    await window.hide();
+  };
+
+  const minimizeWindow = async () => {
+    const window = getCurrentWindow();
+    await window.minimize();
+  };
+
+  const openSettings = async () => {
+    try {
+      await invoke('open_settings');
+    } catch (e) {
+      console.error('Failed to open settings:', e);
+    }
+  };
+
   return (
     <div className="w-80 bg-bg-secondary rounded-xl border border-border-default shadow-lg overflow-hidden">
-      {/* Header */}
-      <div className="px-4 py-3 bg-bg-tertiary border-b border-border-subtle">
+      {/* Draggable Header */}
+      <div
+        className="px-4 py-3 bg-bg-tertiary border-b border-border-subtle cursor-move"
+        data-tauri-drag-region
+      >
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2" data-tauri-drag-region>
             <div className="w-8 h-8 rounded-lg bg-accent-gradient flex items-center justify-center">
               <Activity className="w-4 h-4 text-white" />
             </div>
-            <div>
+            <div data-tauri-drag-region>
               <h1 className="text-sm font-semibold text-text-primary">Observer</h1>
               <div className="flex items-center gap-1.5">
                 <span className={`w-1.5 h-1.5 rounded-full ${statusColors[stats.status]}`} />
                 <span className="text-xs text-text-tertiary capitalize">{stats.status === 'collecting' ? 'Сбор' : stats.status === 'paused' ? 'Пауза' : 'Синхронизация'}</span>
               </div>
             </div>
+          </div>
+          {/* Window controls */}
+          <div className="flex items-center gap-1">
+            <button
+              onClick={minimizeWindow}
+              className="w-6 h-6 rounded-md flex items-center justify-center text-text-muted hover:text-text-secondary hover:bg-bg-hover transition-colors"
+              title="Свернуть"
+            >
+              <Minus className="w-3.5 h-3.5" />
+            </button>
+            <button
+              onClick={hideWindow}
+              className="w-6 h-6 rounded-md flex items-center justify-center text-text-muted hover:text-white hover:bg-red-500/80 transition-colors"
+              title="Закрыть"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
           </div>
         </div>
       </div>
@@ -141,8 +180,12 @@ export default function MenuBar() {
       {/* Footer */}
       <div className="px-4 py-3 bg-bg-tertiary border-t border-border-subtle">
         <div className="flex items-center justify-between text-xs text-text-muted">
-          <span>v0.1.0</span>
-          <button className="hover:text-text-secondary transition-colors">
+          <span>v0.1.1</span>
+          <button
+            onClick={openSettings}
+            className="hover:text-text-secondary transition-colors"
+            title="Настройки"
+          >
             <Settings className="w-4 h-4" />
           </button>
         </div>
