@@ -21,7 +21,11 @@ interface Stats {
   activeTime: number;
 }
 
-export default function Main() {
+interface Props {
+  onOpenSettings: () => void;
+}
+
+export default function Main({ onOpenSettings }: Props) {
   const [stats, setStats] = useState<Stats>({
     eventsToday: 0,
     lastSync: 'Никогда',
@@ -62,14 +66,6 @@ export default function Main() {
       await invoke('open_dashboard');
     } catch (e) {
       console.error('Failed to open dashboard:', e);
-    }
-  };
-
-  const openSettings = async () => {
-    try {
-      await invoke('open_settings');
-    } catch (e) {
-      console.error('Failed to open settings:', e);
     }
   };
 
@@ -116,7 +112,7 @@ export default function Main() {
             )}
           </button>
           <button
-            onClick={openSettings}
+            onClick={onOpenSettings}
             className="p-1.5 text-text-tertiary hover:text-text-primary hover:bg-bg-hover rounded-md transition-colors"
             title="Настройки"
           >

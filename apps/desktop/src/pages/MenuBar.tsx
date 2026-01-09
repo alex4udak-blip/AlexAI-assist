@@ -9,7 +9,11 @@ interface Stats {
   status: 'collecting' | 'paused' | 'syncing';
 }
 
-export default function MenuBar() {
+interface Props {
+  onOpenSettings: () => void;
+}
+
+export default function MenuBar({ onOpenSettings }: Props) {
   const [stats, setStats] = useState<Stats>({
     eventsToday: 0,
     lastSync: 'Никогда',
@@ -76,14 +80,6 @@ export default function MenuBar() {
   const minimizeWindow = async () => {
     const window = getCurrentWindow();
     await window.minimize();
-  };
-
-  const openSettings = async () => {
-    try {
-      await invoke('open_settings');
-    } catch (e) {
-      console.error('Failed to open settings:', e);
-    }
   };
 
   return (
@@ -180,9 +176,9 @@ export default function MenuBar() {
       {/* Footer */}
       <div className="px-4 py-3 bg-bg-tertiary border-t border-border-subtle">
         <div className="flex items-center justify-between text-xs text-text-muted">
-          <span>v0.1.1</span>
+          <span>v0.2.0</span>
           <button
-            onClick={openSettings}
+            onClick={onOpenSettings}
             className="hover:text-text-secondary transition-colors"
             title="Настройки"
           >

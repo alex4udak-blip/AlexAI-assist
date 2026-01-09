@@ -368,6 +368,112 @@ pub async fn queue_clear(
 }
 
 // ============================================================================
+// SETTINGS COMMANDS
+// ============================================================================
+
+use serde::Deserialize;
+
+#[derive(Serialize, Deserialize, Clone)]
+pub struct AppSettings {
+    #[serde(rename = "apiUrl")]
+    pub api_url: String,
+    #[serde(rename = "syncInterval")]
+    pub sync_interval: u32,
+    #[serde(rename = "launchAtStartup")]
+    pub launch_at_startup: bool,
+}
+
+impl Default for AppSettings {
+    fn default() -> Self {
+        Self {
+            api_url: get_dashboard_url(),
+            sync_interval: 30,
+            launch_at_startup: false,
+        }
+    }
+}
+
+fn get_settings_path() -> std::path::PathBuf {
+    dirs::config_dir()
+        .unwrap_or_else(|| std::path::PathBuf::from("."))
+        .join("observer")
+        .join("settings.json")
+}
+
+/// Get app settings
+#[tauri::command]
+pub fn get_settings() -> Result<AppSettings, String> {
+    let path = get_settings_path();
+
+    if path.exists() {
+        let content = std::fs::read_to_string(&path)
+            .map_err(|e| format!("Failed to read settings: {}", e))?;
+        serde_json::from_str(&content)
+            .map_err(|e| format!("Failed to parse settings: {}", e))
+    } else {
+        Ok(AppSettings::default())
+    }
+}
+
+/// Save app settings
+#[tauri::command]
+pub fn save_settings(settings: AppSettings) -> Result<(), String> {
+    let path = get_settings_path();
+
+    // Ensure directory exists
+    if let Some(parent) = path.parent() {
+        std::fs::create_dir_all(parent)
+            .map_err(|e| format!("Failed to create config directory: {}", e))?;
+    }
+
+    let content = serde_json::to_string_pretty(&settings)
+        .map_err(|e| format!("Failed to serialize settings: {}", e))?;
+
+    std::fs::write(&path, content)
+        .map_err(|e| format!("Failed to write settings: {}", e))?;
+
+    // Handle launch at startup (macOS)
+    #[cfg(target_os = "macos")]
+    {
+        if settings.launch_at_startup {
+            // Add to Login Items using AppleScript
+            let _ = std::process::Command::new("osascript")
+                .args(["-e", "tell application \"System Events\" to make login item at end with properties {path:\"/Applications/Observer.app\", hidden:false}"])
+                .output();
+        } else {
+            // Remove from Login Items
+            let _ = std::process::Command::new("osascript")
+                .args(["-e", "tell application \"System Events\" to delete login item \"Observer\""])
+                .output();
+        }
+    }
+
+    Ok(())
+}
+
+/// Open system preferences to a specific pane
+#[tauri::command]
+pub fn open_system_preferences(pane: String) -> Result<(), String> {
+    #[cfg(target_os = "macos")]
+    {
+        let url = match pane.as_str() {
+            "privacy" => "x-apple.systempreferences:com.apple.preference.security?Privacy",
+            "accessibility" => "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility",
+            "screen_recording" => "x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture",
+            "login_items" => "x-apple.systempreferences:com.apple.LoginItems-Settings.extension",
+            _ => "x-apple.systempreferences:",
+        };
+
+        std::process::Command::new("open")
+            .arg(url)
+            .spawn()
+            .map_err(|e| format!("Failed to open system preferences: {}", e))?;
+    }
+
+    Ok(())
+}
+
+// ============================================================================
 // HELPER FUNCTIONS
 // ============================================================================
 
