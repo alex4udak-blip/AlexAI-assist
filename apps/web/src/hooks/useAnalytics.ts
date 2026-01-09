@@ -31,3 +31,8 @@ export function useTimeline(hours = 24) {
   const fetcher = useCallback(() => api.getTimeline(hours), [hours]);
   return useApi(fetcher, [hours]);
 }
+
+export function useAIUsage(days = 7) {
+  const fetcher = useCallback(() => api.getAIUsage(days), [days]);
+  return useApi(fetcher, [days]);
+}

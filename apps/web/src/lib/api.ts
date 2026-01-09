@@ -134,6 +134,8 @@ export const api = {
     fetchApi<ProductivityScore>('/api/v1/analytics/productivity', { params }),
   getTrends: (params?: QueryParams) =>
     fetchApi<TrendData[]>('/api/v1/analytics/trends', { params }),
+  getAIUsage: (days = 7) =>
+    fetchApi<AIUsageStats>('/api/v1/analytics/ai-usage', { params: { days } }),
 
   // Chat
   chat: (message: string, context?: Record<string, unknown>) =>
@@ -366,4 +368,27 @@ export interface HealthCheckResponse {
 export interface UserSettings {
   device_id: string;
   settings: Record<string, unknown>;
+}
+
+export interface AIUsageStats {
+  daily_usage: Array<{
+    date: string;
+    cost: number;
+    requests: number;
+    haiku_cost: number;
+    sonnet_cost: number;
+    opus_cost: number;
+  }>;
+  total_cost: number;
+  total_requests: number;
+  model_breakdown: {
+    haiku: { cost: number; requests: number };
+    sonnet: { cost: number; requests: number };
+    opus: { cost: number; requests: number };
+  };
+  budget_status: {
+    haiku: { used: number; limit: number; remaining: number };
+    sonnet: { used: number; limit: number; remaining: number };
+    opus: { used: number; limit: number; remaining: number };
+  };
 }

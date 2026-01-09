@@ -126,7 +126,37 @@ export function AutomationPanel() {
       const response = await apiFetch('/api/v1/analytics/ai-usage');
       if (response.ok) {
         const data = await response.json();
-        setAiUsage(data);
+        // Transform backend format to frontend format
+        const budgetStatus = data.budget_status || {};
+        const modelBreakdown = data.model_breakdown || {};
+
+        const haikuLimit = budgetStatus.haiku?.limit || 2;
+        const sonnetLimit = budgetStatus.sonnet?.limit || 3;
+        const opusLimit = budgetStatus.opus?.limit || 5;
+
+        const haikuUsed = budgetStatus.haiku?.used || 0;
+        const sonnetUsed = budgetStatus.sonnet?.used || 0;
+        const opusUsed = budgetStatus.opus?.used || 0;
+
+        const transformed: AIUsage = {
+          daily_usage: {
+            haiku: {
+              requests: modelBreakdown.haiku?.requests || 0,
+              cost: haikuUsed,
+            },
+            sonnet: {
+              requests: modelBreakdown.sonnet?.requests || 0,
+              cost: sonnetUsed,
+            },
+            opus: {
+              requests: modelBreakdown.opus?.requests || 0,
+              cost: opusUsed,
+            },
+          },
+          daily_budget: haikuLimit + sonnetLimit + opusLimit,
+          total_spent_today: haikuUsed + sonnetUsed + opusUsed,
+        };
+        setAiUsage(transformed);
       }
     } catch (error) {
       console.error('Failed to fetch AI usage:', error);
