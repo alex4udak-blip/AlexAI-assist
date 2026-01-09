@@ -10,6 +10,7 @@ from src.api.routes import (
     memory,
     patterns,
     sessions,
+    settings,
     suggestions,
 )
 
@@ -23,5 +24,6 @@ __all__ = [
     "memory",
     "patterns",
     "sessions",
+    "settings",
     "suggestions",
 ]

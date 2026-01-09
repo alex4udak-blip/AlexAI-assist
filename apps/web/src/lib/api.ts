@@ -149,6 +149,21 @@ export const api = {
   // Audit Logs
   getAuditLogs: (params?: QueryParams) =>
     fetchApi<AuditLog[]>('/api/v1/automation/audit-logs', { params }),
+
+  // Health Check
+  checkHealth: () =>
+    fetchApi<HealthCheckResponse>('/api/v1/health'),
+
+  // Settings
+  getSettings: (deviceId: string) =>
+    fetchApi<UserSettings>('/api/v1/settings', {
+      params: { device_id: deviceId },
+    }),
+  saveSettings: (deviceId: string, settings: Record<string, unknown>) =>
+    fetchApi<UserSettings>('/api/v1/settings', {
+      method: 'POST',
+      body: JSON.stringify({ device_id: deviceId, settings }),
+    }),
 };
 
 // Types
@@ -334,4 +349,21 @@ export interface AuditLog {
   error_message: string | null;
   duration_ms: number | null;
   ip_address: string | null;
+}
+
+export interface HealthCheckResponse {
+  status: 'healthy' | 'degraded' | 'unhealthy';
+  timestamp: number;
+  response_time_ms: number;
+  checks: {
+    database: { status: string; latency_ms?: number; error?: string };
+    redis: { status: string; latency_ms?: number; error?: string };
+    memory: { status: string; percent_used?: number; error?: string };
+    disk: { status: string; percent_used?: number; error?: string };
+  };
+}
+
+export interface UserSettings {
+  device_id: string;
+  settings: Record<string, unknown>;
 }

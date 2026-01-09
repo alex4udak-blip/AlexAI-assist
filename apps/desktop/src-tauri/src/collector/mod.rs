@@ -262,6 +262,11 @@ pub async fn start_collector(
                             state.buffer_warnings_logged = false;
                         }
 
+                        // Persist event to database
+                        if let Err(e) = state.db.insert_event(&event) {
+                            eprintln!("Warning: Failed to persist event to database: {}", e);
+                        }
+
                         state.events_buffer.push(event);
                         state.events_today += 1;
                     }
@@ -324,6 +329,11 @@ pub async fn start_collector(
 
                                     if buffer_size < crate::BUFFER_WARNING_THRESHOLD / 2 {
                                         state.buffer_warnings_logged = false;
+                                    }
+
+                                    // Persist event to database
+                                    if let Err(e) = state.db.insert_event(&event) {
+                                        eprintln!("Warning: Failed to persist event to database: {}", e);
                                     }
 
                                     state.events_buffer.push(event);

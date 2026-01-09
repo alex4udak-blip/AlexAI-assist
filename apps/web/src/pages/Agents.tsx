@@ -7,6 +7,7 @@ import { CreateAgentModal } from '../components/agents/CreateAgentModal';
 import {
   useAgents,
   useCreateAgent,
+  useUpdateAgent,
   useRunAgent,
   useEnableAgent,
   useDisableAgent,
@@ -31,16 +32,17 @@ const item = {
 export default function Agents() {
   const [selectedAgentId, setSelectedAgentId] = useState<string | null>(null);
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editingAgentId, setEditingAgentId] = useState<string | null>(null);
   const [filter, setFilter] = useState<FilterStatus>('all');
 
   const { data: agents, loading, refetch } = useAgents();
   const { mutate: createAgent, loading: creating } = useCreateAgent();
+  const { mutate: updateAgent, loading: updating } = useUpdateAgent();
   const { mutate: runAgent } = useRunAgent();
   const { mutate: enableAgent } = useEnableAgent();
   const { mutate: disableAgent } = useDisableAgent();
   const { mutate: deleteAgent } = useDeleteAgent();
-
-  const selectedAgent = agents?.find((a) => a.id === selectedAgentId);
 
   const filteredAgents = agents?.filter((agent) => {
     if (filter === 'all') return true;
@@ -68,6 +70,33 @@ export default function Agents() {
     refetch();
   };
 
+  const handleEdit = async (data: {
+    name: string;
+    description: string;
+    agent_type: string;
+    trigger_type: string;
+    trigger_value: string;
+  }) => {
+    if (!editingAgentId) return;
+    await updateAgent(editingAgentId, {
+      name: data.name,
+      description: data.description,
+      agent_type: data.agent_type,
+      trigger_config: {
+        type: data.trigger_type,
+        value: data.trigger_value,
+      },
+    });
+    setShowEditModal(false);
+    setEditingAgentId(null);
+    refetch();
+  };
+
+  const openEditModal = (id: string) => {
+    setEditingAgentId(id);
+    setShowEditModal(true);
+  };
+
   const handleRun = async (id: string) => {
     await runAgent(id);
     refetch();
@@ -93,14 +122,30 @@ export default function Agents() {
     }
   };
 
+  const selectedAgent = agents?.find((a) => a.id === selectedAgentId);
+  const editingAgent = agents?.find((a) => a.id === editingAgentId);
+
   if (selectedAgent) {
     return (
-      <AgentDetail
-        agent={selectedAgent}
-        onBack={() => setSelectedAgentId(null)}
-        onRun={handleRun}
-        onEdit={() => {}}
-      />
+      <>
+        <AgentDetail
+          agent={selectedAgent}
+          onBack={() => setSelectedAgentId(null)}
+          onRun={handleRun}
+          onEdit={openEditModal}
+        />
+        <CreateAgentModal
+          isOpen={showEditModal}
+          onClose={() => {
+            setShowEditModal(false);
+            setEditingAgentId(null);
+          }}
+          onCreate={handleEdit}
+          loading={updating}
+          initialData={editingAgent}
+          isEdit={true}
+        />
+      </>
     );
   }
 

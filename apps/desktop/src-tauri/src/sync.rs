@@ -169,16 +169,19 @@ pub fn validate_url(url_str: &str) -> Result<Url, String> {
 /// Priority:
 /// 1. OBSERVER_SERVER_URL environment variable
 /// 2. ~/.config/observer/server.txt config file
-/// 3. Development fallback (localhost)
+/// 3. Default fallback (localhost for dev, Railway URL for production)
 ///
-/// Note: Production deployments MUST set OBSERVER_SERVER_URL environment variable
-/// or configure server URL via config file
+/// Environment variable:
+///   OBSERVER_SERVER_URL - Server API URL (e.g., https://your-server.railway.app)
+///
+/// Note: Production deployments should set OBSERVER_SERVER_URL environment variable
+/// or configure server URL via config file (~/.config/observer/server.txt)
 pub fn get_server_url() -> String {
-    // Production default URL
+    // Default URL: localhost for dev, Railway URL for production (fallback)
     let default_url = if is_dev_mode() {
         "http://localhost:8000"
     } else {
-        // Production Railway URL
+        // Production Railway URL (fallback - override with OBSERVER_SERVER_URL)
         "https://server-production-0b14.up.railway.app"
     };
 
@@ -222,16 +225,19 @@ pub fn get_server_url() -> String {
 /// Priority:
 /// 1. OBSERVER_DASHBOARD_URL environment variable
 /// 2. ~/.config/observer/dashboard.txt config file
-/// 3. Development fallback (localhost)
+/// 3. Default fallback (localhost for dev, Railway URL for production)
 ///
-/// Note: Production deployments MUST set OBSERVER_DASHBOARD_URL environment variable
-/// or configure dashboard URL via config file
+/// Environment variable:
+///   OBSERVER_DASHBOARD_URL - Web dashboard URL (e.g., https://your-web-app.railway.app)
+///
+/// Note: Production deployments should set OBSERVER_DASHBOARD_URL environment variable
+/// or configure dashboard URL via config file (~/.config/observer/dashboard.txt)
 pub fn get_dashboard_url() -> String {
-    // Production default URL
+    // Default URL: localhost for dev, Railway URL for production (fallback)
     let default_url = if is_dev_mode() {
         "http://localhost:5173"
     } else {
-        // Production Railway URL
+        // Production Railway URL (fallback - override with OBSERVER_DASHBOARD_URL)
         "https://web-production-20d71.up.railway.app"
     };
 
@@ -277,47 +283,52 @@ pub async fn start_sync_service(state: Arc<Mutex<AppState>>) {
     loop {
         tokio::time::sleep(tokio::time::Duration::from_secs(SYNC_INTERVAL_SECS)).await;
 
-        // Get events to sync
+        // Get events to sync (clone instead of drain to keep in buffer until ACKed)
         let events: Vec<Event>;
         {
-            let mut state = state.lock().await;
+            let state = state.lock().await;
             if state.events_buffer.is_empty() {
                 continue;
             }
-            events = state.events_buffer.drain(..).collect();
+            events = state.events_buffer.clone();
         }
 
         // Try to sync - convert error to String immediately to make future Send
         match sync_events(&events).await.map_err(|e| e.to_string()) {
-            Ok(_) => {
+            Ok(acked_event_ids) => {
                 let mut state = state.lock().await;
                 state.last_sync = format_relative_time(Utc::now());
+
+                // Remove only ACKed events from buffer
+                let acked_set: std::collections::HashSet<String> =
+                    acked_event_ids.into_iter().collect();
+                state.events_buffer.retain(|e| !acked_set.contains(&e.id));
+
+                // Delete successfully synced events from database
+                let acked_ids: Vec<String> = acked_set.into_iter().collect();
+                if let Err(e) = state.db.delete_events(&acked_ids) {
+                    eprintln!("Warning: Failed to delete synced events from database: {}", e);
+                }
+
+                println!(
+                    "Sync successful: {} events ACKed, {} remaining in buffer",
+                    acked_ids.len(),
+                    state.events_buffer.len()
+                );
             }
             Err(error_msg) => {
                 eprintln!("Sync failed: {}", error_msg);
-                // Put events back in buffer with bounds checking
-                let mut state = state.lock().await;
-                let mut dropped_count = 0;
-
-                for event in events {
-                    if state.events_buffer.len() >= crate::MAX_BUFFER_SIZE {
-                        // Drop oldest events to make room
-                        state.events_buffer.remove(0);
-                        dropped_count += 1;
-                    }
-                    state.events_buffer.push(event);
-                }
-
-                if dropped_count > 0 {
-                    eprintln!(
-                        "Warning: Dropped {} old events due to buffer overflow after failed sync",
-                        dropped_count
-                    );
-                }
+                // Events remain in buffer for retry
 
                 // Set warning flag if buffer is over threshold
+                let state = state.lock().await;
                 if state.events_buffer.len() >= crate::BUFFER_WARNING_THRESHOLD {
-                    state.buffer_warnings_logged = true;
+                    eprintln!(
+                        "Warning: Event buffer is {}% full ({}/{} events). Events may be lost if sync continues to fail.",
+                        (state.events_buffer.len() * 100) / crate::MAX_BUFFER_SIZE,
+                        state.events_buffer.len(),
+                        crate::MAX_BUFFER_SIZE
+                    );
                 }
             }
         }
@@ -341,13 +352,37 @@ fn is_transient_error(error: &reqwest::Error) -> bool {
         || error.status().map_or(false, |s| s.is_server_error())
 }
 
-async fn sync_events(events: &[Event]) -> Result<(), Box<dyn std::error::Error>> {
+/// Response from server after syncing events
+#[derive(Debug, serde::Deserialize)]
+struct SyncResponse {
+    acked_event_ids: Vec<String>,
+}
+
+async fn sync_events(events: &[Event]) -> Result<Vec<String>, Box<dyn std::error::Error>> {
     let client = create_http_client()?;
     let server_url = get_server_url();
     let api_key = get_api_key();
 
+    // Map events to include event_id field
+    let events_payload: Vec<serde_json::Value> = events
+        .iter()
+        .map(|e| {
+            serde_json::json!({
+                "event_id": e.id,
+                "device_id": e.device_id,
+                "event_type": e.event_type,
+                "timestamp": e.timestamp,
+                "app_name": e.app_name,
+                "window_title": e.window_title,
+                "url": e.url,
+                "data": e.data,
+                "category": e.category,
+            })
+        })
+        .collect();
+
     let payload = serde_json::json!({
-        "events": events
+        "events": events_payload
     });
 
     let mut last_error = None;
@@ -376,7 +411,18 @@ async fn sync_events(events: &[Event]) -> Result<(), Box<dyn std::error::Error>>
                 let status = response.status();
 
                 if status.is_success() {
-                    return Ok(());
+                    // Parse response to get ACKed event IDs
+                    match response.json::<SyncResponse>().await {
+                        Ok(sync_response) => {
+                            return Ok(sync_response.acked_event_ids);
+                        }
+                        Err(e) => {
+                            eprintln!("Failed to parse response: {}", e);
+                            // If we can't parse the response, assume all events were ACKed
+                            // to maintain backward compatibility
+                            return Ok(events.iter().map(|e| e.id.clone()).collect());
+                        }
+                    }
                 }
 
                 // Check if we should retry based on status code
@@ -429,47 +475,41 @@ fn format_relative_time(time: chrono::DateTime<Utc>) -> String {
 pub async fn manual_sync(state: Arc<Mutex<AppState>>) -> Result<(), String> {
     let events: Vec<Event>;
     {
-        let mut state = state.lock().await;
-        events = state.events_buffer.drain(..).collect();
-    }
-
-    if events.is_empty() {
-        return Ok(());
+        let state = state.lock().await;
+        if state.events_buffer.is_empty() {
+            return Ok(());
+        }
+        events = state.events_buffer.clone();
     }
 
     // Convert error to String immediately to make future Send
     match sync_events(&events).await.map_err(|e| e.to_string()) {
-        Ok(_) => {
+        Ok(acked_event_ids) => {
             let mut state = state.lock().await;
             state.last_sync = "Just now".to_string();
+
+            // Remove only ACKed events from buffer
+            let acked_set: std::collections::HashSet<String> =
+                acked_event_ids.into_iter().collect();
+            state.events_buffer.retain(|e| !acked_set.contains(&e.id));
+
+            // Delete successfully synced events from database
+            let acked_ids: Vec<String> = acked_set.into_iter().collect();
+            if let Err(e) = state.db.delete_events(&acked_ids) {
+                eprintln!("Warning: Failed to delete synced events from database: {}", e);
+            }
+
+            println!(
+                "Manual sync successful: {} events ACKed, {} remaining in buffer",
+                acked_ids.len(),
+                state.events_buffer.len()
+            );
+
             Ok(())
         }
         Err(error_msg) => {
-            // Put events back in buffer with bounds checking
-            let mut state = state.lock().await;
-            let mut dropped_count = 0;
-
-            for event in events {
-                if state.events_buffer.len() >= crate::MAX_BUFFER_SIZE {
-                    // Drop oldest events to make room
-                    state.events_buffer.remove(0);
-                    dropped_count += 1;
-                }
-                state.events_buffer.push(event);
-            }
-
-            if dropped_count > 0 {
-                eprintln!(
-                    "Warning: Dropped {} old events due to buffer overflow after failed manual sync",
-                    dropped_count
-                );
-            }
-
-            // Set warning flag if buffer is over threshold
-            if state.events_buffer.len() >= crate::BUFFER_WARNING_THRESHOLD {
-                state.buffer_warnings_logged = true;
-            }
-
+            // Events remain in buffer for retry
+            eprintln!("Manual sync failed: {}", error_msg);
             Err(error_msg)
         }
     }

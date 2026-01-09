@@ -1,11 +1,18 @@
 /**
  * Runtime configuration.
  * Env vars are injected at build time via vite.config.ts loadEnv.
+ *
+ * Environment variables:
+ *   VITE_API_URL - Server API URL (e.g., https://your-server.railway.app)
+ *   VITE_WS_URL - WebSocket URL (e.g., wss://your-server.railway.app)
+ *   VITE_API_KEY - Optional API key for authentication
+ *   VITE_SERVER_RAILWAY_HOST - Railway server host for auto-detection (e.g., server-production-0b14)
  */
 
 const envApiUrl = import.meta.env.VITE_API_URL;
 const envWsUrl = import.meta.env.VITE_WS_URL;
 const envApiKey = import.meta.env.VITE_API_KEY;
+const envServerRailwayHost = import.meta.env.VITE_SERVER_RAILWAY_HOST || 'server-production-0b14';
 
 // Development defaults
 const DEV_API_URL = 'http://localhost:8000';
@@ -22,10 +29,10 @@ function getApiUrl(): string {
       return DEV_API_URL;
     }
 
-    // Priority 3: Railway auto-detection
+    // Priority 3: Railway auto-detection (fallback)
     if (host.includes('railway.app')) {
-      // Replace web service name with server service name
-      const serverHost = host.replace(/web-production[^.]*/, 'server-production-0b14');
+      // Replace web service name with server service name (configurable via VITE_SERVER_RAILWAY_HOST)
+      const serverHost = host.replace(/web-production[^.]*/, envServerRailwayHost);
       return `https://${serverHost}`;
     }
   }
@@ -45,9 +52,10 @@ function getWsUrl(): string {
       return DEV_WS_URL;
     }
 
-    // Priority 3: Railway auto-detection
+    // Priority 3: Railway auto-detection (fallback)
     if (host.includes('railway.app')) {
-      const serverHost = host.replace(/web-production[^.]*/, 'server-production-0b14');
+      // Replace web service name with server service name (configurable via VITE_SERVER_RAILWAY_HOST)
+      const serverHost = host.replace(/web-production[^.]*/, envServerRailwayHost);
       return `wss://${serverHost}`;
     }
   }

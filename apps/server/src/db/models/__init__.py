@@ -24,6 +24,7 @@ from src.db.models.memory import (
 from src.db.models.pattern import Pattern
 from src.db.models.session import Session
 from src.db.models.suggestion import Suggestion
+from src.db.models.user_settings import UserSettings
 
 __all__ = [
     "Agent",
@@ -52,4 +53,5 @@ __all__ = [
     "Screenshot",
     "Session",
     "Suggestion",
+    "UserSettings",
 ]

@@ -593,7 +593,13 @@ async def send_command(
 
     # Send command to device as AutomationTask format
     try:
-        websocket = connected_devices[device_id]
+        websocket = connected_devices.get(device_id)
+        if websocket is None:
+            # Device disconnected between initial check and websocket access
+            raise HTTPException(
+                status_code=404,
+                detail=f"Device {device_id} disconnected",
+            )
 
         # Translate web command to desktop task format
         task = translate_command_to_task(command_id, command.command_type, command.params)

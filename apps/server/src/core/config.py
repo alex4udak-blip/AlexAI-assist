@@ -36,7 +36,9 @@ class Settings(BaseSettings):
     api_key: str = ""
 
     # CORS - stored as comma-separated string, parsed via property
-    # Includes Railway domains by default for production
+    # Default includes common development origins
+    # Override with ALLOWED_ORIGINS_STR env var for production (e.g., https://your-web-app.railway.app)
+    # Railway URLs below are fallback defaults - replace with your actual deployment URLs
     allowed_origins_str: str = "http://localhost:5173,http://localhost:3000,https://web-production-20d71.up.railway.app,https://server-production-0b14.up.railway.app"
 
     @property
