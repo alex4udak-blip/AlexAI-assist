@@ -1,7 +1,7 @@
 """Event model."""
 
 import uuid
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 from typing import Any
 
 from sqlalchemy import DateTime, ForeignKey, Index, String, Text
@@ -27,15 +27,15 @@ class Event(Base):
         nullable=False,
     )
     event_type: Mapped[str] = mapped_column(String(50), nullable=False)
-    timestamp: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    timestamp: Mapped[datetime] = mapped_column(DateTime(), nullable=False)
     app_name: Mapped[str | None] = mapped_column(String(255))
     window_title: Mapped[str | None] = mapped_column(Text)
     url: Mapped[str | None] = mapped_column(Text)
     data: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict)
     category: Mapped[str | None] = mapped_column(String(50))
     created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True),
-        default=lambda: datetime.now(UTC)
+        DateTime(),
+        default=lambda: datetime.now(timezone.utc).replace(tzinfo=None)
     )
 
     __table_args__ = (
