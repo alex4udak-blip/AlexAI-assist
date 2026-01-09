@@ -86,6 +86,7 @@ fn main() {
             commands::toggle_collection,
             commands::sync_now,
             commands::open_dashboard,
+            commands::open_settings,
             commands::check_permissions,
             commands::request_permissions,
             commands::get_focus,

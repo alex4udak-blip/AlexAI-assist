@@ -153,3 +153,24 @@ pub fn request_permissions() -> bool {
 pub fn get_focus() -> Option<FocusInfo> {
     get_current_focus()
 }
+
+/// Open settings - for macOS this opens Accessibility preferences
+#[tauri::command]
+pub fn open_settings() -> Result<(), String> {
+    #[cfg(target_os = "macos")]
+    {
+        // Open Privacy & Security > Accessibility settings
+        std::process::Command::new("open")
+            .arg("x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility")
+            .spawn()
+            .map_err(|e| e.to_string())?;
+    }
+
+    #[cfg(not(target_os = "macos"))]
+    {
+        // For other platforms, we could open app settings or system settings
+        println!("Settings not yet implemented for this platform");
+    }
+
+    Ok(())
+}
