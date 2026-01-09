@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion';
-import { useMemo } from 'react';
+import { useMemo, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   // Desktop components
@@ -27,6 +27,8 @@ import { useSuggestions } from '../hooks/usePatterns';
 import { useMutation } from '../hooks/useApi';
 import { api } from '../lib/api';
 import { useIsMobile, useIsTablet } from '../hooks/useMediaQuery';
+import { useEventsCreated } from '../hooks/useWebSocketSync';
+import { useWebSocket } from '../hooks/useWebSocket';
 
 const container = {
   hidden: { opacity: 0 },
@@ -60,11 +62,23 @@ export default function Dashboard() {
   const isMobile = useIsMobile();
   const isTablet = useIsTablet();
 
+  // Connect to WebSocket for real-time updates
+  const { isConnected } = useWebSocket();
+
   const { data: summary } = useAnalyticsSummary();
   const { data: productivity } = useProductivity();
   const { data: timeline, refetch: refetchTimeline } = useTimeline(24);
   const { data: agents, refetch: refetchAgents } = useAgents();
   const { data: suggestions } = useSuggestions({ status: 'pending' });
+
+  // Handle real-time event updates
+  const handleEventsCreated = useCallback(() => {
+    // Refetch timeline and analytics when new events arrive
+    refetchTimeline();
+  }, [refetchTimeline]);
+
+  // Subscribe to real-time events
+  useEventsCreated(handleEventsCreated);
 
   const { mutate: runAgent } = useMutation(api.runAgent);
   const { mutate: enableAgent } = useMutation(api.enableAgent);

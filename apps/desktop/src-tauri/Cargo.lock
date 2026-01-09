@@ -3193,6 +3193,7 @@ dependencies = [
  "reqwest 0.11.27",
  "serde",
  "serde_json",
+ "sysinfo 0.31.4",
  "tauri",
  "tauri-build",
  "tauri-plugin-autostart",
@@ -4895,6 +4896,20 @@ dependencies = [
  "once_cell",
  "rayon",
  "windows 0.52.0",
+]
+
+[[package]]
+name = "sysinfo"
+version = "0.31.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "355dbe4f8799b304b05e1b0f05fc59b2a18d36645cf169607da45bde2f69a1be"
+dependencies = [
+ "core-foundation-sys",
+ "libc",
+ "memchr",
+ "ntapi",
+ "rayon",
+ "windows 0.56.0",
 ]
 
 [[package]]
@@ -6900,7 +6915,7 @@ dependencies = [
  "image",
  "log",
  "percent-encoding",
- "sysinfo",
+ "sysinfo 0.30.13",
  "thiserror 1.0.69",
  "windows 0.54.0",
  "xcb",

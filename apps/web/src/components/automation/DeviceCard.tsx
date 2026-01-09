@@ -1,7 +1,7 @@
 import { Card, CardHeader, CardTitle, CardContent } from '../ui/Card';
 import { Badge } from '../ui/Badge';
 import { truncate } from '../../lib/utils';
-import { Smartphone, Circle } from 'lucide-react';
+import { Smartphone, Circle, Clock } from 'lucide-react';
 
 export interface DeviceStatus {
   device_id: string;
@@ -13,6 +13,11 @@ export interface DeviceStatus {
     screen_recording: boolean;
   };
   last_seen?: string;
+  sync_status?: {
+    last_sync_at: string | null;
+    events_since_sync: number;
+    sync_status: 'connected' | 'disconnected';
+  };
 }
 
 interface DeviceCardProps {
@@ -22,6 +27,28 @@ interface DeviceCardProps {
 }
 
 export function DeviceCard({ device, selected, onClick }: DeviceCardProps) {
+  const getTimeSinceSync = (lastSync: string | null): string => {
+    if (!lastSync) return 'Never';
+    const secondsAgo = Math.floor(
+      (Date.now() - new Date(lastSync).getTime()) / 1000
+    );
+    if (secondsAgo < 60) return `${secondsAgo}s ago`;
+    const minutesAgo = Math.floor(secondsAgo / 60);
+    if (minutesAgo < 60) return `${minutesAgo}m ago`;
+    const hoursAgo = Math.floor(minutesAgo / 60);
+    return `${hoursAgo}h ago`;
+  };
+
+  const getSyncStatusColor = (lastSync: string | null): string => {
+    if (!lastSync) return 'text-status-error';
+    const secondsAgo = Math.floor(
+      (Date.now() - new Date(lastSync).getTime()) / 1000
+    );
+    if (secondsAgo < 60) return 'text-status-success';
+    if (secondsAgo < 300) return 'text-status-warning';
+    return 'text-status-error';
+  };
+
   return (
     <Card
       variant={selected ? 'elevated' : 'interactive'}
@@ -69,6 +96,28 @@ export function DeviceCard({ device, selected, onClick }: DeviceCardProps) {
             {device.queue_size} commands
           </p>
         </div>
+
+        {/* Sync Status */}
+        {device.sync_status && (
+          <div>
+            <span className="text-xs text-text-tertiary">Last Sync</span>
+            <div className="flex items-center gap-2 mt-0.5">
+              <Clock
+                className={`w-3 h-3 ${getSyncStatusColor(
+                  device.sync_status.last_sync_at
+                )}`}
+              />
+              <p className="text-sm text-text-secondary">
+                {getTimeSinceSync(device.sync_status.last_sync_at)}
+              </p>
+              {device.sync_status.events_since_sync > 0 && (
+                <Badge variant="warning" className="text-xs">
+                  {device.sync_status.events_since_sync} pending
+                </Badge>
+              )}
+            </div>
+          </div>
+        )}
 
         {/* Permissions */}
         <div>

@@ -10,8 +10,9 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.api.deps import get_db_session
-from src.core.websocket import broadcast_event
+from src.core.websocket import broadcast_events_batch
 from src.db.models import Device, Event
+from src.services.session_tracker import SessionTracker
 
 
 def normalize_datetime(dt: datetime | None) -> datetime | None:
@@ -28,6 +29,7 @@ def normalize_datetime(dt: datetime | None) -> datetime | None:
     return dt
 
 router = APIRouter()
+session_tracker = SessionTracker()
 
 
 class EventCreate(BaseModel):
@@ -127,7 +129,8 @@ async def create_events(
 
         device.last_seen_at = datetime.now(timezone.utc).replace(tzinfo=None)
 
-    # Create events
+    # Create events and track sessions
+    session_events = []
     for event_data in batch.events:
         event = Event(
             device_id=event_data.device_id,
@@ -143,13 +146,47 @@ async def create_events(
 
     await db.commit()
 
-    # Broadcast new events to WebSocket clients
-    await broadcast_event("events_created", {
-        "count": len(batch.events),
-        "device_ids": list(device_ids),
-    })
+    # Process events for session tracking
+    # Note: Events are processed in order by timestamp
+    sorted_events = sorted(batch.events, key=lambda e: e.timestamp)
+    for event_data in sorted_events:
+        # Fetch the created event from database
+        result = await db.execute(
+            select(Event)
+            .where(Event.device_id == event_data.device_id)
+            .where(Event.timestamp == normalize_datetime(event_data.timestamp))
+            .order_by(Event.created_at.desc())
+            .limit(1)
+        )
+        event = result.scalar_one_or_none()
 
-    return {"created": len(batch.events)}
+        if event:
+            # Process event for session tracking
+            session_event = await session_tracker.process_event(event, db)
+            if session_event:
+                session_events.append(session_event)
+
+    # Broadcast new events to WebSocket clients
+    # Convert events to dict format for JSON serialization
+    events_data = [
+        {
+            "device_id": e.device_id,
+            "event_type": e.event_type,
+            "timestamp": e.timestamp.isoformat() if e.timestamp else None,
+            "app_name": e.app_name,
+            "window_title": e.window_title,
+            "url": e.url,
+            "category": e.category,
+            "data": e.data,
+        }
+        for e in batch.events
+    ]
+    await broadcast_events_batch(events_data, list(device_ids))
+
+    return {
+        "created": len(batch.events),
+        "session_events": session_events,
+    }
 
 
 @router.get("", response_model=list[EventResponse])

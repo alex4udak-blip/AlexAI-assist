@@ -1,6 +1,6 @@
 """WebSocket management module."""
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from fastapi import WebSocket
@@ -26,3 +26,29 @@ async def broadcast_event(event_type: str, data: dict) -> None:
     # Clean up disconnected clients
     for ws in disconnected:
         active_connections.discard(ws)
+
+
+async def broadcast_device_update(device_id: str, status: dict[str, Any]) -> None:
+    """Broadcast device status update to all connected clients."""
+    await broadcast_event("device_updated", {
+        "device_id": device_id,
+        "status": status,
+    })
+
+
+async def broadcast_command_result(command_id: str, device_id: str, result: dict[str, Any]) -> None:
+    """Broadcast command execution result to all connected clients."""
+    await broadcast_event("command_result", {
+        "command_id": command_id,
+        "device_id": device_id,
+        "result": result,
+    })
+
+
+async def broadcast_events_batch(events: list[dict[str, Any]], device_ids: list[str]) -> None:
+    """Broadcast new events batch to all connected clients."""
+    await broadcast_event("events_created", {
+        "count": len(events),
+        "device_ids": device_ids,
+        "events": events[:10],  # Send first 10 events for preview
+    })

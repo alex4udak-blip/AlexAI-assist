@@ -1,6 +1,7 @@
 """Agent suggester service for pattern-based automation suggestions."""
 
 import json
+import os
 from collections import Counter, defaultdict
 from datetime import datetime, timedelta, timezone
 from typing import Any
@@ -24,15 +25,39 @@ def utc_now() -> datetime:
 class AgentSuggester:
     """Analyze patterns and suggest automation agents."""
 
-    # Thresholds for pattern detection
-    MIN_SEQUENCE_OCCURRENCES = 3
-    MIN_TIME_PATTERN_OCCURRENCES = 5
-    MIN_SWITCH_FREQUENCY = 10
-    LOOKBACK_DAYS = 14
+    # Default thresholds for pattern detection (more aggressive for faster agent creation)
+    DEFAULT_MIN_SEQUENCE_OCCURRENCES = 2
+    DEFAULT_MIN_TIME_PATTERN_OCCURRENCES = 3
+    DEFAULT_MIN_SWITCH_FREQUENCY = 5
+    DEFAULT_LOOKBACK_DAYS = 3
 
     def __init__(self, ai_router: AIRouter):
         """Initialize with AI router for generating suggestions."""
         self.ai_router = ai_router
+
+        # Load configurable thresholds from environment variables
+        self.MIN_SEQUENCE_OCCURRENCES = int(
+            os.getenv("AGENT_MIN_SEQUENCE_OCCURRENCES", self.DEFAULT_MIN_SEQUENCE_OCCURRENCES)
+        )
+        self.MIN_TIME_PATTERN_OCCURRENCES = int(
+            os.getenv("AGENT_MIN_TIME_PATTERN_OCCURRENCES", self.DEFAULT_MIN_TIME_PATTERN_OCCURRENCES)
+        )
+        self.MIN_SWITCH_FREQUENCY = int(
+            os.getenv("AGENT_MIN_SWITCH_FREQUENCY", self.DEFAULT_MIN_SWITCH_FREQUENCY)
+        )
+        self.LOOKBACK_DAYS = int(
+            os.getenv("AGENT_LOOKBACK_DAYS", self.DEFAULT_LOOKBACK_DAYS)
+        )
+
+        logger.info(
+            "AgentSuggester initialized with thresholds",
+            extra={
+                "lookback_days": self.LOOKBACK_DAYS,
+                "min_sequence_occurrences": self.MIN_SEQUENCE_OCCURRENCES,
+                "min_time_pattern_occurrences": self.MIN_TIME_PATTERN_OCCURRENCES,
+                "min_switch_frequency": self.MIN_SWITCH_FREQUENCY,
+            },
+        )
 
     async def analyze_and_suggest(
         self,
@@ -123,7 +148,7 @@ class AgentSuggester:
                         "type": "app_sequence",
                         "sequence": sequence,
                         "occurrences": count,
-                        "confidence": min(count / 10, 1.0),
+                        "confidence": min(count / 5, 1.0),  # More aggressive: 5 occurrences = 100% confidence
                         "data": {"apps": sequence},
                     }
                 )
@@ -205,7 +230,7 @@ class AgentSuggester:
                             and e["timestamp"].hour == hour
                         )
                     )
-                    confidence = min(days_active / 7, 1.0)
+                    confidence = min(days_active / 3, 1.0)  # More aggressive: 3 days = 100% confidence
 
                     patterns.append(
                         {
@@ -242,7 +267,7 @@ class AgentSuggester:
         for from_app, to_apps in switches.items():
             for to_app, count in to_apps.items():
                 if count >= self.MIN_SWITCH_FREQUENCY:
-                    confidence = min(count / 20, 1.0)
+                    confidence = min(count / 10, 1.0)  # More aggressive: 10 switches = 100% confidence
                     patterns.append(
                         {
                             "type": "switch_pattern",

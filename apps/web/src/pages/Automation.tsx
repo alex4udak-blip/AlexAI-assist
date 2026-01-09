@@ -1,5 +1,6 @@
 import { motion } from 'framer-motion';
 import { AutomationPanel } from '../components/automation/AutomationPanel';
+import { AuditLogList } from '../components/automation/AuditLogList';
 
 const container = {
   hidden: { opacity: 0 },
@@ -33,6 +34,10 @@ export default function Automation() {
 
       <motion.div variants={item}>
         <AutomationPanel />
+      </motion.div>
+
+      <motion.div variants={item}>
+        <AuditLogList />
       </motion.div>
     </motion.div>
   );

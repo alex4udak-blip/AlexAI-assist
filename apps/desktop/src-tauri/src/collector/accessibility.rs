@@ -92,9 +92,7 @@ pub mod macos {
     const K_AX_TITLE_ATTRIBUTE: &str = "AXTitle";
     const K_AX_FOCUSED_UI_ELEMENT_ATTRIBUTE: &str = "AXFocusedUIElement";
     const K_AX_SELECTED_TEXT_ATTRIBUTE: &str = "AXSelectedText";
-    #[allow(dead_code)]
     const K_AX_VALUE_ATTRIBUTE: &str = "AXValue";
-    #[allow(dead_code)]
     const K_AX_ROLE_ATTRIBUTE: &str = "AXRole";
 
     /// Get information about the currently focused UI element (internal implementation)
@@ -378,6 +376,197 @@ pub mod macos {
         run_on_main_thread(|| get_browser_url_impl())
     }
 
+    /// Get the value of the currently focused text field (internal implementation)
+    /// This captures what the user is typing in any text field, including browser inputs
+    ///
+    /// # Thread Safety
+    /// This function must be called from the main thread only.
+    ///
+    /// # Safety
+    /// Uses unsafe FFI calls to Core Foundation and Accessibility APIs
+    fn get_focused_text_field_value_impl() -> Option<String> {
+        assert_main_thread();
+
+        unsafe {
+            let system_wide = AXUIElementCreateSystemWide();
+            if system_wide.is_null() {
+                return None;
+            }
+
+            // Get focused application
+            let attr_name = CFString::new(K_AX_FOCUSED_APPLICATION_ATTRIBUTE);
+            let mut focused_app: *mut c_void = std::ptr::null_mut();
+
+            let result = AXUIElementCopyAttributeValue(
+                system_wide,
+                attr_name.as_concrete_TypeRef() as *const c_void,
+                &mut focused_app,
+            );
+
+            CFRelease(system_wide);
+
+            if result != K_AX_ERROR_SUCCESS || focused_app.is_null() {
+                return None;
+            }
+
+            // Get focused UI element
+            let focused_attr = CFString::new(K_AX_FOCUSED_UI_ELEMENT_ATTRIBUTE);
+            let mut focused_element: *mut c_void = std::ptr::null_mut();
+
+            let element_result = AXUIElementCopyAttributeValue(
+                focused_app,
+                focused_attr.as_concrete_TypeRef() as *const c_void,
+                &mut focused_element,
+            );
+
+            CFRelease(focused_app);
+
+            if element_result != K_AX_ERROR_SUCCESS || focused_element.is_null() {
+                return None;
+            }
+
+            // Get the role to check if it's a text field
+            let role_attr = CFString::new(K_AX_ROLE_ATTRIBUTE);
+            let mut role_value: *mut c_void = std::ptr::null_mut();
+
+            let role_result = AXUIElementCopyAttributeValue(
+                focused_element,
+                role_attr.as_concrete_TypeRef() as *const c_void,
+                &mut role_value,
+            );
+
+            if role_result == K_AX_ERROR_SUCCESS && !role_value.is_null() {
+                let cf_string = CFString::wrap_under_create_rule(role_value as _);
+                let role = cf_string.to_string();
+
+                // Check if it's a text input element
+                let is_text_field = role.contains("TextField")
+                    || role.contains("TextArea")
+                    || role.contains("SearchField")
+                    || role.contains("ComboBox");
+
+                if !is_text_field {
+                    CFRelease(focused_element);
+                    return None;
+                }
+            } else {
+                if !role_value.is_null() {
+                    CFRelease(role_value);
+                }
+                CFRelease(focused_element);
+                return None;
+            }
+
+            // Get the value of the text field
+            let value_attr = CFString::new(K_AX_VALUE_ATTRIBUTE);
+            let mut value: *mut c_void = std::ptr::null_mut();
+
+            let value_result = AXUIElementCopyAttributeValue(
+                focused_element,
+                value_attr.as_concrete_TypeRef() as *const c_void,
+                &mut value,
+            );
+
+            CFRelease(focused_element);
+
+            if value_result == K_AX_ERROR_SUCCESS && !value.is_null() {
+                let cf_string = CFString::wrap_under_create_rule(value as _);
+                let text = cf_string.to_string();
+                if !text.is_empty() {
+                    return Some(text);
+                }
+            } else if !value.is_null() {
+                CFRelease(value);
+            }
+
+            None
+        }
+    }
+
+    /// Get the value of the currently focused text field
+    /// This captures what the user is typing in any text field, including browser inputs
+    ///
+    /// # Thread Safety
+    /// This function is thread-safe. It can be called from any thread.
+    /// If not on the main thread, it will automatically dispatch to the main thread.
+    pub fn get_focused_text_field_value() -> Option<String> {
+        run_on_main_thread(|| get_focused_text_field_value_impl())
+    }
+
+    /// Get browser input data including the current text being typed
+    /// Returns (url, typed_text) if in a browser with a focused text field
+    ///
+    /// # Thread Safety
+    /// This function is thread-safe. It can be called from any thread.
+    /// If not on the main thread, it will automatically dispatch to the main thread.
+    pub fn get_browser_input() -> Option<(Option<String>, String)> {
+        run_on_main_thread(|| {
+            // First check if we're in a browser
+            let system_wide = unsafe { AXUIElementCreateSystemWide() };
+            if system_wide.is_null() {
+                return None;
+            }
+
+            unsafe {
+                let attr_name = CFString::new(K_AX_FOCUSED_APPLICATION_ATTRIBUTE);
+                let mut focused_app: *mut c_void = std::ptr::null_mut();
+
+                let result = AXUIElementCopyAttributeValue(
+                    system_wide,
+                    attr_name.as_concrete_TypeRef() as *const c_void,
+                    &mut focused_app,
+                );
+
+                CFRelease(system_wide);
+
+                if result != K_AX_ERROR_SUCCESS || focused_app.is_null() {
+                    return None;
+                }
+
+                // Get app name to check if it's a browser
+                let title_attr = CFString::new(K_AX_TITLE_ATTRIBUTE);
+                let mut title_value: *mut c_void = std::ptr::null_mut();
+
+                let title_result = AXUIElementCopyAttributeValue(
+                    focused_app,
+                    title_attr.as_concrete_TypeRef() as *const c_void,
+                    &mut title_value,
+                );
+
+                let app_name = if title_result == K_AX_ERROR_SUCCESS && !title_value.is_null() {
+                    let cf_string = CFString::wrap_under_create_rule(title_value as _);
+                    cf_string.to_string().to_lowercase()
+                } else {
+                    if !title_value.is_null() {
+                        CFRelease(title_value);
+                    }
+                    CFRelease(focused_app);
+                    return None;
+                };
+
+                CFRelease(focused_app);
+
+                // Check if it's a browser
+                let is_browser = app_name.contains("chrome")
+                    || app_name.contains("safari")
+                    || app_name.contains("firefox")
+                    || app_name.contains("edge")
+                    || app_name.contains("arc")
+                    || app_name.contains("brave");
+
+                if !is_browser {
+                    return None;
+                }
+
+                // Get the URL and text field value
+                let url = get_browser_url_impl();
+                let text_value = get_focused_text_field_value_impl();
+
+                text_value.map(|text| (url, text))
+            }
+        })
+    }
+
     /// Check if the app has accessibility permission
     ///
     /// # Thread Safety
@@ -489,6 +678,16 @@ pub mod macos {
 
     /// Get the current URL from browser (if focused)
     pub fn get_browser_url() -> Option<String> {
+        None
+    }
+
+    /// Get the value of the currently focused text field
+    pub fn get_focused_text_field_value() -> Option<String> {
+        None
+    }
+
+    /// Get browser input data including the current text being typed
+    pub fn get_browser_input() -> Option<(Option<String>, String)> {
         None
     }
 

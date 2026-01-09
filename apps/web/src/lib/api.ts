@@ -145,6 +145,10 @@ export const api = {
     fetchApi<ChatMessage[]>('/api/v1/chat/history', {
       params: { session_id: sessionId },
     }),
+
+  // Audit Logs
+  getAuditLogs: (params?: QueryParams) =>
+    fetchApi<AuditLog[]>('/api/v1/automation/audit-logs', { params }),
 };
 
 // Types
@@ -316,4 +320,18 @@ export interface ChatMessage {
   role: 'user' | 'assistant';
   content: string;
   timestamp: string;
+}
+
+export interface AuditLog {
+  id: string;
+  timestamp: string;
+  action_type: string;
+  actor: string;
+  device_id: string | null;
+  command_type: string | null;
+  command_params: Record<string, unknown> | null;
+  result: string;
+  error_message: string | null;
+  duration_ms: number | null;
+  ip_address: string | null;
 }

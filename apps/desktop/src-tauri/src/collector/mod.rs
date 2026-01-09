@@ -4,11 +4,13 @@ mod browser;
 mod messenger;
 #[allow(dead_code)]
 mod screenshots;
+mod system_metrics;
 
 pub use accessibility::macos::*;
 // Only export types that are actually used in Event struct
 pub use browser::BrowserTab;
 pub use messenger::Message;
+pub use system_metrics::{SystemMetrics, SystemMetricsCollector};
 
 use crate::AppState;
 use chrono::{DateTime, Utc};
@@ -43,6 +45,10 @@ pub struct Event {
     pub browser_tab: Option<BrowserTab>,
     pub messages: Option<Vec<Message>>,
     pub screenshot_path: Option<String>,
+    // System metrics
+    pub system_metrics: Option<SystemMetrics>,
+    // Browser input capture (text being typed)
+    pub typed_text: Option<String>,
 }
 
 impl Event {
@@ -64,6 +70,8 @@ impl Event {
             browser_tab: None,
             messages: None,
             screenshot_path: None,
+            system_metrics: None,
+            typed_text: None,
         }
     }
 
@@ -130,6 +138,10 @@ pub async fn start_collector(
 ) {
     let mut last_app: Option<String> = None;
     let mut last_title: Option<String> = None;
+    let mut last_typed_text: Option<String> = None;
+
+    // Initialize system metrics collector
+    let metrics_collector = SystemMetricsCollector::new();
 
     // Check accessibility permission on start
     if !has_accessibility_permission() {
@@ -176,6 +188,11 @@ pub async fn start_collector(
                         )
                         .with_category(categorize_app(app_name));
 
+                        // Collect system metrics
+                        if let Ok(metrics) = metrics_collector.collect() {
+                            event.system_metrics = Some(metrics);
+                        }
+
                         // Add URL if available from accessibility API
                         if let Some(ref info) = focus_info {
                             event.url = info.url.clone();
@@ -188,6 +205,30 @@ pub async fn start_collector(
                                     });
                                 }
                             }
+                        }
+
+                        // Capture browser input if in a browser
+                        let app_lower = app_name.to_lowercase();
+                        let is_browser = app_lower.contains("chrome")
+                            || app_lower.contains("safari")
+                            || app_lower.contains("firefox")
+                            || app_lower.contains("edge")
+                            || app_lower.contains("arc")
+                            || app_lower.contains("brave");
+
+                        if is_browser {
+                            if let Some((url, typed_text)) = get_browser_input() {
+                                // Only update if text has changed
+                                if Some(&typed_text) != last_typed_text.as_ref() {
+                                    event.typed_text = Some(typed_text.clone());
+                                    event.url = url.or(event.url);
+                                    last_typed_text = Some(typed_text);
+                                }
+                            } else {
+                                last_typed_text = None;
+                            }
+                        } else {
+                            last_typed_text = None;
                         }
 
                         // Add to buffer with bounds checking
@@ -225,8 +266,75 @@ pub async fn start_collector(
                         state.events_today += 1;
                     }
 
-                    last_app = current_app;
-                    last_title = current_title;
+                    last_app = current_app.clone();
+                    last_title = current_title.clone();
+                } else {
+                    // No focus change, but check for browser input changes
+                    if let Some(app_name) = &current_app {
+                        let app_lower = app_name.to_lowercase();
+                        let is_browser = app_lower.contains("chrome")
+                            || app_lower.contains("safari")
+                            || app_lower.contains("firefox")
+                            || app_lower.contains("edge")
+                            || app_lower.contains("arc")
+                            || app_lower.contains("brave");
+
+                        if is_browser {
+                            if let Some((url, typed_text)) = get_browser_input() {
+                                // Only create event if text has changed
+                                if Some(&typed_text) != last_typed_text.as_ref() && !typed_text.is_empty() {
+                                    let mut event = Event::new(
+                                        "browser_input",
+                                        current_app.clone(),
+                                        current_title.clone(),
+                                    )
+                                    .with_category("browsing");
+
+                                    // Collect system metrics
+                                    if let Ok(metrics) = metrics_collector.collect() {
+                                        event.system_metrics = Some(metrics);
+                                    }
+
+                                    event.typed_text = Some(typed_text.clone());
+                                    event.url = url;
+                                    last_typed_text = Some(typed_text);
+
+                                    // Add to buffer with bounds checking
+                                    let mut state = state.lock().await;
+
+                                    let buffer_size = state.events_buffer.len();
+
+                                    if buffer_size >= crate::MAX_BUFFER_SIZE {
+                                        state.events_buffer.remove(0);
+                                        eprintln!(
+                                            "Warning: Event buffer full ({} events). Dropping oldest event.",
+                                            crate::MAX_BUFFER_SIZE
+                                        );
+                                    }
+
+                                    if buffer_size >= crate::BUFFER_WARNING_THRESHOLD && !state.buffer_warnings_logged {
+                                        eprintln!(
+                                            "Warning: Event buffer is {}% full ({}/{} events). Events may be lost if sync continues to fail.",
+                                            (buffer_size * 100) / crate::MAX_BUFFER_SIZE,
+                                            buffer_size,
+                                            crate::MAX_BUFFER_SIZE
+                                        );
+                                        state.buffer_warnings_logged = true;
+                                    }
+
+                                    if buffer_size < crate::BUFFER_WARNING_THRESHOLD / 2 {
+                                        state.buffer_warnings_logged = false;
+                                    }
+
+                                    state.events_buffer.push(event);
+                                    state.events_today += 1;
+                                }
+                            } else if last_typed_text.is_some() {
+                                // Typed text cleared or focus left text field
+                                last_typed_text = None;
+                            }
+                        }
+                    }
                 }
             }
         }
