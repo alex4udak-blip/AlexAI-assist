@@ -143,9 +143,23 @@ pub async fn start_collector(
     // Initialize system metrics collector
     let metrics_collector = SystemMetricsCollector::new();
 
-    // Check accessibility permission on start
-    if !has_accessibility_permission() {
-        eprintln!("Warning: Accessibility permission not granted. Some features will be limited.");
+    // Request accessibility and screen recording permissions on start
+    #[cfg(target_os = "macos")]
+    {
+        use crate::automation::{request_accessibility, request_screen_recording};
+
+        if !has_accessibility_permission() {
+            println!("Requesting accessibility permission...");
+            let granted = request_accessibility();
+            if granted {
+                println!("Accessibility permission granted!");
+            } else {
+                eprintln!("Warning: Accessibility permission not granted. Some features will be limited.");
+            }
+        }
+
+        // Also request screen recording permission
+        request_screen_recording();
     }
 
     println!("Collector started. Waiting for events...");

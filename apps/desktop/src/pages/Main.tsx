@@ -65,6 +65,14 @@ export default function Main() {
     }
   };
 
+  const openSettings = async () => {
+    try {
+      await invoke('open_settings');
+    } catch (e) {
+      console.error('Failed to open settings:', e);
+    }
+  };
+
   const formatTime = (minutes: number) => {
     const hours = Math.floor(minutes / 60);
     const mins = minutes % 60;
@@ -81,9 +89,8 @@ export default function Main() {
         {/* Traffic lights space (macOS native buttons) */}
         <div className="w-20" />
 
-        {/* Center - App title with icon */}
+        {/* Center - App title with status */}
         <div className="flex-1 flex items-center justify-center gap-2">
-          <Eye className="w-4 h-4 text-violet-400" />
           <span className="text-sm font-medium text-text-secondary">Observer</span>
           <span
             className={`w-1.5 h-1.5 rounded-full ${
@@ -108,7 +115,11 @@ export default function Main() {
               <Play className="w-4 h-4" />
             )}
           </button>
-          <button className="p-1.5 text-text-tertiary hover:text-text-primary hover:bg-bg-hover rounded-md transition-colors">
+          <button
+            onClick={openSettings}
+            className="p-1.5 text-text-tertiary hover:text-text-primary hover:bg-bg-hover rounded-md transition-colors"
+            title="Настройки"
+          >
             <Settings className="w-4 h-4" />
           </button>
         </div>
