@@ -16,17 +16,25 @@
       {
         "label": "main",
         "title": "Observer",
-        "width": 320,
-        "height": 440,
+        "width": 900,
+        "height": 680,
+        "minWidth": 600,
+        "minHeight": 500,
         "visible": true,
-        "resizable": false,
-        "decorations": false,
-        "transparent": true,
-        "skipTaskbar": true,
-        "alwaysOnTop": true,
-        "center": true
+        "resizable": true,
+        "decorations": true,
+        "transparent": false,
+        "skipTaskbar": false,
+        "alwaysOnTop": false,
+        "center": true,
+        "titleBarStyle": "Transparent",
+        "hiddenTitle": true
       }
     ],
+    "trayIcon": {
+      "iconPath": "icons/icon.png",
+      "iconAsTemplate": true
+    },
     "security": {
       "csp": "default-src 'self' tauri:; script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src 'self' https://*.railway.app http://localhost:* ws://localhost:*; img-src 'self' data: https:; font-src 'self'"
     }
@@ -34,12 +42,13 @@
   "bundle": {
     "active": true,
     "targets": "all",
-    "shortDescription": "Activity monitoring for productivity insights",
+    "shortDescription": "AI-powered personal assistant that observes and automates",
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",
       "icons/128x128@2x.png",
-      "icons/icon.icns"
+      "icons/icon.icns",
+      "icons/icon.png"
     ],
     "macOS": {
       "entitlements": "entitlements.plist",

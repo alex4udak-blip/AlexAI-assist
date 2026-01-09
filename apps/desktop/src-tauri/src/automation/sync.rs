@@ -124,12 +124,6 @@ impl AutomationSync {
             *writer = Some(write);
         }
 
-        // Get a reference to use locally
-        let mut write = {
-            let writer = self.ws_writer.lock().await;
-            writer.as_ref().unwrap().clone()
-        };
-
         // Update connection status
         {
             let mut connected = self.is_connected.lock().await;
@@ -144,14 +138,16 @@ impl AutomationSync {
             let json = serde_json::to_string(&auth_msg)
                 .map_err(|e| format!("Failed to serialize auth: {}", e))?;
 
-            write
-                .send(Message::Text(json))
-                .await
-                .map_err(|e| format!("Failed to send auth: {}", e))?;
+            let mut writer = self.ws_writer.lock().await;
+            if let Some(w) = writer.as_mut() {
+                w.send(Message::Text(json))
+                    .await
+                    .map_err(|e| format!("Failed to send auth: {}", e))?;
+            }
         }
 
-        // Spawn ping task
-        let mut write_clone = write.clone();
+        // Spawn ping task using Arc reference to ws_writer
+        let ws_writer_clone = Arc::clone(&self.ws_writer);
         tokio::spawn(async move {
             loop {
                 sleep(PING_INTERVAL).await;
@@ -161,7 +157,12 @@ impl AutomationSync {
                 };
 
                 if let Ok(json) = serde_json::to_string(&ping_msg) {
-                    if write_clone.send(Message::Text(json)).await.is_err() {
+                    let mut writer = ws_writer_clone.lock().await;
+                    if let Some(w) = writer.as_mut() {
+                        if w.send(Message::Text(json)).await.is_err() {
+                            break;
+                        }
+                    } else {
                         break;
                     }
                 }
@@ -172,7 +173,7 @@ impl AutomationSync {
         while let Some(msg) = read.next().await {
             match msg {
                 Ok(Message::Text(text)) => {
-                    if let Err(e) = self.handle_message(&text, &mut write).await {
+                    if let Err(e) = self.handle_message(&text).await {
                         eprintln!("Error handling message: {}", e);
                     }
                 }
@@ -181,7 +182,10 @@ impl AutomationSync {
                     break;
                 }
                 Ok(Message::Ping(data)) => {
-                    let _ = write.send(Message::Pong(data)).await;
+                    let mut writer = self.ws_writer.lock().await;
+                    if let Some(w) = writer.as_mut() {
+                        let _ = w.send(Message::Pong(data)).await;
+                    }
                 }
                 Err(e) => {
                     eprintln!("WebSocket error: {}", e);
@@ -204,12 +208,6 @@ impl AutomationSync {
     async fn handle_message(
         &self,
         text: &str,
-        write: &mut futures_util::stream::SplitSink<
-            tokio_tungstenite::WebSocketStream<
-                tokio_tungstenite::MaybeTlsStream<tokio::net::TcpStream>,
-            >,
-            Message,
-        >,
     ) -> Result<(), String> {
         let msg: WsMessage = serde_json::from_str(text)
             .map_err(|e| format!("Failed to parse message: {}", e))?;

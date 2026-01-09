@@ -1,7 +1,6 @@
 /// Notification management module
 /// Uses tauri_plugin_notification for cross-platform notifications
 
-use tauri::Manager;
 use tauri_plugin_notification::NotificationExt;
 use serde::{Serialize, Deserialize};
 
@@ -31,16 +30,14 @@ pub fn send_notification(
 ) -> Result<(), String> {
     let notification = app.notification();
 
-    let mut builder = notification.builder()
+    // Note: Action buttons are not supported in tauri_plugin_notification
+    // The action field in config is stored for potential future use
+    let _action = config.action; // Suppress unused warning
+
+    notification.builder()
         .title(config.title)
-        .body(config.body);
-
-    // Add action button if specified
-    if let Some(action) = config.action {
-        builder = builder.action(&action);
-    }
-
-    builder.show()
+        .body(config.body)
+        .show()
         .map_err(|e| format!("Failed to show notification: {}", e))?;
 
     Ok(())

@@ -1,19 +1,19 @@
 /// Input automation module for mouse and keyboard control
-/// Uses enigo library with singleton pattern for optimization
+/// Uses enigo library for cross-platform input simulation
 
 use enigo::{Enigo, Settings, Mouse, Keyboard, Direction, Key, Button};
-use once_cell::sync::Lazy;
-use std::sync::Mutex;
 
-/// Global singleton instance of Enigo for optimized performance
-static ENIGO: Lazy<Mutex<Enigo>> = Lazy::new(|| {
+/// Create a new Enigo instance
+/// Note: Enigo is not thread-safe (CGEventSource is not Send),
+/// so we create a new instance per operation
+fn create_enigo() -> Result<Enigo, String> {
     let settings = Settings::default();
-    Mutex::new(Enigo::new(&settings).expect("Failed to create Enigo instance"))
-});
+    Enigo::new(&settings).map_err(|e| format!("Failed to create Enigo instance: {}", e))
+}
 
 /// Click at specific screen coordinates
 pub fn click_at(x: i32, y: i32, button: MouseButton) -> Result<(), String> {
-    let mut enigo = ENIGO.lock().map_err(|e| format!("Failed to lock enigo: {}", e))?;
+    let mut enigo = create_enigo()?;
 
     // Move to position
     enigo.move_mouse(x, y, enigo::Coordinate::Abs)
@@ -34,7 +34,7 @@ pub fn click_at(x: i32, y: i32, button: MouseButton) -> Result<(), String> {
 
 /// Type text at current cursor position
 pub fn type_text(text: &str) -> Result<(), String> {
-    let mut enigo = ENIGO.lock().map_err(|e| format!("Failed to lock enigo: {}", e))?;
+    let mut enigo = create_enigo()?;
 
     enigo.text(text)
         .map_err(|e| format!("Failed to type text: {}", e))?;
@@ -44,7 +44,7 @@ pub fn type_text(text: &str) -> Result<(), String> {
 
 /// Press a keyboard hotkey (e.g., Command+C, Control+V)
 pub fn press_hotkey(modifiers: &[Modifier], key: &str) -> Result<(), String> {
-    let mut enigo = ENIGO.lock().map_err(|e| format!("Failed to lock enigo: {}", e))?;
+    let mut enigo = create_enigo()?;
 
     // Press modifiers
     for modifier in modifiers {
@@ -80,7 +80,7 @@ pub fn press_hotkey(modifiers: &[Modifier], key: &str) -> Result<(), String> {
 
 /// Move mouse to coordinates without clicking
 pub fn move_mouse(x: i32, y: i32) -> Result<(), String> {
-    let mut enigo = ENIGO.lock().map_err(|e| format!("Failed to lock enigo: {}", e))?;
+    let mut enigo = create_enigo()?;
 
     enigo.move_mouse(x, y, enigo::Coordinate::Abs)
         .map_err(|e| format!("Failed to move mouse: {}", e))?;
@@ -90,7 +90,7 @@ pub fn move_mouse(x: i32, y: i32) -> Result<(), String> {
 
 /// Scroll the mouse wheel
 pub fn scroll(amount: i32, axis: ScrollAxis) -> Result<(), String> {
-    let mut enigo = ENIGO.lock().map_err(|e| format!("Failed to lock enigo: {}", e))?;
+    let mut enigo = create_enigo()?;
 
     match axis {
         ScrollAxis::Vertical => {

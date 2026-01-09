@@ -49,7 +49,6 @@ pub fn extract_text_from_path(path: &str) -> Result<OcrResult, String> {
 #[cfg(target_os = "macos")]
 fn extract_text_macos(image: &RgbaImage) -> Result<OcrResult, String> {
     use std::process::Command;
-    use std::io::Write;
 
     // Save image to temporary file
     let temp_dir = std::env::temp_dir();

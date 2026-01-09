@@ -49,7 +49,7 @@ impl SystemMetricsCollector {
         system.refresh_memory();
 
         // Calculate CPU usage (average across all cores)
-        let cpu_usage = system.global_cpu_info().cpu_usage();
+        let cpu_usage = system.global_cpu_usage();
 
         // Get memory information
         let ram_used = system.used_memory();

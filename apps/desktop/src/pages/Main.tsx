@@ -9,6 +9,7 @@ import {
   Clock,
   Monitor,
   BarChart3,
+  Eye,
 } from 'lucide-react';
 import { invoke } from '@tauri-apps/api/core';
 
@@ -71,13 +72,54 @@ export default function Main() {
   };
 
   return (
-    <div className="min-h-screen bg-bg-primary">
-      {/* Header */}
-      <header className="bg-bg-secondary border-b border-border-subtle p-4">
+    <div className="min-h-screen bg-bg-primary flex flex-col">
+      {/* macOS Style Titlebar - draggable area */}
+      <div
+        data-tauri-drag-region
+        className="h-12 bg-bg-secondary/80 backdrop-blur-xl border-b border-border-subtle flex items-center px-4 shrink-0"
+      >
+        {/* Traffic lights space (macOS native buttons) */}
+        <div className="w-20" />
+
+        {/* Center - App title with icon */}
+        <div className="flex-1 flex items-center justify-center gap-2">
+          <Eye className="w-4 h-4 text-violet-400" />
+          <span className="text-sm font-medium text-text-secondary">Observer</span>
+          <span
+            className={`w-1.5 h-1.5 rounded-full ${
+              stats.status === 'collecting'
+                ? 'bg-status-success'
+                : stats.status === 'syncing'
+                ? 'bg-status-info animate-pulse'
+                : 'bg-status-warning'
+            }`}
+          />
+        </div>
+
+        {/* Right side actions */}
+        <div className="w-20 flex items-center justify-end gap-1">
+          <button
+            onClick={toggleCollection}
+            className="p-1.5 text-text-tertiary hover:text-text-primary hover:bg-bg-hover rounded-md transition-colors"
+          >
+            {stats.status === 'collecting' ? (
+              <Pause className="w-4 h-4" />
+            ) : (
+              <Play className="w-4 h-4" />
+            )}
+          </button>
+          <button className="p-1.5 text-text-tertiary hover:text-text-primary hover:bg-bg-hover rounded-md transition-colors">
+            <Settings className="w-4 h-4" />
+          </button>
+        </div>
+      </div>
+
+      {/* Main Header */}
+      <header className="bg-bg-secondary border-b border-border-subtle p-4 shrink-0">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-accent-gradient flex items-center justify-center">
-              <Activity className="w-5 h-5 text-white" />
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-violet-400 to-violet-600 flex items-center justify-center shadow-lg shadow-violet-500/20">
+              <Eye className="w-5 h-5 text-white" />
             </div>
             <div>
               <h1 className="text-lg font-bold text-text-primary">Observer</h1>
@@ -92,106 +134,158 @@ export default function Main() {
                   }`}
                 />
                 <span className="text-xs text-text-tertiary capitalize">
-                  {stats.status === 'collecting' ? 'Сбор' : stats.status === 'paused' ? 'Пауза' : 'Синхронизация'}
+                  {stats.status === 'collecting' ? 'Сбор данных' : stats.status === 'paused' ? 'Пауза' : 'Синхронизация'}
                 </span>
               </div>
             </div>
           </div>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={toggleCollection}
-              className="p-2 text-text-secondary hover:text-text-primary hover:bg-bg-hover rounded-lg transition-colors"
-            >
-              {stats.status === 'collecting' ? (
-                <Pause className="w-5 h-5" />
-              ) : (
-                <Play className="w-5 h-5" />
-              )}
-            </button>
-            <button className="p-2 text-text-secondary hover:text-text-primary hover:bg-bg-hover rounded-lg transition-colors">
-              <Settings className="w-5 h-5" />
-            </button>
-          </div>
+          <button
+            onClick={openDashboard}
+            className="px-4 py-2 bg-gradient-to-r from-violet-500 to-violet-600 text-white text-sm font-medium rounded-lg hover:opacity-90 transition-opacity flex items-center gap-2 shadow-lg shadow-violet-500/20"
+          >
+            <ExternalLink className="w-4 h-4" />
+            Веб-дашборд
+          </button>
         </div>
       </header>
 
-      {/* Content */}
-      <main className="p-4 space-y-4">
-        {/* Stats Grid */}
-        <div className="grid grid-cols-2 gap-4">
-          <div className="bg-bg-secondary rounded-xl p-4 border border-border-subtle">
-            <div className="flex items-center gap-2 mb-2">
-              <BarChart3 className="w-4 h-4 text-text-tertiary" />
-              <span className="text-xs text-text-muted">Событий сегодня</span>
+      {/* Content - scrollable area */}
+      <main className="flex-1 overflow-y-auto p-6">
+        <div className="max-w-4xl mx-auto space-y-6">
+          {/* Stats Grid */}
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="bg-bg-secondary rounded-xl p-4 border border-border-subtle hover:border-violet-500/30 transition-colors">
+              <div className="flex items-center gap-2 mb-2">
+                <BarChart3 className="w-4 h-4 text-violet-400" />
+                <span className="text-xs text-text-muted">Событий сегодня</span>
+              </div>
+              <p className="text-2xl font-bold text-text-primary">
+                {stats.eventsToday.toLocaleString()}
+              </p>
             </div>
-            <p className="text-2xl font-bold text-text-primary">
-              {stats.eventsToday}
-            </p>
-          </div>
-          <div className="bg-bg-secondary rounded-xl p-4 border border-border-subtle">
-            <div className="flex items-center gap-2 mb-2">
-              <Clock className="w-4 h-4 text-text-tertiary" />
-              <span className="text-xs text-text-muted">Активное время</span>
+            <div className="bg-bg-secondary rounded-xl p-4 border border-border-subtle hover:border-violet-500/30 transition-colors">
+              <div className="flex items-center gap-2 mb-2">
+                <Clock className="w-4 h-4 text-violet-400" />
+                <span className="text-xs text-text-muted">Активное время</span>
+              </div>
+              <p className="text-2xl font-bold text-text-primary">
+                {formatTime(stats.activeTime)}
+              </p>
             </div>
-            <p className="text-2xl font-bold text-text-primary">
-              {formatTime(stats.activeTime)}
-            </p>
+            <div className="bg-bg-secondary rounded-xl p-4 border border-border-subtle hover:border-violet-500/30 transition-colors">
+              <div className="flex items-center gap-2 mb-2">
+                <Activity className="w-4 h-4 text-violet-400" />
+                <span className="text-xs text-text-muted">Приложений</span>
+              </div>
+              <p className="text-2xl font-bold text-text-primary">
+                {stats.topApps.length}
+              </p>
+            </div>
+            <div className="bg-bg-secondary rounded-xl p-4 border border-border-subtle hover:border-violet-500/30 transition-colors">
+              <div className="flex items-center gap-2 mb-2">
+                <RefreshCw className="w-4 h-4 text-violet-400" />
+                <span className="text-xs text-text-muted">Синхр.</span>
+              </div>
+              <p className="text-lg font-medium text-text-primary truncate">
+                {stats.lastSync}
+              </p>
+            </div>
           </div>
-        </div>
 
-        {/* Top Apps */}
-        <div className="bg-bg-secondary rounded-xl p-4 border border-border-subtle">
-          <h2 className="text-sm font-semibold text-text-primary mb-3 flex items-center gap-2">
-            <Monitor className="w-4 h-4" />
-            Топ приложений
-          </h2>
-          {stats.topApps.length > 0 ? (
-            <div className="space-y-2">
-              {stats.topApps.slice(0, 5).map((app) => (
-                <div
-                  key={app.name}
-                  className="flex items-center justify-between"
-                >
-                  <span className="text-sm text-text-secondary">{app.name}</span>
-                  <span className="text-sm font-medium text-text-primary">
-                    {app.count}
-                  </span>
+          {/* Two column layout */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* Top Apps */}
+            <div className="bg-bg-secondary rounded-xl p-5 border border-border-subtle">
+              <h2 className="text-sm font-semibold text-text-primary mb-4 flex items-center gap-2">
+                <Monitor className="w-4 h-4 text-violet-400" />
+                Топ приложений
+              </h2>
+              {stats.topApps.length > 0 ? (
+                <div className="space-y-3">
+                  {stats.topApps.slice(0, 8).map((app, index) => (
+                    <div
+                      key={app.name}
+                      className="flex items-center gap-3"
+                    >
+                      <span className="text-xs text-text-muted w-4">{index + 1}</span>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center justify-between mb-1">
+                          <span className="text-sm text-text-secondary truncate">{app.name}</span>
+                          <span className="text-sm font-medium text-text-primary ml-2">
+                            {app.count}
+                          </span>
+                        </div>
+                        <div className="h-1 bg-bg-tertiary rounded-full overflow-hidden">
+                          <div
+                            className="h-full bg-gradient-to-r from-violet-500 to-violet-400 rounded-full"
+                            style={{ width: `${(app.count / stats.topApps[0].count) * 100}%` }}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  ))}
                 </div>
-              ))}
+              ) : (
+                <div className="text-center py-8">
+                  <Eye className="w-8 h-8 text-text-muted mx-auto mb-2" />
+                  <p className="text-sm text-text-muted">
+                    Активность ещё не записана
+                  </p>
+                </div>
+              )}
             </div>
-          ) : (
-            <p className="text-sm text-text-muted text-center py-4">
-              Активность ещё не записана
-            </p>
-          )}
-        </div>
 
-        {/* Sync Status */}
-        <div className="bg-bg-secondary rounded-xl p-4 border border-border-subtle">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-sm text-text-secondary">Последняя синхр.</span>
-            <span className="text-sm text-text-primary">{stats.lastSync}</span>
+            {/* Quick Actions */}
+            <div className="space-y-4">
+              {/* Sync Status */}
+              <div className="bg-bg-secondary rounded-xl p-5 border border-border-subtle">
+                <h2 className="text-sm font-semibold text-text-primary mb-4 flex items-center gap-2">
+                  <RefreshCw className="w-4 h-4 text-violet-400" />
+                  Синхронизация
+                </h2>
+                <div className="flex items-center justify-between mb-4">
+                  <span className="text-sm text-text-secondary">Последняя синхронизация</span>
+                  <span className="text-sm font-medium text-text-primary">{stats.lastSync}</span>
+                </div>
+                <button
+                  onClick={() => invoke('sync_now')}
+                  disabled={stats.status === 'syncing'}
+                  className="w-full py-2.5 bg-bg-tertiary hover:bg-bg-hover text-text-secondary text-sm rounded-lg transition-colors flex items-center justify-center gap-2 disabled:opacity-50 border border-border-subtle"
+                >
+                  <RefreshCw
+                    className={`w-4 h-4 ${stats.status === 'syncing' ? 'animate-spin' : ''}`}
+                  />
+                  {stats.status === 'syncing' ? 'Синхронизация...' : 'Синхронизировать сейчас'}
+                </button>
+              </div>
+
+              {/* Status Card */}
+              <div className="bg-bg-secondary rounded-xl p-5 border border-border-subtle">
+                <h2 className="text-sm font-semibold text-text-primary mb-4 flex items-center gap-2">
+                  <Activity className="w-4 h-4 text-violet-400" />
+                  Статус
+                </h2>
+                <div className="flex items-center gap-3 p-3 bg-bg-tertiary rounded-lg">
+                  <div className={`w-3 h-3 rounded-full ${
+                    stats.status === 'collecting'
+                      ? 'bg-status-success'
+                      : stats.status === 'syncing'
+                      ? 'bg-status-info animate-pulse'
+                      : 'bg-status-warning'
+                  }`} />
+                  <div>
+                    <p className="text-sm font-medium text-text-primary">
+                      {stats.status === 'collecting' ? 'Активен' : stats.status === 'paused' ? 'Пауза' : 'Синхронизация'}
+                    </p>
+                    <p className="text-xs text-text-muted">
+                      {stats.status === 'collecting' ? 'Собираю данные активности' : stats.status === 'paused' ? 'Сбор приостановлен' : 'Отправка на сервер...'}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
-          <button
-            onClick={() => invoke('sync_now')}
-            disabled={stats.status === 'syncing'}
-            className="w-full py-2 bg-bg-tertiary hover:bg-bg-hover text-text-secondary text-sm rounded-lg transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
-          >
-            <RefreshCw
-              className={`w-4 h-4 ${stats.status === 'syncing' ? 'animate-spin' : ''}`}
-            />
-            {stats.status === 'syncing' ? 'Синхронизация...' : 'Синхронизировать'}
-          </button>
         </div>
-
-        {/* Open Dashboard */}
-        <button
-          onClick={openDashboard}
-          className="w-full py-3 bg-accent-gradient text-white text-sm font-medium rounded-lg hover:opacity-90 transition-opacity flex items-center justify-center gap-2"
-        >
-          <ExternalLink className="w-4 h-4" />
-          Открыть веб-дашборд
-        </button>
       </main>
     </div>
   );

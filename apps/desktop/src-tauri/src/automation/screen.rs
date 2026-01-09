@@ -1,7 +1,8 @@
 /// Screen capture module with caching
 /// Uses xcap for cross-platform screenshot support with 500ms cache TTL
 
-use image::{ImageBuffer, RgbaImage};
+use base64::{Engine as _, engine::general_purpose::STANDARD as BASE64};
+use image::{ImageBuffer, ImageEncoder, RgbaImage};
 use once_cell::sync::Lazy;
 use std::sync::Mutex;
 use std::time::{Duration, Instant};
@@ -45,8 +46,8 @@ pub fn capture_screenshot() -> Result<RgbaImage, String> {
         .capture_image()
         .map_err(|e| format!("Failed to capture screenshot: {}", e))?;
 
-    // Convert to RgbaImage
-    let rgba_image = image_to_rgba(&image);
+    // xcap returns RgbaImage directly
+    let rgba_image = image;
 
     // Update cache
     {
@@ -75,7 +76,7 @@ pub fn capture_monitor(monitor_index: usize) -> Result<RgbaImage, String> {
         .capture_image()
         .map_err(|e| format!("Failed to capture screenshot: {}", e))?;
 
-    Ok(image_to_rgba(&image))
+    Ok(image)
 }
 
 /// Capture screenshot of specific region
@@ -121,11 +122,6 @@ pub fn get_monitors() -> Result<Vec<MonitorInfo>, String> {
     Ok(info)
 }
 
-/// Convert xcap image to RgbaImage
-fn image_to_rgba(img: &image::DynamicImage) -> RgbaImage {
-    img.to_rgba8()
-}
-
 /// Encode image to base64 PNG
 pub fn encode_to_base64(image: &RgbaImage) -> Result<String, String> {
     let mut buffer = Vec::new();
@@ -140,7 +136,7 @@ pub fn encode_to_base64(image: &RgbaImage) -> Result<String, String> {
         )
         .map_err(|e| format!("Failed to encode PNG: {}", e))?;
 
-    Ok(base64::encode(&buffer))
+    Ok(BASE64.encode(&buffer))
 }
 
 /// Encode image to base64 JPEG
@@ -167,7 +163,7 @@ pub fn encode_to_base64_jpeg(image: &RgbaImage, quality: u8) -> Result<String, S
         )
         .map_err(|e| format!("Failed to encode JPEG: {}", e))?;
 
-    Ok(base64::encode(&buffer))
+    Ok(BASE64.encode(&buffer))
 }
 
 /// Clear screenshot cache
