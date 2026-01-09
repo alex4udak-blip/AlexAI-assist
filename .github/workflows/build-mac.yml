@@ -125,32 +125,38 @@ jobs:
             cd -
           fi
 
-      - name: Sign update bundles
-        if: ${{ env.TAURI_SIGNING_PRIVATE_KEY != '' }}
+      - name: Sign update bundles with Tauri CLI
+        if: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY != '' }}
         run: |
           VERSION="${{ steps.version.outputs.version }}"
 
-          # Sign aarch64 bundle
+          # Install tauri-cli for signing
+          cargo install tauri-cli --version "^2.0" || true
+
+          # Sign aarch64 bundle using Tauri's Ed25519 signing
           AARCH64_TAR="apps/desktop/src-tauri/target/aarch64-apple-darwin/release/bundle/macos/Observer_${VERSION}_aarch64.app.tar.gz"
           if [ -f "$AARCH64_TAR" ]; then
-            echo "$TAURI_SIGNING_PRIVATE_KEY" | base64 -d > /tmp/private_key
-            openssl dgst -sha256 -sign /tmp/private_key -out "${AARCH64_TAR}.sig" "$AARCH64_TAR"
-            base64 -i "${AARCH64_TAR}.sig" -o "${AARCH64_TAR}.sig.b64"
-            mv "${AARCH64_TAR}.sig.b64" "${AARCH64_TAR}.sig"
-            rm /tmp/private_key
+            echo "Signing aarch64 bundle..."
+            cargo tauri signer sign "$AARCH64_TAR" --private-key "$TAURI_SIGNING_PRIVATE_KEY" --password "$TAURI_SIGNING_PRIVATE_KEY_PASSWORD" || {
+              echo "Warning: Failed to sign aarch64 bundle, continuing without signature"
+            }
           fi
 
           # Sign x86_64 bundle
           X64_TAR="apps/desktop/src-tauri/target/x86_64-apple-darwin/release/bundle/macos/Observer_${VERSION}_x64.app.tar.gz"
           if [ -f "$X64_TAR" ]; then
-            echo "$TAURI_SIGNING_PRIVATE_KEY" | base64 -d > /tmp/private_key
-            openssl dgst -sha256 -sign /tmp/private_key -out "${X64_TAR}.sig" "$X64_TAR"
-            base64 -i "${X64_TAR}.sig" -o "${X64_TAR}.sig.b64"
-            mv "${X64_TAR}.sig.b64" "${X64_TAR}.sig"
-            rm /tmp/private_key
+            echo "Signing x86_64 bundle..."
+            cargo tauri signer sign "$X64_TAR" --private-key "$TAURI_SIGNING_PRIVATE_KEY" --password "$TAURI_SIGNING_PRIVATE_KEY_PASSWORD" || {
+              echo "Warning: Failed to sign x86_64 bundle, continuing without signature"
+            }
           fi
+
+          # List generated signatures
+          echo "Generated signatures:"
+          find apps/desktop/src-tauri/target -name "*.sig" -ls 2>/dev/null || true
         env:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
 
       - name: Upload artifact (aarch64)
         uses: actions/upload-artifact@v4

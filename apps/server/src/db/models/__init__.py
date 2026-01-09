@@ -2,6 +2,7 @@
 
 from src.db.models.agent import Agent, AgentLog
 from src.db.models.audit_log import AuditLog
+from src.db.models.automation import CommandResult, DeviceStatus, Feedback, Screenshot
 from src.db.models.chat import ChatMessage
 from src.db.models.device import Device
 from src.db.models.event import Event
@@ -29,8 +30,11 @@ __all__ = [
     "AgentLog",
     "AuditLog",
     "ChatMessage",
+    "CommandResult",
     "Device",
+    "DeviceStatus",
     "Event",
+    "Feedback",
     "MemoryBelief",
     "MemoryCube",
     "MemoryEntity",
@@ -45,6 +49,7 @@ __all__ = [
     "MemoryRelationship",
     "MemoryTopic",
     "Pattern",
+    "Screenshot",
     "Session",
     "Suggestion",
 ]
