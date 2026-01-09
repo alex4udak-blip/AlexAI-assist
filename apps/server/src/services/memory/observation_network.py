@@ -120,7 +120,7 @@ class ObservationNetwork:
         if existing:
             # Update existing
             existing.mention_count += 1
-            existing.last_seen = datetime.utcnow()
+            existing.last_seen = datetime.now(timezone.utc).replace(tzinfo=None)
             if summary:
                 existing.summary = summary
             if attributes:

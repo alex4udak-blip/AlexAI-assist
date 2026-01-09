@@ -2,10 +2,23 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+    <!-- Usage Descriptions (required for permission prompts) -->
     <key>NSAccessibilityUsageDescription</key>
     <string>Observer needs Accessibility access to track which applications you use and help analyze your work patterns.</string>
+
     <key>NSAppleEventsUsageDescription</key>
     <string>Observer uses Apple Events to communicate with other applications.</string>
+
+    <key>NSScreenCaptureUsageDescription</key>
+    <string>Observer needs Screen Recording permission to capture screenshots for visual automation and OCR analysis.</string>
+
+    <key>NSCameraUsageDescription</key>
+    <string>Observer may use the camera for visual automation features.</string>
+
+    <key>NSMicrophoneUsageDescription</key>
+    <string>Observer may use the microphone for audio-based automation features.</string>
+
+    <!-- UI Configuration -->
     <key>LSUIElement</key>
     <true/>
 </dict>

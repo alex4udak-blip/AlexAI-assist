@@ -3,7 +3,7 @@
 import json
 import logging
 from collections import defaultdict
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime, timedelta, timezone
 from typing import Any
 from uuid import UUID
 
@@ -388,7 +388,7 @@ Focus on:
             if improvements.get("settings"):
                 agent.settings.update(improvements["settings"])
 
-            agent.updated_at = datetime.now(UTC)
+            agent.updated_at = datetime.now(timezone.utc).replace(tzinfo=None)
             await self.db.commit()
 
             # Log improvement
@@ -569,7 +569,7 @@ Generate a JSON specification:
                 )
 
                 agent.status = "disabled"
-                agent.updated_at = datetime.now(UTC)
+                agent.updated_at = datetime.now(timezone.utc).replace(tzinfo=None)
 
                 # Log deactivation
                 log = AgentLog(
@@ -643,7 +643,7 @@ Generate a JSON specification:
 
                     if agent:
                         agent.status = "active"
-                        agent.updated_at = datetime.now(UTC)
+                        agent.updated_at = datetime.now(timezone.utc).replace(tzinfo=None)
                         rollback_results["agents_restored"].append(str(agent_id))
 
                 rollback_results["rolled_back_cycles"] += 1

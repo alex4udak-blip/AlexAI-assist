@@ -87,11 +87,59 @@ export function AutomationPanel() {
   // Connect to WebSocket
   const { isConnected } = useWebSocket();
 
+  const fetchDevices = useCallback(async () => {
+    try {
+      const response = await apiFetch('/api/v1/automation/devices');
+      if (response.ok) {
+        const data = await response.json();
+
+        // Fetch sync status for each device
+        const devicesWithSync = await Promise.all(
+          data.map(async (device: DeviceStatus) => {
+            try {
+              const syncResponse = await apiFetch(
+                `/api/v1/automation/devices/${device.device_id}/sync-status`
+              );
+              if (syncResponse.ok) {
+                const syncData = await syncResponse.json();
+                return { ...device, sync_status: syncData };
+              }
+            } catch (error) {
+              console.error(`Failed to fetch sync status for ${device.device_id}:`, error);
+            }
+            return device;
+          })
+        );
+
+        setDevices(devicesWithSync);
+        if (!selectedDevice && devicesWithSync.length > 0) {
+          setSelectedDevice(devicesWithSync[0].device_id);
+        }
+      }
+    } catch (error) {
+      console.error('Failed to fetch devices:', error);
+    }
+  }, [selectedDevice]);
+
+  const fetchAIUsage = useCallback(async () => {
+    try {
+      const response = await apiFetch('/api/v1/analytics/ai-usage');
+      if (response.ok) {
+        const data = await response.json();
+        setAiUsage(data);
+      }
+    } catch (error) {
+      console.error('Failed to fetch AI usage:', error);
+    } finally {
+      setAiUsageLoading(false);
+    }
+  }, []);
+
   // Fetch devices on mount and when WebSocket connects
   useEffect(() => {
     fetchDevices();
     fetchAIUsage();
-  }, [isConnected]);
+  }, [isConnected, fetchDevices, fetchAIUsage]);
 
   // Handle real-time device updates via WebSocket
   const handleDeviceUpdate = useCallback((update: { device_id: string; status: Record<string, unknown> }) => {
@@ -164,54 +212,6 @@ export function AutomationPanel() {
   // Subscribe to WebSocket updates
   useDeviceUpdates(handleDeviceUpdate);
   useCommandResults(handleCommandResult);
-
-  const fetchDevices = async () => {
-    try {
-      const response = await apiFetch('/api/v1/automation/devices');
-      if (response.ok) {
-        const data = await response.json();
-
-        // Fetch sync status for each device
-        const devicesWithSync = await Promise.all(
-          data.map(async (device: DeviceStatus) => {
-            try {
-              const syncResponse = await apiFetch(
-                `/api/v1/automation/devices/${device.device_id}/sync-status`
-              );
-              if (syncResponse.ok) {
-                const syncData = await syncResponse.json();
-                return { ...device, sync_status: syncData };
-              }
-            } catch (error) {
-              console.error(`Failed to fetch sync status for ${device.device_id}:`, error);
-            }
-            return device;
-          })
-        );
-
-        setDevices(devicesWithSync);
-        if (!selectedDevice && devicesWithSync.length > 0) {
-          setSelectedDevice(devicesWithSync[0].device_id);
-        }
-      }
-    } catch (error) {
-      console.error('Failed to fetch devices:', error);
-    }
-  };
-
-  const fetchAIUsage = async () => {
-    try {
-      const response = await apiFetch('/api/v1/analytics/ai-usage');
-      if (response.ok) {
-        const data = await response.json();
-        setAiUsage(data);
-      }
-    } catch (error) {
-      console.error('Failed to fetch AI usage:', error);
-    } finally {
-      setAiUsageLoading(false);
-    }
-  };
 
   const fetchScreenshots = async (deviceId: string) => {
     try {

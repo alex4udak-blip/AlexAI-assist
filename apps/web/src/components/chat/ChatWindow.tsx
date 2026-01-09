@@ -79,9 +79,33 @@ export function ChatWindow() {
   };
 
   return (
-    <div className="flex flex-col h-full">
-      {/* Messages */}
-      <div className="flex-1 overflow-y-auto p-4 lg:p-6 scrollbar-hide">
+    <div className="flex flex-col h-full bg-bg-primary relative overflow-hidden">
+      {/* Background effects */}
+      <div className="absolute inset-0 bg-hud-radial opacity-30 pointer-events-none" />
+      <div className="absolute inset-0 bg-scanline opacity-10 pointer-events-none" />
+
+      {/* Messages with custom scrollbar */}
+      <div className="flex-1 overflow-y-auto p-4 lg:p-6 relative z-10 custom-scrollbar">
+        <style>
+          {`
+            .custom-scrollbar::-webkit-scrollbar {
+              width: 8px;
+            }
+            .custom-scrollbar::-webkit-scrollbar-track {
+              background: rgba(6, 182, 212, 0.05);
+              border-radius: 4px;
+            }
+            .custom-scrollbar::-webkit-scrollbar-thumb {
+              background: linear-gradient(180deg, rgba(6, 182, 212, 0.4), rgba(59, 130, 246, 0.4));
+              border-radius: 4px;
+              box-shadow: 0 0 10px rgba(6, 182, 212, 0.3);
+            }
+            .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+              background: linear-gradient(180deg, rgba(6, 182, 212, 0.6), rgba(59, 130, 246, 0.6));
+              box-shadow: 0 0 15px rgba(6, 182, 212, 0.5);
+            }
+          `}
+        </style>
         <div className="max-w-3xl mx-auto space-y-6">
           {messages.length === 0 ? (
             <motion.div
@@ -89,42 +113,86 @@ export function ChatWindow() {
               animate={{ opacity: 1, y: 0 }}
               className="flex flex-col items-center justify-center min-h-[60vh] text-center"
             >
-              <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-violet-500 to-blue-500
-                              flex items-center justify-center mb-6 shadow-glow">
-                <Bot className="w-8 h-8 text-white" />
-              </div>
-              <h2 className="text-2xl font-semibold text-text-primary tracking-tight mb-3">
-                Чат с Observer
-              </h2>
-              <p className="text-text-tertiary max-w-md mb-8">
+              {/* AI Avatar with enhanced glow */}
+              <motion.div
+                initial={{ scale: 0.8, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                transition={{ delay: 0.2 }}
+                className="relative w-20 h-20 mb-8"
+              >
+                <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-hud-cyan to-hud-blue
+                                flex items-center justify-center shadow-hud-lg
+                                border border-hud-cyan/50">
+                  <Bot className="w-10 h-10 text-white" />
+                </div>
+                {/* Pulse rings */}
+                <motion.div
+                  animate={{ scale: [1, 1.3, 1], opacity: [0.5, 0, 0.5] }}
+                  transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
+                  className="absolute inset-0 rounded-2xl border-2 border-hud-cyan"
+                />
+                <motion.div
+                  animate={{ scale: [1, 1.5, 1], opacity: [0.3, 0, 0.3] }}
+                  transition={{ duration: 2, repeat: Infinity, ease: "easeInOut", delay: 0.5 }}
+                  className="absolute inset-0 rounded-2xl border-2 border-hud-blue"
+                />
+              </motion.div>
+
+              <motion.h2
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ delay: 0.3 }}
+                className="text-2xl font-semibold text-text-primary tracking-tight mb-3"
+              >
+                Чат с <span className="text-hud-cyan">Observer</span>
+              </motion.h2>
+              <motion.p
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ delay: 0.4 }}
+                className="text-text-tertiary max-w-md mb-8"
+              >
                 Задавайте вопросы о паттернах вашей активности, получайте предложения
                 по автоматизации или просите помощи с рабочим процессом.
-              </p>
+              </motion.p>
 
-              {/* Quick prompts */}
-              <div className="flex flex-col sm:flex-row items-center justify-center gap-3 w-full max-w-2xl">
+              {/* Quick prompts with sci-fi styling */}
+              <motion.div
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.5 }}
+                className="flex flex-col sm:flex-row items-center justify-center gap-3 w-full max-w-2xl"
+              >
                 {[
                   'Как прошёл мой день?',
                   'Какие паттерны ты заметил?',
                   'Предложи автоматизацию',
-                ].map((prompt) => (
-                  <button
+                ].map((prompt, index) => (
+                  <motion.button
                     key={prompt}
+                    whileHover={{ scale: 1.02, y: -2 }}
+                    whileTap={{ scale: 0.98 }}
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.6 + index * 0.1 }}
                     onClick={() => {
                       setInput(prompt);
                     }}
                     aria-label={`Использовать подсказку: ${prompt}`}
-                    className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl
-                               border border-border-subtle bg-white/[0.02]
+                    className="relative flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl
+                               border-2 border-hud-cyan/20 bg-gradient-to-br from-hud-cyan/10 to-hud-blue/5
                                text-sm text-text-secondary whitespace-nowrap
-                               hover:bg-white/[0.05] hover:border-border-default
-                               transition-all duration-150 w-full sm:w-auto"
+                               hover:border-hud-cyan/40 hover:shadow-hud-sm
+                               backdrop-blur-sm
+                               transition-all duration-150 w-full sm:w-auto overflow-hidden"
                   >
-                    <Sparkles className="w-4 h-4 text-hud-cyan shrink-0" />
-                    {prompt}
-                  </button>
+                    {/* Glow effect on hover */}
+                    <div className="absolute inset-0 bg-gradient-to-r from-hud-cyan/0 via-hud-cyan/10 to-hud-cyan/0 opacity-0 hover:opacity-100 transition-opacity" />
+                    <Sparkles className="w-4 h-4 text-hud-cyan shrink-0 relative z-10" />
+                    <span className="relative z-10">{prompt}</span>
+                  </motion.button>
                 ))}
-              </div>
+              </motion.div>
             </motion.div>
           ) : (
             <>
@@ -134,26 +202,54 @@ export function ChatWindow() {
             </>
           )}
 
-          {/* Loading indicator */}
+          {/* Enhanced loading indicator with pulse */}
           {loading && (
             <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
               className="flex items-center gap-3"
             >
-              <div className="w-8 h-8 rounded-full bg-gradient-to-br from-violet-500 to-blue-500
-                              flex items-center justify-center">
+              {/* AI Avatar with pulse */}
+              <div className="relative w-8 h-8 rounded-full bg-gradient-to-br from-hud-cyan to-hud-blue
+                              flex items-center justify-center shadow-glow-cyan">
                 <Bot className="w-4 h-4 text-white" />
+                <motion.div
+                  animate={{ scale: [1, 1.2, 1], opacity: [0.5, 0, 0.5] }}
+                  transition={{ duration: 1.5, repeat: Infinity, ease: "easeInOut" }}
+                  className="absolute inset-0 rounded-full border-2 border-hud-cyan"
+                />
               </div>
-              <div className="flex items-center gap-2 px-4 py-3 rounded-2xl rounded-tl-md bg-white/[0.05]">
-                <div className="flex gap-1">
-                  <span className="w-2 h-2 bg-hud-cyan rounded-full animate-bounce" />
-                  <span className="w-2 h-2 bg-hud-cyan rounded-full animate-bounce"
-                        style={{ animationDelay: '0.1s' }} />
-                  <span className="w-2 h-2 bg-hud-cyan rounded-full animate-bounce"
-                        style={{ animationDelay: '0.2s' }} />
+
+              {/* Typing indicator */}
+              <div className="relative flex items-center gap-2 px-4 py-3 rounded-2xl rounded-tl-md
+                              bg-gradient-to-br from-hud-cyan/10 to-hud-blue/5
+                              border border-hud-cyan/20 backdrop-blur-sm shadow-hud-sm overflow-hidden">
+                {/* Animated scan line */}
+                <motion.div
+                  animate={{ x: [-100, 200] }}
+                  transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
+                  className="absolute inset-0 w-20 bg-gradient-to-r from-transparent via-hud-cyan/20 to-transparent skew-x-12"
+                />
+
+                {/* Animated dots */}
+                <div className="flex gap-1 relative z-10">
+                  <motion.span
+                    animate={{ y: [0, -8, 0], opacity: [0.5, 1, 0.5] }}
+                    transition={{ duration: 1, repeat: Infinity, ease: "easeInOut" }}
+                    className="w-2 h-2 bg-hud-cyan rounded-full shadow-glow-cyan"
+                  />
+                  <motion.span
+                    animate={{ y: [0, -8, 0], opacity: [0.5, 1, 0.5] }}
+                    transition={{ duration: 1, repeat: Infinity, ease: "easeInOut", delay: 0.2 }}
+                    className="w-2 h-2 bg-hud-cyan rounded-full shadow-glow-cyan"
+                  />
+                  <motion.span
+                    animate={{ y: [0, -8, 0], opacity: [0.5, 1, 0.5] }}
+                    transition={{ duration: 1, repeat: Infinity, ease: "easeInOut", delay: 0.4 }}
+                    className="w-2 h-2 bg-hud-cyan rounded-full shadow-glow-cyan"
+                  />
                 </div>
-                <span className="text-sm text-text-tertiary ml-1">Observer думает...</span>
+                <span className="text-sm text-text-tertiary ml-1 font-mono relative z-10">Observer думает...</span>
               </div>
             </motion.div>
           )}
