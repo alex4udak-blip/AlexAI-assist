@@ -77,7 +77,11 @@ pub mod macos {
             let _ = tx.send(result);
         });
 
-        rx.recv().expect("Failed to receive result from main thread")
+        rx.recv().unwrap_or_else(|_| {
+            // This should never happen unless the main thread callback panicked
+            eprintln!("Warning: Main thread callback failed, returning default value");
+            panic!("Failed to receive result from main thread - callback may have panicked")
+        })
     }
 
     // AX error codes

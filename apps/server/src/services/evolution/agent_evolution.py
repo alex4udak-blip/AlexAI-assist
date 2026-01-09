@@ -3,7 +3,7 @@
 import json
 import logging
 from collections import defaultdict
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from typing import Any
 from uuid import UUID
 
@@ -53,7 +53,7 @@ class AgentEvolution:
             "improved_agents": [],
             "created_tools": [],
             "deactivated_agents": [],
-            "timestamp": datetime.utcnow().isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
         }
 
         try:
@@ -101,7 +101,7 @@ class AgentEvolution:
         logger.debug("Analyzing patterns for agent creation")
 
         # Query patterns that meet criteria for agent creation
-        cutoff_date = datetime.utcnow() - timedelta(days=self.RECENCY_DAYS)
+        cutoff_date = datetime.now(UTC) - timedelta(days=self.RECENCY_DAYS)
         query = (
             select(Pattern)
             .where(
@@ -388,7 +388,7 @@ Focus on:
             if improvements.get("settings"):
                 agent.settings.update(improvements["settings"])
 
-            agent.updated_at = datetime.utcnow()
+            agent.updated_at = datetime.now(UTC)
             await self.db.commit()
 
             # Log improvement
@@ -569,7 +569,7 @@ Generate a JSON specification:
                 )
 
                 agent.status = "disabled"
-                agent.updated_at = datetime.utcnow()
+                agent.updated_at = datetime.now(UTC)
 
                 # Log deactivation
                 log = AgentLog(
@@ -615,7 +615,7 @@ Generate a JSON specification:
             "rolled_back_cycles": 0,
             "agents_deleted": [],
             "agents_restored": [],
-            "timestamp": datetime.utcnow().isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
         }
 
         try:
@@ -631,7 +631,7 @@ Generate a JSON specification:
                     agent = result.scalar_one_or_none()
 
                     if agent:
-                        await self.db.delete(agent)
+                        self.db.delete(agent)  # delete() is synchronous
                         rollback_results["agents_deleted"].append(str(agent_id))
 
                 # Restore deactivated agents
@@ -643,7 +643,7 @@ Generate a JSON specification:
 
                     if agent:
                         agent.status = "active"
-                        agent.updated_at = datetime.utcnow()
+                        agent.updated_at = datetime.now(UTC)
                         rollback_results["agents_restored"].append(str(agent_id))
 
                 rollback_results["rolled_back_cycles"] += 1

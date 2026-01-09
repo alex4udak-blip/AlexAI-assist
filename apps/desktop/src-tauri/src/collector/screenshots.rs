@@ -326,10 +326,13 @@ impl ScreenshotManager {
                 if let Some(dirname) = path.file_name().and_then(|n| n.to_str()) {
                     // Try to parse as date
                     if let Ok(dir_date) = chrono::NaiveDate::parse_from_str(dirname, "%Y-%m-%d") {
-                        let dir_datetime = dir_date.and_hms_opt(0, 0, 0)
-                            .unwrap()
-                            .and_local_timezone(Utc)
-                            .unwrap();
+                        // Safely convert to datetime, skip if fails
+                        let Some(naive_dt) = dir_date.and_hms_opt(0, 0, 0) else {
+                            continue;
+                        };
+                        let chrono::LocalResult::Single(dir_datetime) = naive_dt.and_local_timezone(Utc) else {
+                            continue;
+                        };
 
                         if dir_datetime < cutoff_date {
                             // Delete entire directory
