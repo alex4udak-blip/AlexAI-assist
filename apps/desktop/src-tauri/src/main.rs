@@ -170,6 +170,10 @@ fn main() {
             commands::queue_pause,
             commands::queue_resume,
             commands::queue_clear,
+            // Settings commands
+            commands::get_settings,
+            commands::save_settings,
+            commands::open_system_preferences,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
