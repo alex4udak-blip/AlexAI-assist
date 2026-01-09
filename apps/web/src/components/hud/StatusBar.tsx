@@ -7,6 +7,8 @@ interface StatusBarProps {
   activeAgents?: number;
   totalAgents?: number;
   systemHealth?: 'healthy' | 'warning' | 'critical';
+  lastEventMinutesAgo?: number;
+  syncStatus?: 'synced' | 'syncing' | 'stale';
 }
 
 export function StatusBar({
@@ -14,6 +16,8 @@ export function StatusBar({
   activeAgents = 0,
   totalAgents = 0,
   systemHealth = 'healthy',
+  lastEventMinutesAgo = 0,
+  syncStatus = 'synced',
 }: StatusBarProps) {
   const { isConnected } = useWebSocket();
 
@@ -26,13 +30,41 @@ export function StatusBar({
     return `${mins}м`;
   };
 
-  const healthConfig = {
-    healthy: { color: 'bg-status-success', glow: 'shadow-glow-green', label: 'Система OK' },
-    warning: { color: 'bg-status-warning', glow: 'shadow-glow-orange', label: 'Внимание' },
-    critical: { color: 'bg-status-error', glow: 'shadow-glow-orange', label: 'Критично' },
+  // More descriptive health config with tooltips
+  const getHealthConfig = () => {
+    if (!isConnected) {
+      return {
+        color: 'bg-status-error',
+        glow: 'shadow-glow-orange',
+        label: 'Нет связи',
+        tooltip: 'WebSocket отключен'
+      };
+    }
+    if (lastEventMinutesAgo > 30) {
+      return {
+        color: 'bg-status-warning',
+        glow: 'shadow-glow-orange',
+        label: 'Нет данных',
+        tooltip: `Последнее событие ${lastEventMinutesAgo}м назад`
+      };
+    }
+    if (lastEventMinutesAgo > 5) {
+      return {
+        color: 'bg-status-warning',
+        glow: 'shadow-glow-orange',
+        label: 'Ожидание',
+        tooltip: `Последнее событие ${lastEventMinutesAgo}м назад`
+      };
+    }
+    return {
+      color: 'bg-status-success',
+      glow: 'shadow-glow-green',
+      label: 'Активно',
+      tooltip: 'Данные поступают в реальном времени'
+    };
   };
 
-  const health = healthConfig[systemHealth];
+  const health = getHealthConfig();
 
   return (
     <motion.div
@@ -86,17 +118,23 @@ export function StatusBar({
       </div>
 
       {/* System Health */}
-      <div className="flex items-center gap-2 min-w-0 flex-1">
+      <div className="flex items-center gap-2 min-w-0 flex-1 group relative">
         <div className={`w-9 h-9 rounded-lg ${health.color}/10 flex items-center justify-center
                         border ${health.color}/30 flex-shrink-0`}>
           <Shield className={`w-4 h-4 ${
-            systemHealth === 'healthy' ? 'text-status-success' :
-            systemHealth === 'warning' ? 'text-status-warning' : 'text-status-error'
+            health.color.includes('success') ? 'text-status-success' :
+            health.color.includes('warning') ? 'text-status-warning' : 'text-status-error'
           }`} />
         </div>
         <div className="min-w-0">
           <p className="text-[10px] text-text-muted uppercase tracking-wider font-mono">Система</p>
           <p className="text-xs font-medium text-text-primary truncate">{health.label}</p>
+        </div>
+        {/* Tooltip */}
+        <div className="absolute left-0 top-full mt-1 px-2 py-1 bg-bg-tertiary rounded text-[10px]
+                        text-text-secondary opacity-0 group-hover:opacity-100 transition-opacity
+                        pointer-events-none whitespace-nowrap z-50 border border-border-subtle">
+          {health.tooltip}
         </div>
       </div>
 
