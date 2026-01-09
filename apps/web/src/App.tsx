@@ -1,4 +1,5 @@
 import { Routes, Route } from 'react-router-dom';
+import ErrorBoundary from './components/ErrorBoundary';
 import Layout from './components/layout/Layout';
 import Dashboard from './pages/Dashboard';
 import Agents from './pages/Agents';
@@ -11,18 +12,20 @@ import Automation from './pages/Automation';
 
 function App() {
   return (
-    <Layout>
-      <Routes>
-        <Route path="/" element={<Dashboard />} />
-        <Route path="/agents" element={<Agents />} />
-        <Route path="/analytics" element={<Analytics />} />
-        <Route path="/history" element={<History />} />
-        <Route path="/chat" element={<Chat />} />
-        <Route path="/automation" element={<Automation />} />
-        <Route path="/settings" element={<Settings />} />
-        <Route path="/download" element={<Download />} />
-      </Routes>
-    </Layout>
+    <ErrorBoundary>
+      <Layout>
+        <Routes>
+          <Route path="/" element={<Dashboard />} />
+          <Route path="/agents" element={<Agents />} />
+          <Route path="/analytics" element={<Analytics />} />
+          <Route path="/history" element={<History />} />
+          <Route path="/chat" element={<Chat />} />
+          <Route path="/automation" element={<Automation />} />
+          <Route path="/settings" element={<Settings />} />
+          <Route path="/download" element={<Download />} />
+        </Routes>
+      </Layout>
+    </ErrorBoundary>
   );
 }
 

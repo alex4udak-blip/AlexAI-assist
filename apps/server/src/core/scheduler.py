@@ -126,6 +126,8 @@ def start_scheduler() -> None:
         id="detect_patterns",
         name="Detect behavior patterns",
         replace_existing=True,
+        max_instances=1,
+        coalesce=True,
     )
 
     # Run memory consolidation every hour
@@ -135,6 +137,8 @@ def start_scheduler() -> None:
         id="memory_consolidation",
         name="Consolidate memory system",
         replace_existing=True,
+        max_instances=1,
+        coalesce=True,
     )
 
     # Run memory decay daily at 3 AM
@@ -144,6 +148,8 @@ def start_scheduler() -> None:
         id="memory_decay",
         name="Apply memory decay",
         replace_existing=True,
+        max_instances=1,
+        coalesce=True,
     )
 
     # Run belief evolution weekly on Sunday at 4 AM
@@ -153,6 +159,8 @@ def start_scheduler() -> None:
         id="belief_evolution",
         name="Evolve beliefs from evidence",
         replace_existing=True,
+        max_instances=1,
+        coalesce=True,
     )
 
     # Run evolution cycle every 6 hours, starting 5 minutes from now
@@ -163,6 +171,8 @@ def start_scheduler() -> None:
         name="Run evolution cycle",
         next_run_time=datetime.now(timezone.utc).replace(tzinfo=None) + timedelta(minutes=5),
         replace_existing=True,
+        max_instances=1,
+        coalesce=True,
     )
 
     scheduler.start()
@@ -171,5 +181,5 @@ def start_scheduler() -> None:
 
 def stop_scheduler() -> None:
     """Stop the background scheduler."""
-    scheduler.shutdown(wait=False)
+    scheduler.shutdown(wait=True)
     logger.info("Background scheduler stopped")
