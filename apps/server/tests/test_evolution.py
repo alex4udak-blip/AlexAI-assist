@@ -9,7 +9,7 @@ Comprehensive tests for all evolution subsystems:
 """
 
 import json
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock, call, patch
@@ -319,12 +319,12 @@ class TestBehaviorEvolution:
         mock_msg1 = MagicMock()
         mock_msg1.role = "user"
         mock_msg1.content = "Please make your responses shorter"
-        mock_msg1.timestamp = datetime.utcnow()
+        mock_msg1.timestamp = datetime.now(timezone.utc).replace(tzinfo=None)
 
         mock_msg2 = MagicMock()
         mock_msg2.role = "user"
         mock_msg2.content = "Too verbose, can you be more brief?"
-        mock_msg2.timestamp = datetime.utcnow()
+        mock_msg2.timestamp = datetime.now(timezone.utc).replace(tzinfo=None)
 
         mock_result = MagicMock()
         mock_result.scalars.return_value.all.return_value = [mock_msg1, mock_msg2]
@@ -346,17 +346,17 @@ class TestBehaviorEvolution:
         mock_msg1 = MagicMock()
         mock_msg1.role = "user"
         mock_msg1.content = "Great job, спасибо!"
-        mock_msg1.timestamp = datetime.utcnow()
+        mock_msg1.timestamp = datetime.now(timezone.utc).replace(tzinfo=None)
 
         mock_msg2 = MagicMock()
         mock_msg2.role = "user"
         mock_msg2.content = "Please make it shorter"
-        mock_msg2.timestamp = datetime.utcnow()
+        mock_msg2.timestamp = datetime.now(timezone.utc).replace(tzinfo=None)
 
         mock_msg3 = MagicMock()
         mock_msg3.role = "assistant"
         mock_msg3.content = "Here is the detailed response..."
-        mock_msg3.timestamp = datetime.utcnow()
+        mock_msg3.timestamp = datetime.now(timezone.utc).replace(tzinfo=None)
 
         mock_result = MagicMock()
         mock_result.scalars.return_value.all.return_value = [mock_msg1, mock_msg2, mock_msg3]
@@ -974,7 +974,7 @@ class TestIntegration:
             mock_msg = MagicMock()
             mock_msg.role = "user"
             mock_msg.content = "Too verbose"
-            mock_msg.timestamp = datetime.utcnow()
+            mock_msg.timestamp = datetime.now(timezone.utc).replace(tzinfo=None)
 
             mock_result = MagicMock()
             mock_result.scalars.return_value.all.return_value = [mock_msg]

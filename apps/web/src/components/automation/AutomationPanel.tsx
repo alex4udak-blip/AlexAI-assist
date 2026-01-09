@@ -6,7 +6,7 @@ import { Input } from '../ui/Input';
 import { DeviceCard, type DeviceStatus } from './DeviceCard';
 import { CommandHistory, type CommandRecord } from './CommandHistory';
 import { AIUsageCard, type AIUsage } from './AIUsageCard';
-import { config } from '../../lib/config';
+import { apiFetch } from '../../lib/config';
 import {
   Camera,
   ScanText,
@@ -19,8 +19,6 @@ import {
   Loader2,
   Image as ImageIcon,
 } from 'lucide-react';
-
-const API_URL = config.apiUrl;
 
 interface CommandResult {
   command_id: string;
@@ -79,7 +77,7 @@ export function AutomationPanel() {
 
   const fetchDevices = async () => {
     try {
-      const response = await fetch(`${API_URL}/api/v1/automation/devices`);
+      const response = await apiFetch('/api/v1/automation/devices');
       if (response.ok) {
         const data = await response.json();
         setDevices(data);
@@ -94,7 +92,7 @@ export function AutomationPanel() {
 
   const fetchAIUsage = async () => {
     try {
-      const response = await fetch(`${API_URL}/api/v1/analytics/ai-usage`);
+      const response = await apiFetch('/api/v1/analytics/ai-usage');
       if (response.ok) {
         const data = await response.json();
         setAiUsage(data);
@@ -119,11 +117,10 @@ export function AutomationPanel() {
     setLastResult(null);
 
     try {
-      const response = await fetch(
-        `${API_URL}/api/v1/automation/command/${selectedDevice}`,
+      const response = await apiFetch(
+        `/api/v1/automation/command/${selectedDevice}`,
         {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             command_type: commandType,
             params,
@@ -144,8 +141,8 @@ export function AutomationPanel() {
 
       const pollResult = async () => {
         attempts++;
-        const resultResponse = await fetch(
-          `${API_URL}/api/v1/automation/result/${commandId}`
+        const resultResponse = await apiFetch(
+          `/api/v1/automation/result/${commandId}`
         );
 
         if (resultResponse.ok) {

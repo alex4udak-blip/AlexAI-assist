@@ -236,27 +236,78 @@ impl AutomationSync {
     }
 }
 
-/// Get WebSocket URL from environment or config
-pub fn get_websocket_url() -> String {
-    // Try to get from environment variable
+/// Configuration from file
+#[derive(Debug, Clone, Default)]
+pub struct AutomationConfig {
+    pub ws_url: String,
+    pub api_key: Option<String>,
+    pub device_id: String,
+}
+
+/// Read configuration from file
+pub fn read_config() -> AutomationConfig {
+    let mut config = AutomationConfig {
+        ws_url: "ws://localhost:8000".to_string(),
+        api_key: None,
+        device_id: get_device_id(),
+    };
+
+    // Try environment variables first
     if let Ok(url) = std::env::var("OBSERVER_WS_URL") {
-        return url;
+        config.ws_url = url;
+    }
+    if let Ok(key) = std::env::var("OBSERVER_API_KEY") {
+        config.api_key = Some(key);
     }
 
     // Try to read from config file
     if let Ok(home) = std::env::var("HOME") {
         let config_path = format!("{}/.observer/config.json", home);
-        if let Ok(content) = std::fs::read_to_string(config_path) {
+        if let Ok(content) = std::fs::read_to_string(&config_path) {
             if let Ok(json) = serde_json::from_str::<serde_json::Value>(&content) {
                 if let Some(url) = json.get("ws_url").and_then(|v| v.as_str()) {
-                    return url.to_string();
+                    config.ws_url = url.to_string();
+                }
+                if let Some(key) = json.get("api_key").and_then(|v| v.as_str()) {
+                    config.api_key = Some(key.to_string());
+                }
+                if let Some(id) = json.get("device_id").and_then(|v| v.as_str()) {
+                    config.device_id = id.to_string();
                 }
             }
         }
     }
 
-    // Default to localhost
-    "ws://localhost:8000/ws/automation".to_string()
+    config
+}
+
+/// Get unique device ID
+fn get_device_id() -> String {
+    // Try to get from environment
+    if let Ok(id) = std::env::var("OBSERVER_DEVICE_ID") {
+        return id;
+    }
+
+    // Generate from machine ID or hostname
+    if let Ok(hostname) = std::env::var("HOSTNAME") {
+        return format!("mac-{}", hostname);
+    }
+
+    // Fallback to random ID
+    format!("mac-{}", uuid::Uuid::new_v4().to_string().split('-').next().unwrap_or("unknown"))
+}
+
+/// Get WebSocket URL with authentication
+pub fn get_websocket_url() -> String {
+    let config = read_config();
+    let base_url = format!("{}/ws/automation/{}", config.ws_url, config.device_id);
+
+    // Add API key as query parameter if available
+    if let Some(api_key) = config.api_key {
+        format!("{}?api_key={}", base_url, api_key)
+    } else {
+        base_url
+    }
 }
 
 #[cfg(test)]

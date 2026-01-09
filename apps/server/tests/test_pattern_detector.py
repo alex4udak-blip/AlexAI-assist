@@ -1,6 +1,6 @@
 """Tests for Pattern Detection Service."""
 
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from unittest.mock import AsyncMock, MagicMock
 from uuid import uuid4
 
@@ -20,7 +20,7 @@ class TestPatternDetection:
         service = PatternDetectorService(db_mock)
 
         # Create events with repeating app sequence
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc).replace(tzinfo=None)
         events = [
             Event(
                 id=uuid4(),
@@ -55,7 +55,7 @@ class TestPatternDetection:
         db_mock = AsyncMock()
         service = PatternDetectorService(db_mock)
 
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc).replace(tzinfo=None)
         # Create sequence with different apps (automatable)
         events = [
             Event(
@@ -85,7 +85,7 @@ class TestPatternDetection:
         db_mock = AsyncMock()
         service = PatternDetectorService(db_mock)
 
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc).replace(tzinfo=None)
         # Create sequence with same app repeated (not automatable)
         events = [
             Event(
@@ -118,7 +118,7 @@ class TestPatternDetection:
         service = PatternDetectorService(db_mock)
 
         # Create events at specific hour (9 AM)
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc).replace(tzinfo=None)
         base_time = now.replace(hour=9, minute=0, second=0, microsecond=0)
         events = [
             Event(
@@ -154,7 +154,7 @@ class TestPatternDetection:
         service = PatternDetectorService(db_mock)
 
         # Create events with frequent app switches
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc).replace(tzinfo=None)
         apps = ["Chrome", "VSCode", "Slack", "Terminal", "Chrome", "Slack"]
         events = [
             Event(
@@ -187,7 +187,7 @@ class TestPatternDetection:
         service = PatternDetectorService(db_mock)
 
         # Create events with same app (no switches)
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc).replace(tzinfo=None)
         events = [
             Event(
                 id=uuid4(),
@@ -221,7 +221,7 @@ class TestPatternScoring:
         db_mock = AsyncMock()
         service = PatternDetectorService(db_mock)
 
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc).replace(tzinfo=None)
         # Create sequence that repeats exactly 7 times
         events = [
             Event(
@@ -253,7 +253,7 @@ class TestPatternScoring:
         db_mock = AsyncMock()
         service = PatternDetectorService(db_mock)
 
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc).replace(tzinfo=None)
         # Create multiple sequences with different frequencies
         events = []
         # High frequency sequence
@@ -301,7 +301,7 @@ class TestPatternScoring:
         db_mock = AsyncMock()
         service = PatternDetectorService(db_mock)
 
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc).replace(tzinfo=None)
         # Create sequence that repeats only 2 times
         events = [
             Event(
@@ -331,7 +331,7 @@ class TestPatternScoring:
         db_mock = AsyncMock()
         service = PatternDetectorService(db_mock)
 
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc).replace(tzinfo=None)
         # Create many different sequences
         events = []
         for seq_num in range(20):
@@ -387,7 +387,7 @@ class TestEdgeCases:
         db_mock = AsyncMock()
         service = PatternDetectorService(db_mock)
 
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc).replace(tzinfo=None)
         events = [
             Event(
                 id=uuid4(),
@@ -415,7 +415,7 @@ class TestEdgeCases:
         db_mock = AsyncMock()
         service = PatternDetectorService(db_mock)
 
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc).replace(tzinfo=None)
         events = [
             Event(
                 id=uuid4(),
@@ -444,7 +444,7 @@ class TestEdgeCases:
         db_mock = AsyncMock()
         service = PatternDetectorService(db_mock)
 
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc).replace(tzinfo=None)
         # Create duplicate events (same app at same time)
         events = [
             Event(
@@ -475,7 +475,7 @@ class TestEdgeCases:
         db_mock = AsyncMock()
         service = PatternDetectorService(db_mock)
 
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc).replace(tzinfo=None)
         apps = ["Chrome", None, "VSCode", None, "Terminal", "Chrome", "VSCode", "Terminal"]
         events = [
             Event(
@@ -508,7 +508,7 @@ class TestEdgeCases:
         db_mock = AsyncMock()
         service = PatternDetectorService(db_mock)
 
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc).replace(tzinfo=None)
         events = [
             Event(
                 id=uuid4(),
@@ -537,7 +537,7 @@ class TestEdgeCases:
         db_mock = AsyncMock()
         service = PatternDetectorService(db_mock)
 
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc).replace(tzinfo=None)
         events = [
             Event(
                 id=uuid4(),
@@ -607,8 +607,8 @@ class TestPatternPersistence:
                 trigger_conditions={},
                 sequence=[],
                 occurrences=5,
-                created_at=datetime.utcnow(),
-                updated_at=datetime.utcnow(),
+                created_at=datetime.now(timezone.utc).replace(tzinfo=None),
+                updated_at=datetime.now(timezone.utc).replace(tzinfo=None),
             ),
             Pattern(
                 id=uuid4(),
@@ -617,8 +617,8 @@ class TestPatternPersistence:
                 trigger_conditions={},
                 sequence=[],
                 occurrences=3,
-                created_at=datetime.utcnow(),
-                updated_at=datetime.utcnow(),
+                created_at=datetime.now(timezone.utc).replace(tzinfo=None),
+                updated_at=datetime.now(timezone.utc).replace(tzinfo=None),
             ),
         ]
         mock_result = MagicMock()
@@ -691,8 +691,8 @@ class TestPatternPersistence:
             trigger_conditions={},
             sequence=[],
             occurrences=5,
-            created_at=datetime.utcnow(),
-            updated_at=datetime.utcnow(),
+            created_at=datetime.now(timezone.utc).replace(tzinfo=None),
+            updated_at=datetime.now(timezone.utc).replace(tzinfo=None),
         )
         mock_result = MagicMock()
         mock_result.scalar_one_or_none.return_value = mock_pattern

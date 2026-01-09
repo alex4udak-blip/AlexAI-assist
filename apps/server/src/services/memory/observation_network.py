@@ -5,7 +5,7 @@ Implements Hindsight's Observation Network with Zep-style temporal KG.
 
 import logging
 import re
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any
 from uuid import UUID, uuid4
 
@@ -140,8 +140,8 @@ class ObservationNetwork:
             attributes=attributes or {},
             key_facts=key_facts or [],
             mention_count=1,
-            first_seen=datetime.utcnow(),
-            last_seen=datetime.utcnow(),
+            first_seen=datetime.now(timezone.utc).replace(tzinfo=None),
+            last_seen=datetime.now(timezone.utc).replace(tzinfo=None),
         )
         self.db.add(entity)
         await self.db.flush()
@@ -361,7 +361,7 @@ class ObservationNetwork:
                     MemoryRelationship.relation_type == relation_type,
                     or_(
                         MemoryRelationship.valid_to.is_(None),
-                        MemoryRelationship.valid_to > datetime.utcnow(),
+                        MemoryRelationship.valid_to > datetime.now(timezone.utc).replace(tzinfo=None),
                     ),
                 )
             )
@@ -375,7 +375,7 @@ class ObservationNetwork:
             existing.confidence = calculate_weighted_average(
                 existing.confidence, confidence, old_weight=0.5
             )
-            existing.updated_at = datetime.utcnow()
+            existing.updated_at = datetime.now(timezone.utc).replace(tzinfo=None)
             return existing
 
         relationship = MemoryRelationship(
@@ -388,7 +388,7 @@ class ObservationNetwork:
             strength=strength,
             confidence=confidence,
             event_time=event_time,
-            valid_from=datetime.utcnow(),
+            valid_from=datetime.now(timezone.utc).replace(tzinfo=None),
         )
         self.db.add(relationship)
 
@@ -413,7 +413,7 @@ class ObservationNetwork:
                         MemoryRelationship.source_id == entity_id,
                         or_(
                             MemoryRelationship.valid_to.is_(None),
-                            MemoryRelationship.valid_to > datetime.utcnow(),
+                            MemoryRelationship.valid_to > datetime.now(timezone.utc).replace(tzinfo=None),
                         ),
                     )
                 )
@@ -439,7 +439,7 @@ class ObservationNetwork:
                         MemoryRelationship.target_id == entity_id,
                         or_(
                             MemoryRelationship.valid_to.is_(None),
-                            MemoryRelationship.valid_to > datetime.utcnow(),
+                            MemoryRelationship.valid_to > datetime.now(timezone.utc).replace(tzinfo=None),
                         ),
                     )
                 )
@@ -548,7 +548,7 @@ class ObservationNetwork:
                     MemoryRelationship.source_id.in_(entity_ids),
                     or_(
                         MemoryRelationship.valid_to.is_(None),
-                        MemoryRelationship.valid_to > datetime.utcnow(),
+                        MemoryRelationship.valid_to > datetime.now(timezone.utc).replace(tzinfo=None),
                     ),
                 )
             )
@@ -564,7 +564,7 @@ class ObservationNetwork:
                     MemoryRelationship.target_id.in_(entity_ids),
                     or_(
                         MemoryRelationship.valid_to.is_(None),
-                        MemoryRelationship.valid_to > datetime.utcnow(),
+                        MemoryRelationship.valid_to > datetime.now(timezone.utc).replace(tzinfo=None),
                     ),
                 )
             )
@@ -653,7 +653,7 @@ class ObservationNetwork:
                     MemoryRelationship.source_id.in_(entity_ids),
                     or_(
                         MemoryRelationship.valid_to.is_(None),
-                        MemoryRelationship.valid_to > datetime.utcnow(),
+                        MemoryRelationship.valid_to > datetime.now(timezone.utc).replace(tzinfo=None),
                     ),
                 )
             )
@@ -669,7 +669,7 @@ class ObservationNetwork:
                     MemoryRelationship.target_id.in_(entity_ids),
                     or_(
                         MemoryRelationship.valid_to.is_(None),
-                        MemoryRelationship.valid_to > datetime.utcnow(),
+                        MemoryRelationship.valid_to > datetime.now(timezone.utc).replace(tzinfo=None),
                     ),
                 )
             )
@@ -718,7 +718,7 @@ Return ONLY the summary, no prefix."""
                 )
 
                 entity.summary = summary.strip()
-                entity.last_updated = datetime.utcnow()
+                entity.last_updated = datetime.now(timezone.utc).replace(tzinfo=None)
                 updated += 1
 
             except Exception as e:

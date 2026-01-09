@@ -7,7 +7,7 @@ import json
 import logging
 import re
 import unicodedata
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any
 from uuid import UUID, uuid4
 
@@ -267,7 +267,7 @@ Example:
             confidence=operation.get("confidence"),
             success=success,
             error=error,
-            created_at=datetime.utcnow(),
+            created_at=datetime.now(timezone.utc).replace(tzinfo=None),
         )
         self.db.add(log)
         return log
@@ -281,7 +281,7 @@ Example:
 
         from sqlalchemy import func, select
 
-        cutoff = datetime.utcnow() - timedelta(hours=hours)
+        cutoff = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(hours=hours)
 
         result = await self.db.execute(
             select(

@@ -1,7 +1,7 @@
 """Event analyzer service."""
 
 from collections import defaultdict
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Any
 
 from sqlalchemy import func, select
@@ -24,9 +24,9 @@ class AnalyzerService:
     ) -> dict[str, Any]:
         """Get activity summary statistics."""
         if not start_date:
-            start_date = datetime.utcnow() - timedelta(days=7)
+            start_date = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(days=7)
         if not end_date:
-            end_date = datetime.utcnow()
+            end_date = datetime.now(timezone.utc).replace(tzinfo=None)
 
         query = select(Event).where(
             Event.timestamp >= start_date,
@@ -73,7 +73,7 @@ class AnalyzerService:
         days: int = 7,
     ) -> list[dict[str, Any]]:
         """Get time spent by category."""
-        start_date = datetime.utcnow() - timedelta(days=days)
+        start_date = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(days=days)
 
         query = (
             select(
@@ -102,7 +102,7 @@ class AnalyzerService:
         limit: int = 20,
     ) -> list[dict[str, Any]]:
         """Get app usage statistics."""
-        start_date = datetime.utcnow() - timedelta(days=days)
+        start_date = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(days=days)
 
         query = (
             select(
@@ -134,8 +134,8 @@ class AnalyzerService:
         device_id: str | None = None,
     ) -> dict[str, Any]:
         """Calculate productivity score based on activity patterns."""
-        today = datetime.utcnow().replace(
-            hour=0, minute=0, second=0, microsecond=0
+        today = datetime.now(timezone.utc).replace(
+            hour=0, minute=0, second=0, microsecond=0, tzinfo=None
         )
 
         query = select(Event).where(Event.timestamp >= today)
@@ -177,7 +177,7 @@ class AnalyzerService:
         days: int = 30,
     ) -> list[dict[str, Any]]:
         """Get activity trends over time."""
-        start_date = datetime.utcnow() - timedelta(days=days)
+        start_date = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(days=days)
 
         date_trunc_expr = func.date_trunc("day", Event.timestamp)
         query = (

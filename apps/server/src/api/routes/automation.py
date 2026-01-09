@@ -99,6 +99,97 @@ class TaskRequest(BaseModel):
     )
 
 
+def translate_command_to_task(command_id: str, command_type: str, params: dict[str, Any]) -> dict[str, Any]:
+    """Translate web command format to desktop AutomationTask format.
+
+    The desktop expects tasks in the format:
+    {
+        "id": "...",
+        "priority": "Normal",
+        "command": {
+            "type": "Screenshot",
+            "params": { "save_path": null }
+        },
+        "created_at": "..."
+    }
+    """
+    # Map command types to desktop TaskCommand format
+    command_mapping: dict[str, dict[str, Any]] = {
+        "click": {
+            "type": "Click",
+            "params": {
+                "x": params.get("x", 0),
+                "y": params.get("y", 0),
+                "button": params.get("button", "left"),
+            },
+        },
+        "type": {
+            "type": "Type",
+            "params": {
+                "text": params.get("text", ""),
+            },
+        },
+        "hotkey": {
+            "type": "Hotkey",
+            "params": {
+                "modifiers": params.get("modifiers", []),
+                "key": params.get("key", ""),
+            },
+        },
+        "screenshot": {
+            "type": "Screenshot",
+            "params": {
+                "save_path": params.get("save_path"),
+            },
+        },
+        "navigate": {
+            "type": "BrowserNavigate",
+            "params": {
+                "browser": params.get("browser", "chrome"),
+                "url": params.get("url", ""),
+            },
+        },
+        "get_url": {
+            "type": "BrowserGetUrl",
+            "params": {
+                "browser": params.get("browser", "chrome"),
+            },
+        },
+        "wait": {
+            "type": "Wait",
+            "params": {
+                "milliseconds": params.get("milliseconds", 1000),
+            },
+        },
+        "ocr": {
+            "type": "Custom",
+            "params": {
+                "name": "ocr",
+                "params": params,
+            },
+        },
+    }
+
+    # Get the translated command or use Custom for unknown types
+    translated = command_mapping.get(
+        command_type.lower(),
+        {
+            "type": "Custom",
+            "params": {
+                "name": command_type,
+                "params": params,
+            },
+        },
+    )
+
+    return {
+        "id": command_id,
+        "priority": "Normal",
+        "command": translated,
+        "created_at": utc_now().isoformat() + "Z",
+    }
+
+
 @router.websocket("/ws/automation/{device_id}")
 async def automation_websocket(websocket: WebSocket, device_id: str) -> None:
     """WebSocket endpoint for real-time device control."""
@@ -216,16 +307,18 @@ async def send_command(
         "created_at": utc_now(),
     }
 
-    # Send command to device
+    # Send command to device as AutomationTask format
     try:
         websocket = connected_devices[device_id]
+
+        # Translate web command to desktop task format
+        task = translate_command_to_task(command_id, command.command_type, command.params)
+
+        # Send as automation_task message type (matches desktop WsMessage::AutomationTask)
         await websocket.send_json(
             {
-                "type": "command",
-                "command_id": command_id,
-                "command_type": command.command_type,
-                "params": command.params,
-                "requires_confirmation": command.requires_confirmation,
+                "type": "automation_task",
+                "task": task,
             }
         )
 
