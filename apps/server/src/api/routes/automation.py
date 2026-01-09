@@ -3,28 +3,165 @@
 import asyncio
 from datetime import datetime, timezone
 from typing import Any
-from uuid import UUID, uuid4
+from uuid import uuid4
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, WebSocket, WebSocketDisconnect
 from pydantic import BaseModel, Field
-from sqlalchemy import select
+from sqlalchemy import desc, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.api.deps import get_db_session
 from src.api.middleware import validate_websocket_auth
 from src.core.logging import get_logger, log_error
-from src.core.websocket import broadcast_device_update, broadcast_command_result
+from src.core.websocket import broadcast_command_result, broadcast_device_update
+from src.db.models import CommandResult, DeviceStatus, Screenshot
 from src.db.models.audit_log import AuditLog
+from src.db.models.device import Device
 
 router = APIRouter()
 logger = get_logger(__name__)
 
-# In-memory storage for automation state
+# WebSocket connections (runtime state, not persisted)
 connected_devices: dict[str, WebSocket] = {}
-device_statuses: dict[str, dict[str, Any]] = {}
-pending_commands: dict[str, dict[str, Any]] = {}
-command_results: dict[str, dict[str, Any]] = {}
-screenshot_history: dict[str, list[dict[str, Any]]] = {}  # device_id -> list of screenshots
+
+# Database session for background tasks
+_db_session_factory: Any = None
+
+
+def set_db_session_factory(factory: Any) -> None:
+    """Set the database session factory for background operations."""
+    global _db_session_factory
+    _db_session_factory = factory
+
+
+async def get_or_create_device(db: AsyncSession, device_id: str) -> Device:
+    """Get or create a device record."""
+    result = await db.execute(select(Device).where(Device.id == device_id))
+    device = result.scalar_one_or_none()
+    if not device:
+        device = Device(
+            id=device_id,
+            name=f"Device-{device_id[:8]}",
+            os="unknown",
+        )
+        db.add(device)
+        await db.commit()
+        await db.refresh(device)
+    return device
+
+
+async def get_or_create_device_status(db: AsyncSession, device_id: str) -> DeviceStatus:
+    """Get or create device status record."""
+    result = await db.execute(
+        select(DeviceStatus).where(DeviceStatus.device_id == device_id)
+    )
+    status = result.scalar_one_or_none()
+    if not status:
+        # Ensure device exists first
+        await get_or_create_device(db, device_id)
+        status = DeviceStatus(
+            device_id=device_id,
+            connected=False,
+            status="idle",
+        )
+        db.add(status)
+        await db.commit()
+        await db.refresh(status)
+    return status
+
+
+async def update_device_status(
+    db: AsyncSession,
+    device_id: str,
+    connected: bool | None = None,
+    status: str | None = None,
+    status_data: dict[str, Any] | None = None,
+) -> DeviceStatus:
+    """Update device status in database."""
+    device_status = await get_or_create_device_status(db, device_id)
+
+    now = utc_now()
+    if connected is not None:
+        device_status.connected = connected
+    if status is not None:
+        device_status.status = status
+    if status_data is not None:
+        device_status.status_data = status_data
+    device_status.last_seen_at = now
+    device_status.last_sync_at = now
+    device_status.updated_at = now
+
+    await db.commit()
+    await db.refresh(device_status)
+    return device_status
+
+
+async def save_command_result_to_db(
+    db: AsyncSession,
+    command_id: str,
+    device_id: str,
+    command_type: str,
+    command_params: dict[str, Any] | None,
+    success: bool,
+    result_data: dict[str, Any] | None = None,
+    error: str | None = None,
+    duration_ms: int | None = None,
+) -> CommandResult:
+    """Save command result to database."""
+    # Check if command already exists
+    result = await db.execute(
+        select(CommandResult).where(CommandResult.id == command_id)
+    )
+    cmd_result = result.scalar_one_or_none()
+
+    now = utc_now()
+    if cmd_result:
+        # Update existing
+        cmd_result.success = success
+        cmd_result.result_data = result_data
+        cmd_result.error = error
+        cmd_result.duration_ms = duration_ms
+        cmd_result.status = "completed" if success else "failed"
+        cmd_result.completed_at = now
+    else:
+        # Create new
+        cmd_result = CommandResult(
+            id=command_id,
+            device_id=device_id,
+            command_type=command_type,
+            command_params=command_params,
+            success=success,
+            result_data=result_data,
+            error=error,
+            duration_ms=duration_ms,
+            status="completed" if success else "failed",
+            completed_at=now,
+        )
+        db.add(cmd_result)
+
+    await db.commit()
+    await db.refresh(cmd_result)
+    return cmd_result
+
+
+async def save_screenshot_to_db(
+    db: AsyncSession,
+    device_id: str,
+    screenshot_data: str,
+    command_id: str | None = None,
+    ocr_text: str | None = None,
+) -> Screenshot:
+    """Save screenshot to database."""
+    screenshot = Screenshot(
+        device_id=device_id,
+        command_id=command_id,
+        screenshot_data=screenshot_data,
+        ocr_text=ocr_text,
+    )
+    db.add(screenshot)
+    await db.commit()
+    await db.refresh(screenshot)
+    return screenshot
 
 
 def utc_now() -> datetime:
@@ -228,7 +365,11 @@ def translate_command_to_task(command_id: str, command_type: str, params: dict[s
 
 
 @router.websocket("/ws/automation/{device_id}")
-async def automation_websocket(websocket: WebSocket, device_id: str) -> None:
+async def automation_websocket(
+    websocket: WebSocket,
+    device_id: str,
+    db: AsyncSession = Depends(get_db_session),
+) -> None:
     """WebSocket endpoint for real-time device control."""
     # Validate authentication
     if not await validate_websocket_auth(websocket):
@@ -241,13 +382,11 @@ async def automation_websocket(websocket: WebSocket, device_id: str) -> None:
 
     await websocket.accept()
     connected_devices[device_id] = websocket
-    now = utc_now()
-    device_statuses[device_id] = {
-        "connected": True,
-        "last_seen_at": now,
-        "last_sync_at": now,
-        "status": "idle",
-    }
+
+    # Update device status in database
+    device_status = await update_device_status(
+        db, device_id, connected=True, status="idle"
+    )
 
     logger.info(
         "Device connected to automation WebSocket",
@@ -255,7 +394,11 @@ async def automation_websocket(websocket: WebSocket, device_id: str) -> None:
     )
 
     # Broadcast device connection to web clients
-    await broadcast_device_update(device_id, device_statuses[device_id])
+    await broadcast_device_update(device_id, {
+        "connected": True,
+        "last_seen_at": device_status.last_seen_at,
+        "status": device_status.status,
+    })
 
     try:
         while True:
@@ -263,112 +406,131 @@ async def automation_websocket(websocket: WebSocket, device_id: str) -> None:
             message_type = data.get("type")
 
             if message_type == "status_update":
-                # Update device status
-                now = utc_now()
-                device_statuses[device_id].update(
-                    {
-                        "last_seen_at": now,
-                        "last_sync_at": now,
-                        "status": data.get("status", "idle"),
-                        **data.get("data", {}),
-                    }
+                # Update device status in database
+                status_data = data.get("data", {})
+                device_status = await update_device_status(
+                    db,
+                    device_id,
+                    status=data.get("status", "idle"),
+                    status_data=status_data,
                 )
                 logger.debug(
                     "Device status updated",
                     extra={"device_id": device_id, "status": data.get("status")},
                 )
                 # Broadcast status update to web clients
-                await broadcast_device_update(device_id, device_statuses[device_id])
+                await broadcast_device_update(device_id, {
+                    "connected": device_status.connected,
+                    "last_seen_at": device_status.last_seen_at,
+                    "status": device_status.status,
+                    **(device_status.status_data or {}),
+                })
 
             elif message_type == "command_result":
-                # Store command result
+                # Store command result in database
                 command_id = data.get("command_id")
                 if command_id:
                     result_data = data.get("result", {})
-                    command_results[command_id] = {
-                        "success": data.get("success", False),
-                        "result": result_data,
-                        "error": data.get("error"),
-                        "screenshot_url": data.get("screenshot_url"),
-                        "duration_ms": data.get("duration_ms"),
-                        "completed_at": utc_now(),
-                    }
+                    success = data.get("success", False)
 
-                    # Store screenshot in history if present
+                    # Save to database
+                    await save_command_result_to_db(
+                        db,
+                        command_id=command_id,
+                        device_id=device_id,
+                        command_type="unknown",  # Will be updated from pending
+                        command_params=None,
+                        success=success,
+                        result_data=result_data,
+                        error=data.get("error"),
+                        duration_ms=data.get("duration_ms"),
+                    )
+
+                    # Store screenshot if present
                     if isinstance(result_data, dict) and result_data.get("screenshot"):
-                        if device_id not in screenshot_history:
-                            screenshot_history[device_id] = []
-                        screenshot_history[device_id].insert(0, {
-                            "screenshot": result_data["screenshot"],
-                            "timestamp": utc_now().isoformat() + "Z",
-                            "command_id": command_id,
-                        })
-                        # Keep only last 10 screenshots
-                        screenshot_history[device_id] = screenshot_history[device_id][:10]
+                        await save_screenshot_to_db(
+                            db,
+                            device_id=device_id,
+                            screenshot_data=result_data["screenshot"],
+                            command_id=command_id,
+                        )
 
                     logger.info(
-                        "Command result received",
+                        "Command result received and persisted",
                         extra={
                             "device_id": device_id,
                             "command_id": command_id,
-                            "success": data.get("success"),
+                            "success": success,
                         },
                     )
 
                     # Broadcast command result to web clients
-                    await broadcast_command_result(command_id, device_id, command_results[command_id])
+                    await broadcast_command_result(command_id, device_id, {
+                        "success": success,
+                        "result": result_data,
+                        "error": data.get("error"),
+                        "duration_ms": data.get("duration_ms"),
+                        "completed_at": utc_now(),
+                    })
 
             elif message_type == "task_result":
-                # Store task result from desktop (WsMessage::TaskResult format)
-                # Desktop sends: {"type": "task_result", "result": {"task_id": "...", "success": bool, "error": Option<String>, "output": Option<Value>}}
+                # Store task result from desktop
                 result_data = data.get("result", {})
                 task_id = result_data.get("task_id")
                 if task_id:
                     output_data = result_data.get("output")
-                    command_results[task_id] = {
-                        "success": result_data.get("success", False),
-                        "result": output_data,
-                        "error": result_data.get("error"),
-                        "screenshot_url": result_data.get("screenshot_url"),
-                        "duration_ms": result_data.get("duration_ms"),
-                        "completed_at": utc_now(),
-                    }
+                    success = result_data.get("success", False)
 
-                    # Store screenshot in history if present
+                    # Save to database
+                    await save_command_result_to_db(
+                        db,
+                        command_id=task_id,
+                        device_id=device_id,
+                        command_type="task",
+                        command_params=None,
+                        success=success,
+                        result_data=output_data if isinstance(output_data, dict) else {"output": output_data},
+                        error=result_data.get("error"),
+                        duration_ms=result_data.get("duration_ms"),
+                    )
+
+                    # Store screenshot if present
                     if isinstance(output_data, dict) and output_data.get("screenshot"):
-                        if device_id not in screenshot_history:
-                            screenshot_history[device_id] = []
-                        screenshot_history[device_id].insert(0, {
-                            "screenshot": output_data["screenshot"],
-                            "timestamp": utc_now().isoformat() + "Z",
-                            "command_id": task_id,
-                        })
-                        # Keep only last 10 screenshots
-                        screenshot_history[device_id] = screenshot_history[device_id][:10]
+                        await save_screenshot_to_db(
+                            db,
+                            device_id=device_id,
+                            screenshot_data=output_data["screenshot"],
+                            command_id=task_id,
+                        )
 
                     logger.info(
-                        "Task result received from desktop",
+                        "Task result received and persisted",
                         extra={
                             "device_id": device_id,
                             "task_id": task_id,
-                            "success": result_data.get("success"),
+                            "success": success,
                         },
                     )
 
                     # Broadcast task result to web clients
-                    await broadcast_command_result(task_id, device_id, command_results[task_id])
+                    await broadcast_command_result(task_id, device_id, {
+                        "success": success,
+                        "result": output_data,
+                        "error": result_data.get("error"),
+                        "duration_ms": result_data.get("duration_ms"),
+                        "completed_at": utc_now(),
+                    })
 
             elif message_type == "ping":
-                # Respond to ping
+                # Respond to ping and update last_seen
                 await websocket.send_json({"type": "pong"})
-                device_statuses[device_id]["last_seen_at"] = utc_now()
+                await update_device_status(db, device_id)
 
     except WebSocketDisconnect:
         connected_devices.pop(device_id, None)
-        if device_id in device_statuses:
-            device_statuses[device_id]["connected"] = False
-            # Broadcast device disconnection to web clients
-            await broadcast_device_update(device_id, device_statuses[device_id])
+        await update_device_status(db, device_id, connected=False)
+        # Broadcast device disconnection
+        await broadcast_device_update(device_id, {"connected": False})
         logger.info(
             "Device disconnected from automation WebSocket",
             extra={"device_id": device_id},
@@ -381,10 +543,11 @@ async def automation_websocket(websocket: WebSocket, device_id: str) -> None:
             extra={"device_id": device_id},
         )
         connected_devices.pop(device_id, None)
-        if device_id in device_statuses:
-            device_statuses[device_id]["connected"] = False
-            # Broadcast device disconnection to web clients
-            await broadcast_device_update(device_id, device_statuses[device_id])
+        try:
+            await update_device_status(db, device_id, connected=False)
+            await broadcast_device_update(device_id, {"connected": False})
+        except Exception:
+            pass  # Best effort
 
 
 @router.post("/command/{device_id}", response_model=CommandResponse)
@@ -417,16 +580,16 @@ async def send_command(
     command_id = str(uuid4())
     start_time = utc_now()
 
-    # Store pending command
-    pending_commands[command_id] = {
-        "device_id": device_id,
-        "command_type": command.command_type,
-        "params": command.params,
-        "timeout": command.timeout,
-        "requires_confirmation": command.requires_confirmation,
-        "status": "pending",
-        "created_at": start_time,
-    }
+    # Store pending command in database
+    cmd_result = CommandResult(
+        id=command_id,
+        device_id=device_id,
+        command_type=command.command_type,
+        command_params=command.params,
+        status="pending",
+    )
+    db.add(cmd_result)
+    await db.commit()
 
     # Send command to device as AutomationTask format
     try:
@@ -468,12 +631,14 @@ async def send_command(
             "command_id": command_id,
             "status": "pending",
             "device_id": device_id,
-            "created_at": pending_commands[command_id]["created_at"],
+            "created_at": start_time,
         }
 
     except Exception as e:
-        # Clean up pending command
-        pending_commands.pop(command_id, None)
+        # Update command status to failed
+        cmd_result.status = "failed"
+        cmd_result.error = str(e)
+        await db.commit()
 
         # Log failure to audit trail
         duration = int((utc_now() - start_time).total_seconds() * 1000)
@@ -502,67 +667,100 @@ async def send_command(
         )
 
 
-@router.get("/result/{command_id}", response_model=CommandResult)
+@router.get("/result/{command_id}")
 async def get_command_result(
     command_id: str,
     timeout: int = Query(default=30, ge=1, le=300, description="Timeout in seconds"),
+    db: AsyncSession = Depends(get_db_session),
 ) -> dict[str, Any]:
     """Get command result with timeout."""
     # Wait for result with timeout
     start_time = utc_now()
     while (utc_now() - start_time).total_seconds() < timeout:
-        if command_id in command_results:
-            result = command_results.pop(command_id)
-            pending_commands.pop(command_id, None)
-            return result
+        # Query from database
+        result = await db.execute(
+            select(CommandResult).where(CommandResult.id == command_id)
+        )
+        cmd_result = result.scalar_one_or_none()
+
+        if cmd_result and cmd_result.status in ("completed", "failed"):
+            return {
+                "success": cmd_result.success or False,
+                "result": cmd_result.result_data,
+                "error": cmd_result.error,
+                "duration_ms": cmd_result.duration_ms,
+            }
 
         await asyncio.sleep(0.5)
+        await db.refresh(cmd_result) if cmd_result else None
 
-    # Timeout
-    pending_commands.pop(command_id, None)
+    # Timeout - update command status
+    result = await db.execute(
+        select(CommandResult).where(CommandResult.id == command_id)
+    )
+    cmd_result = result.scalar_one_or_none()
+    if cmd_result:
+        cmd_result.status = "timeout"
+        await db.commit()
+
     raise HTTPException(
         status_code=408,
         detail="Command execution timeout",
     )
 
 
-@router.get("/status/{device_id}", response_model=DeviceStatus)
-async def get_device_status(device_id: str) -> dict[str, Any]:
-    """Get device status."""
-    status = device_statuses.get(device_id)
+@router.get("/status/{device_id}")
+async def get_device_status(
+    device_id: str,
+    db: AsyncSession = Depends(get_db_session),
+) -> dict[str, Any]:
+    """Get device status from database."""
+    result = await db.execute(
+        select(DeviceStatus).where(DeviceStatus.device_id == device_id)
+    )
+    status = result.scalar_one_or_none()
+
     if not status:
         raise HTTPException(
             status_code=404,
             detail=f"Device {device_id} not found",
         )
 
+    # Check if actually connected via WebSocket
+    is_connected = device_id in connected_devices
+
     return {
         "device_id": device_id,
-        "connected": status.get("connected", False),
-        "last_seen_at": status.get("last_seen_at"),
+        "connected": is_connected,
+        "last_seen_at": status.last_seen_at,
         "status_data": {
-            k: v
-            for k, v in status.items()
-            if k not in ("connected", "last_seen_at")
+            "status": status.status,
+            **(status.status_data or {}),
         },
     }
 
 
-@router.get("/devices", response_model=list[DeviceStatus])
-async def list_devices() -> list[dict[str, Any]]:
-    """List all connected devices."""
+@router.get("/devices")
+async def list_devices(
+    db: AsyncSession = Depends(get_db_session),
+) -> list[dict[str, Any]]:
+    """List all devices from database."""
+    result = await db.execute(
+        select(DeviceStatus).order_by(desc(DeviceStatus.last_seen_at))
+    )
+    statuses = result.scalars().all()
+
     return [
         {
-            "device_id": device_id,
-            "connected": status.get("connected", False),
-            "last_seen_at": status.get("last_seen_at"),
+            "device_id": status.device_id,
+            "connected": status.device_id in connected_devices,
+            "last_seen_at": status.last_seen_at,
             "status_data": {
-                k: v
-                for k, v in status.items()
-                if k not in ("connected", "last_seen_at")
+                "status": status.status,
+                **(status.status_data or {}),
             },
         }
-        for device_id, status in device_statuses.items()
+        for status in statuses
     ]
 
 
@@ -608,33 +806,97 @@ class Screenshot(BaseModel):
     command_id: str = Field(..., description="Associated command ID")
 
 
-@router.get("/devices/{device_id}/screenshots", response_model=list[Screenshot])
-async def get_screenshot_history(device_id: str) -> list[dict[str, Any]]:
-    """Get screenshot history for a device."""
-    if device_id not in device_statuses:
+@router.get("/devices/{device_id}/screenshots")
+async def get_screenshot_history(
+    device_id: str,
+    limit: int = Query(default=10, ge=1, le=100),
+    db: AsyncSession = Depends(get_db_session),
+) -> list[dict[str, Any]]:
+    """Get screenshot history for a device from database."""
+    # Check device exists
+    result = await db.execute(
+        select(DeviceStatus).where(DeviceStatus.device_id == device_id)
+    )
+    if not result.scalar_one_or_none():
         raise HTTPException(
             status_code=404,
             detail=f"Device {device_id} not found",
         )
 
-    return screenshot_history.get(device_id, [])
+    # Get screenshots from database
+    result = await db.execute(
+        select(Screenshot)
+        .where(Screenshot.device_id == device_id)
+        .order_by(desc(Screenshot.captured_at))
+        .limit(limit)
+    )
+    screenshots = result.scalars().all()
+
+    return [
+        {
+            "screenshot": s.screenshot_data,
+            "timestamp": s.captured_at.isoformat() + "Z",
+            "command_id": s.command_id,
+        }
+        for s in screenshots
+    ]
+
+
+class CommandResultInput(BaseModel):
+    """Input schema for command result (different from DB model)."""
+
+    success: bool = Field(..., description="Whether command succeeded")
+    result: Any = Field(default=None, description="Command result data")
+    error: str | None = Field(default=None, description="Error message if failed")
+    screenshot_url: str | None = Field(default=None, description="Screenshot URL if captured")
+    duration_ms: int | None = Field(default=None, description="Execution duration in milliseconds")
+
+
+class DeviceStatusInput(BaseModel):
+    """Input schema for device status."""
+
+    connected: bool = Field(..., description="Whether device is connected")
+    last_seen_at: datetime | None = Field(default=None, description="Last seen timestamp")
+    status_data: dict[str, Any] = Field(default_factory=dict, description="Additional status data")
 
 
 @router.post("/results")
-async def save_command_result(
+async def save_command_result_endpoint(
     command_id: str = Query(..., description="Command ID"),
-    result: CommandResult = ...,
+    result: CommandResultInput = ...,
     db: AsyncSession = Depends(get_db_session),
 ) -> dict[str, str]:
     """Save command result from device (alternative to WebSocket)."""
-    command_results[command_id] = {
-        "success": result.success,
-        "result": result.result,
-        "error": result.error,
-        "screenshot_url": result.screenshot_url,
-        "duration_ms": result.duration_ms,
-        "completed_at": utc_now(),
-    }
+    # Find device_id from existing command or create new
+    existing = await db.execute(
+        select(CommandResult).where(CommandResult.id == command_id)
+    )
+    cmd = existing.scalar_one_or_none()
+
+    if cmd:
+        # Update existing
+        cmd.success = result.success
+        cmd.result_data = {"result": result.result} if result.result else None
+        cmd.error = result.error
+        cmd.duration_ms = result.duration_ms
+        cmd.status = "completed" if result.success else "failed"
+        cmd.completed_at = utc_now()
+    else:
+        # Create new with unknown device
+        cmd = CommandResult(
+            id=command_id,
+            device_id="unknown",
+            command_type="unknown",
+            success=result.success,
+            result_data={"result": result.result} if result.result else None,
+            error=result.error,
+            duration_ms=result.duration_ms,
+            status="completed" if result.success else "failed",
+            completed_at=utc_now(),
+        )
+        db.add(cmd)
+
+    await db.commit()
 
     logger.info(
         "Command result saved via REST",
@@ -645,16 +907,18 @@ async def save_command_result(
 
 
 @router.post("/status")
-async def save_device_status(
+async def save_device_status_endpoint(
     device_id: str = Query(..., description="Device ID"),
-    status: DeviceStatus = ...,
+    status: DeviceStatusInput = ...,
+    db: AsyncSession = Depends(get_db_session),
 ) -> dict[str, str]:
     """Save device status (alternative to WebSocket)."""
-    device_statuses[device_id] = {
-        "connected": status.connected,
-        "last_seen_at": status.last_seen_at or utc_now(),
-        **status.status_data,
-    }
+    await update_device_status(
+        db,
+        device_id,
+        connected=status.connected,
+        status_data=status.status_data,
+    )
 
     logger.debug(
         "Device status saved via REST",
@@ -668,9 +932,14 @@ async def save_device_status(
 async def execute_task(
     device_id: str,
     task: TaskRequest,
+    request: Request,
     db: AsyncSession = Depends(get_db_session),
 ) -> dict[str, Any]:
     """Execute compound task using AI to break down into steps."""
+    import json as json_module
+
+    from src.services.ai_router import AIRouter, TaskComplexity
+
     # Check if device is connected
     if device_id not in connected_devices:
         raise HTTPException(
@@ -678,9 +947,8 @@ async def execute_task(
             detail=f"Device {device_id} not connected",
         )
 
-    # TODO: Use AI router to break down task into commands
-    # For now, return a placeholder response
     task_id = str(uuid4())
+    websocket = connected_devices[device_id]
 
     logger.info(
         "Task execution requested",
@@ -691,12 +959,169 @@ async def execute_task(
         },
     )
 
-    return {
-        "task_id": task_id,
-        "status": "pending",
-        "message": "Task execution will be implemented with AI router",
-        "description": task.description,
-    }
+    # Use AI router to break down task into automation commands
+    try:
+        ai_router = AIRouter()
+
+        # Create prompt for task breakdown
+        context_str = json_module.dumps(task.context) if task.context else "{}"
+        prompt = f"""You are an automation assistant. Break down this task into specific automation commands.
+
+Task: {task.description}
+
+Context: {context_str}
+
+Available commands:
+- click: {{x, y, button}} - Click at coordinates
+- type: {{text}} - Type text
+- hotkey: {{modifiers, key}} - Press keyboard shortcut (modifiers: ctrl, alt, shift, meta)
+- screenshot: {{save_path}} - Take screenshot
+- navigate: {{browser, url}} - Navigate browser to URL
+- wait: {{milliseconds}} - Wait for specified time
+
+Return a JSON array of commands in order. Each command should have:
+- command_type: one of the available commands
+- params: the parameters for that command
+- description: what this step does
+
+Example response:
+[
+  {{"command_type": "navigate", "params": {{"browser": "chrome", "url": "https://example.com"}}, "description": "Open example.com"}},
+  {{"command_type": "wait", "params": {{"milliseconds": 2000}}, "description": "Wait for page to load"}},
+  {{"command_type": "click", "params": {{"x": 500, "y": 300}}, "description": "Click on the button"}}
+]
+
+Return ONLY the JSON array, no other text."""
+
+        result = await ai_router.query(
+            prompt=prompt,
+            complexity=TaskComplexity.MEDIUM,
+            max_tokens=2048,
+            use_cache=False,  # Each task is unique
+        )
+
+        # Parse AI response
+        response_text = result.get("response", "[]")
+
+        # Try to extract JSON from response
+        try:
+            # Handle potential markdown code blocks
+            if "```json" in response_text:
+                response_text = response_text.split("```json")[1].split("```")[0]
+            elif "```" in response_text:
+                response_text = response_text.split("```")[1].split("```")[0]
+
+            commands = json_module.loads(response_text.strip())
+        except json_module.JSONDecodeError:
+            logger.warning(
+                "Failed to parse AI response as JSON, using single command",
+                extra={"response": response_text[:200]},
+            )
+            # Fallback: treat the whole task as a single custom command
+            commands = [{
+                "command_type": "custom",
+                "params": {"description": task.description},
+                "description": task.description,
+            }]
+
+        # Store parent task
+        parent_cmd = CommandResult(
+            id=task_id,
+            device_id=device_id,
+            command_type="compound_task",
+            command_params={"description": task.description, "steps": len(commands)},
+            status="executing",
+        )
+        db.add(parent_cmd)
+        await db.commit()
+
+        # Execute each command in sequence
+        executed_commands = []
+        for i, cmd in enumerate(commands):
+            cmd_id = f"{task_id}-step-{i+1}"
+            cmd_type = cmd.get("command_type", "custom")
+            cmd_params = cmd.get("params", {})
+
+            # Store command
+            step_cmd = CommandResult(
+                id=cmd_id,
+                device_id=device_id,
+                command_type=cmd_type,
+                command_params=cmd_params,
+                status="pending",
+            )
+            db.add(step_cmd)
+            await db.commit()
+
+            # Translate and send to device
+            translated_task = translate_command_to_task(cmd_id, cmd_type, cmd_params)
+
+            await websocket.send_json({
+                "type": "automation_task",
+                "task": translated_task,
+            })
+
+            executed_commands.append({
+                "command_id": cmd_id,
+                "command_type": cmd_type,
+                "description": cmd.get("description", ""),
+            })
+
+            logger.info(
+                f"Task step {i+1}/{len(commands)} sent",
+                extra={
+                    "task_id": task_id,
+                    "command_id": cmd_id,
+                    "command_type": cmd_type,
+                },
+            )
+
+        # Log to audit trail
+        await create_audit_log(
+            db=db,
+            action_type="task_executed",
+            actor="user",
+            result="pending",
+            device_id=device_id,
+            command_type="compound_task",
+            command_params={"description": task.description, "steps": len(commands)},
+            ip_address=request.client.host if request.client else None,
+        )
+
+        return {
+            "task_id": task_id,
+            "status": "executing",
+            "steps": len(commands),
+            "commands": executed_commands,
+            "ai_model": result.get("model"),
+            "ai_cost": result.get("cost"),
+        }
+
+    except Exception as e:
+        log_error(
+            logger,
+            "Failed to execute task with AI router",
+            error=e,
+            extra={"device_id": device_id, "task_id": task_id},
+        )
+
+        # Fallback: send task description as a single custom command
+        fallback_cmd = CommandResult(
+            id=task_id,
+            device_id=device_id,
+            command_type="custom",
+            command_params={"description": task.description},
+            status="pending",
+        )
+        db.add(fallback_cmd)
+        await db.commit()
+
+        return {
+            "task_id": task_id,
+            "status": "pending",
+            "message": f"AI breakdown failed ({str(e)}), sent as custom task",
+            "description": task.description,
+        }
 
 
 class AuditLogResponse(BaseModel):

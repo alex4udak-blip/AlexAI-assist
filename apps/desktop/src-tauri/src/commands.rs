@@ -1,7 +1,7 @@
 use crate::collector::{
     get_current_focus, has_accessibility_permission, request_accessibility_permission, FocusInfo,
 };
-use crate::sync::{get_dashboard_url, validate_url};
+use crate::sync::{get_dashboard_url, manual_sync, validate_url};
 use crate::AppState;
 use crate::automation;
 use crate::permissions;
@@ -118,13 +118,9 @@ pub async fn toggle_collection(state: State<'_, Arc<Mutex<AppState>>>) -> Result
 
 #[tauri::command]
 pub async fn sync_now(state: State<'_, Arc<Mutex<AppState>>>) -> Result<(), String> {
-    let mut state = state.lock().await;
-
-    // Perform sync (in real implementation, this would call the sync module)
-    state.last_sync = "Just now".to_string();
-    state.events_buffer.clear();
-
-    Ok(())
+    // Actually sync events to server using the sync module
+    let state_arc = state.inner().clone();
+    manual_sync(state_arc).await
 }
 
 #[tauri::command]

@@ -16,7 +16,7 @@ from uuid import uuid4
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.db.models import Agent, AgentLog, ChatMessage
+from src.db.models import Agent, AgentLog, ChatMessage, Feedback
 
 logger = logging.getLogger(__name__)
 
@@ -401,24 +401,107 @@ class FeedbackCollector:
             - context: Associated context
             - timestamp: When feedback was added
         """
-        feedback_record = {
-            "id": str(uuid4()),
+        feedback_id = str(uuid4())
+        now = datetime.now(UTC)
+        ctx = context or {}
+
+        # Create and persist feedback record to database
+        feedback = Feedback(
+            id=feedback_id,
+            feedback_type=feedback_type,
+            content=content,
+            category=category,
+            context=ctx,
+            session_id=ctx.get("session_id"),
+            message_id=ctx.get("message_id"),
+            agent_id=ctx.get("agent_id"),
+            processed=False,
+        )
+
+        self.db.add(feedback)
+        await self.db.commit()
+        await self.db.refresh(feedback)
+
+        logger.info(
+            f"Explicit feedback saved to database: {feedback_type} - {category or 'uncategorized'}"
+        )
+
+        return {
+            "id": feedback_id,
             "type": feedback_type,
             "content": content,
             "category": category,
-            "context": context or {},
-            "timestamp": datetime.now(UTC),
+            "context": ctx,
+            "timestamp": now,
         }
 
-        logger.info(
-            f"Explicit feedback added: {feedback_type} - {category or 'uncategorized'}"
+    async def get_unprocessed_feedback(
+        self,
+        limit: int = 100,
+    ) -> list[dict[str, Any]]:
+        """Get unprocessed feedback records for evolution processing.
+
+        Args:
+            limit: Maximum number of records to return
+
+        Returns:
+            List of unprocessed feedback records
+        """
+        query = (
+            select(Feedback)
+            .where(Feedback.processed == False)  # noqa: E712
+            .order_by(Feedback.created_at.asc())
+            .limit(limit)
         )
 
-        # In a real implementation, this would be stored in a dedicated feedback table
-        # For now, we return the structured feedback record
-        # TODO: Create and use a Feedback model/table for persistent storage
+        result = await self.db.execute(query)
+        feedbacks = result.scalars().all()
 
-        return feedback_record
+        return [
+            {
+                "id": f.id,
+                "type": f.feedback_type,
+                "content": f.content,
+                "category": f.category,
+                "context": f.context,
+                "session_id": f.session_id,
+                "message_id": f.message_id,
+                "agent_id": f.agent_id,
+                "timestamp": f.created_at,
+            }
+            for f in feedbacks
+        ]
+
+    async def mark_feedback_processed(
+        self,
+        feedback_ids: list[str],
+    ) -> int:
+        """Mark feedback records as processed.
+
+        Args:
+            feedback_ids: List of feedback IDs to mark as processed
+
+        Returns:
+            Number of records updated
+        """
+        if not feedback_ids:
+            return 0
+
+        query = (
+            select(Feedback)
+            .where(Feedback.id.in_(feedback_ids))
+        )
+
+        result = await self.db.execute(query)
+        feedbacks = result.scalars().all()
+
+        for feedback in feedbacks:
+            feedback.processed = True
+
+        await self.db.commit()
+
+        logger.info(f"Marked {len(feedbacks)} feedback records as processed")
+        return len(feedbacks)
 
     def _find_phrase_matches(
         self, text: str, phrases: list[str]
