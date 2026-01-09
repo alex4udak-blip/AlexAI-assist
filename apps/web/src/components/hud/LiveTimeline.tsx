@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion';
-import { useRef, useEffect } from 'react';
+import { useRef, useEffect, useMemo } from 'react';
 import { Monitor, Bot, Clock } from 'lucide-react';
 
 interface TimelineEvent {
@@ -10,6 +10,15 @@ interface TimelineEvent {
   endTime?: string;
   category?: string;
   color?: string;
+}
+
+interface GroupedEvent {
+  id: string;
+  name: string;
+  startTime: string;
+  endTime: string;
+  category?: string;
+  eventCount: number;
 }
 
 interface LiveTimelineProps {
@@ -36,6 +45,57 @@ export function LiveTimeline({
   const hours = Array.from({ length: endHour - startHour + 1 }, (_, i) => startHour + i);
   const totalMinutes = (endHour - startHour + 1) * 60;
 
+  // Group consecutive events by app name to avoid overlapping bars
+  const groupedEvents = useMemo(() => {
+    const appEvents = events.filter(e => e.type === 'app');
+    if (appEvents.length === 0) return [];
+
+    // Sort by time descending (most recent first), then reverse for chronological
+    const sorted = [...appEvents].sort((a, b) =>
+      new Date(a.startTime).getTime() - new Date(b.startTime).getTime()
+    );
+
+    const groups: GroupedEvent[] = [];
+    let currentGroup: GroupedEvent | null = null;
+
+    sorted.forEach((event) => {
+      const eventTime = new Date(event.startTime);
+
+      if (currentGroup && currentGroup.name === event.name) {
+        // Extend current group
+        const groupEnd = new Date(currentGroup.endTime);
+        const timeDiff = (eventTime.getTime() - groupEnd.getTime()) / 60000; // minutes
+
+        // If less than 5 minutes gap, extend the group
+        if (timeDiff < 5) {
+          currentGroup.endTime = new Date(eventTime.getTime() + 60000).toISOString(); // +1 min
+          currentGroup.eventCount++;
+          return;
+        }
+      }
+
+      // Start new group
+      if (currentGroup) {
+        groups.push(currentGroup);
+      }
+
+      currentGroup = {
+        id: event.id,
+        name: event.name,
+        startTime: event.startTime,
+        endTime: new Date(eventTime.getTime() + 60000).toISOString(), // Default 1 min duration
+        category: event.category,
+        eventCount: 1,
+      };
+    });
+
+    if (currentGroup) {
+      groups.push(currentGroup);
+    }
+
+    return groups;
+  }, [events]);
+
   // Auto-scroll to current time
   useEffect(() => {
     if (scrollRef.current) {
@@ -52,14 +112,14 @@ export function LiveTimeline({
   const getEventPosition = (startTime: string) => {
     const date = new Date(startTime);
     const minutes = (date.getHours() - startHour) * 60 + date.getMinutes();
-    return (minutes / totalMinutes) * 100;
+    return Math.max(0, (minutes / totalMinutes) * 100);
   };
 
-  const getEventWidth = (startTime: string, endTime?: string) => {
+  const getEventWidth = (startTime: string, endTime: string) => {
     const start = new Date(startTime);
-    const end = endTime ? new Date(endTime) : new Date();
-    const durationMinutes = (end.getTime() - start.getTime()) / 60000;
-    return Math.max((durationMinutes / totalMinutes) * 100, 0.5); // Min 0.5% width
+    const end = new Date(endTime);
+    const durationMinutes = Math.max(1, (end.getTime() - start.getTime()) / 60000);
+    return Math.max((durationMinutes / totalMinutes) * 100, 0.8); // Min 0.8% width
   };
 
   // Current time indicator
@@ -111,34 +171,44 @@ export function LiveTimeline({
             ))}
           </div>
 
-          {/* Events track - Apps */}
+          {/* Events track - Apps (grouped) */}
           <div className="absolute top-8 left-0 right-0 h-7">
-            {events
-              .filter((e) => e.type === 'app')
-              .map((event) => {
-                const color = event.color || categoryColors[event.category || 'other'];
-                return (
-                  <motion.div
-                    key={event.id}
-                    initial={{ opacity: 0, scaleX: 0 }}
-                    animate={{ opacity: 1, scaleX: 1 }}
-                    className="absolute top-0 h-full rounded-md flex items-center px-2
-                               overflow-hidden cursor-pointer group"
-                    style={{
-                      left: `${getEventPosition(event.startTime)}%`,
-                      width: `${getEventWidth(event.startTime, event.endTime)}%`,
-                      backgroundColor: `${color}20`,
-                      borderLeft: `3px solid ${color}`,
-                    }}
-                    title={`${event.name} - ${event.category || 'other'}`}
-                  >
-                    <Monitor className="w-3 h-3 shrink-0" style={{ color }} />
-                    <span className="ml-1 text-[10px] text-text-primary truncate">
-                      {event.name}
+            {groupedEvents.map((event) => {
+              const color = categoryColors[event.category || 'other'];
+              const position = getEventPosition(event.startTime);
+              const width = getEventWidth(event.startTime, event.endTime);
+
+              // Skip events that are outside visible range
+              if (position > 100 || position + width < 0) return null;
+
+              return (
+                <motion.div
+                  key={`${event.id}-${event.startTime}`}
+                  initial={{ opacity: 0, scaleX: 0 }}
+                  animate={{ opacity: 1, scaleX: 1 }}
+                  className="absolute top-0 h-full rounded-md flex items-center px-2
+                             overflow-hidden cursor-pointer group hover:z-10"
+                  style={{
+                    left: `${position}%`,
+                    width: `${width}%`,
+                    backgroundColor: `${color}30`,
+                    borderLeft: `3px solid ${color}`,
+                    minWidth: '60px',
+                  }}
+                  title={`${event.name} - ${event.category || 'other'} (${event.eventCount} событий)`}
+                >
+                  <Monitor className="w-3 h-3 shrink-0" style={{ color }} />
+                  <span className="ml-1 text-[10px] text-text-primary truncate font-medium">
+                    {event.name}
+                  </span>
+                  {event.eventCount > 1 && (
+                    <span className="ml-1 text-[9px] text-text-muted">
+                      ({event.eventCount})
                     </span>
-                  </motion.div>
-                );
-              })}
+                  )}
+                </motion.div>
+              );
+            })}
           </div>
 
           {/* Events track - Agents */}

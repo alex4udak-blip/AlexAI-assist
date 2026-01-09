@@ -282,16 +282,18 @@ export default function Dashboard() {
   }, [agents, summary]);
 
   // Calculate system health based on recent events
-  const systemHealth = useMemo(() => {
-    if (!timeline || timeline.length === 0) return 'warning';
+  const { systemHealth, lastEventMinutesAgo } = useMemo(() => {
+    if (!timeline || timeline.length === 0) {
+      return { systemHealth: 'warning' as const, lastEventMinutesAgo: 999 };
+    }
 
     const latestEvent = new Date(timeline[0].timestamp);
     const now = new Date();
-    const minutesAgo = (now.getTime() - latestEvent.getTime()) / 60000;
+    const minutesAgo = Math.round((now.getTime() - latestEvent.getTime()) / 60000);
 
-    if (minutesAgo < 5) return 'healthy';
-    if (minutesAgo < 30) return 'warning';
-    return 'critical';
+    if (minutesAgo < 5) return { systemHealth: 'healthy' as const, lastEventMinutesAgo: minutesAgo };
+    if (minutesAgo < 30) return { systemHealth: 'warning' as const, lastEventMinutesAgo: minutesAgo };
+    return { systemHealth: 'critical' as const, lastEventMinutesAgo: minutesAgo };
   }, [timeline]);
 
   // Generate agent activity stream
@@ -468,7 +470,8 @@ export default function Dashboard() {
             focusTime={currentFocus?.sessionMinutes}
             activeAgents={activeAgents.length}
             totalAgents={agents?.length ?? 0}
-            systemHealth={systemHealth as 'healthy' | 'warning' | 'critical'}
+            systemHealth={systemHealth}
+            lastEventMinutesAgo={lastEventMinutesAgo}
           />
         </motion.div>
 
@@ -549,7 +552,8 @@ export default function Dashboard() {
           focusTime={currentFocus?.sessionMinutes}
           activeAgents={activeAgents.length}
           totalAgents={agents?.length ?? 0}
-          systemHealth={systemHealth as 'healthy' | 'warning' | 'critical'}
+          systemHealth={systemHealth}
+          lastEventMinutesAgo={lastEventMinutesAgo}
         />
       </motion.div>
 
