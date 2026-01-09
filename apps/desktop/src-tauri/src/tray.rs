@@ -14,27 +14,43 @@ pub fn create_tray(app: &App) -> Result<(), Box<dyn std::error::Error>> {
 
     let menu = Menu::with_items(app, &[&show, &dashboard, &separator, &quit])?;
 
-    // Load tray icon - use a simple colored icon for visibility
-    let icon = Image::from_path("icons/icon.png")
-        .or_else(|_| Image::from_path("icons/32x32.png"))
-        .unwrap_or_else(|_| {
-            // Fallback: create a simple 16x16 colored icon
-            let mut rgba = vec![0u8; 16 * 16 * 4];
-            for i in 0..(16 * 16) {
-                let idx = i * 4;
-                rgba[idx] = 99;      // R - indigo
+    // Create a simple 22x22 colored tray icon (standard macOS menu bar size)
+    // Using indigo color (#6366f1) as a circle
+    let size = 22u32;
+    let mut rgba = vec![0u8; (size * size * 4) as usize];
+    let center = size as f32 / 2.0;
+    let radius = size as f32 / 2.0 - 1.0;
+
+    for y in 0..size {
+        for x in 0..size {
+            let idx = ((y * size + x) * 4) as usize;
+            let dx = x as f32 - center;
+            let dy = y as f32 - center;
+            let dist = (dx * dx + dy * dy).sqrt();
+
+            if dist <= radius {
+                // Inside circle - indigo color
+                rgba[idx] = 99;      // R
                 rgba[idx + 1] = 102; // G
                 rgba[idx + 2] = 241; // B
                 rgba[idx + 3] = 255; // A
+            } else {
+                // Outside circle - transparent
+                rgba[idx] = 0;
+                rgba[idx + 1] = 0;
+                rgba[idx + 2] = 0;
+                rgba[idx + 3] = 0;
             }
-            Image::new_owned(rgba, 16, 16)
-        });
+        }
+    }
+
+    let icon = Image::new_owned(rgba, size, size);
 
     let tray = TrayIconBuilder::new()
         .icon(icon)
-        .icon_as_template(false) // Use colored icon, not template
+        .icon_as_template(false)
         .menu(&menu)
-        .menu_on_left_click(false)
+        .show_menu_on_left_click(false)
         .tooltip("Observer - Activity Tracker")
         .on_menu_event(move |app, event| match event.id.as_ref() {
             "quit" => {
