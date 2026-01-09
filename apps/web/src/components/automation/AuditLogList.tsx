@@ -7,7 +7,6 @@ import { Select } from '../ui/Select';
 import { api, type AuditLog } from '../../lib/api';
 import {
   Clock,
-  User,
   Monitor,
   AlertCircle,
   CheckCircle,
