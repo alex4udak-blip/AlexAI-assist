@@ -7,7 +7,9 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
 from apscheduler.triggers.interval import IntervalTrigger
 
+from src.core.config import settings
 from src.db.session import async_session_maker
+from src.services.cleanup import CleanupService
 from src.services.pattern_detector import PatternDetectorService
 from src.services.evolution.orchestrator import EvolutionOrchestrator
 
@@ -117,6 +119,24 @@ async def run_evolution_cycle() -> None:
         logger.error(f"Evolution cycle failed: {e}")
 
 
+async def data_retention_cleanup_job() -> None:
+    """Daily job to clean up old data based on retention policy."""
+    logger.info("Running scheduled data retention cleanup...")
+    try:
+        async with async_session_maker() as db:
+            cleanup_service = CleanupService(db)
+            result = await cleanup_service.cleanup(
+                retention_days=settings.retention_days,
+                dry_run=False,
+            )
+            logger.info(
+                f"Data retention cleanup complete: deleted {result.get('total_deleted', 0)} records "
+                f"(retention: {settings.retention_days} days)"
+            )
+    except Exception as e:
+        logger.error(f"Data retention cleanup job failed: {e}")
+
+
 def start_scheduler() -> None:
     """Start the background scheduler."""
     # Run pattern detection every 5 minutes
@@ -175,8 +195,19 @@ def start_scheduler() -> None:
         coalesce=True,
     )
 
+    # Run data retention cleanup daily at 2 AM
+    scheduler.add_job(
+        data_retention_cleanup_job,
+        trigger=CronTrigger(hour=2, minute=0),
+        id="data_retention_cleanup",
+        name="Clean up old data based on retention policy",
+        replace_existing=True,
+        max_instances=1,
+        coalesce=True,
+    )
+
     scheduler.start()
-    logger.info("Background scheduler started with memory jobs")
+    logger.info("Background scheduler started with memory and cleanup jobs")
 
 
 def stop_scheduler() -> None:

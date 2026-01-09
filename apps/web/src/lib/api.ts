@@ -143,9 +143,17 @@ export const api = {
       method: 'POST',
       body: JSON.stringify({ message, context }),
     }),
-  getChatHistory: (sessionId?: string) =>
-    fetchApi<ChatMessage[]>('/api/v1/chat/history', {
-      params: { session_id: sessionId },
+  getChatHistory: (options?: {
+    sessionId?: string;
+    limit?: number;
+    offset?: number;
+  }) =>
+    fetchApi<PaginatedChatHistory>('/api/v1/chat/history', {
+      params: {
+        session_id: options?.sessionId,
+        limit: options?.limit ?? 30,
+        offset: options?.offset ?? 0,
+      },
     }),
 
   // Audit Logs
@@ -337,6 +345,14 @@ export interface ChatMessage {
   role: 'user' | 'assistant';
   content: string;
   timestamp: string;
+}
+
+export interface PaginatedChatHistory {
+  messages: ChatMessage[];
+  total: number;
+  limit: number;
+  offset: number;
+  has_more: boolean;
 }
 
 export interface AuditLog {

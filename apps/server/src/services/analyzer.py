@@ -1,10 +1,9 @@
 """Event analyzer service."""
 
-from collections import defaultdict
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
-from sqlalchemy import func, select
+from sqlalchemy import case, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.db.models import Event
@@ -22,35 +21,63 @@ class AnalyzerService:
         start_date: datetime | None = None,
         end_date: datetime | None = None,
     ) -> dict[str, Any]:
-        """Get activity summary statistics."""
+        """Get activity summary statistics using SQL aggregations."""
         if not start_date:
             start_date = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(days=7)
         if not end_date:
             end_date = datetime.now(timezone.utc).replace(tzinfo=None)
 
-        query = select(Event).where(
+        # Base filter conditions
+        base_conditions = [
             Event.timestamp >= start_date,
             Event.timestamp <= end_date,
-        )
-
+        ]
         if device_id:
-            query = query.where(Event.device_id == device_id)
+            base_conditions.append(Event.device_id == device_id)
 
-        result = await self.db.execute(query)
-        events = result.scalars().all()
+        # Query 1: Get total event count
+        total_query = select(func.count(Event.id)).where(*base_conditions)
+        total_result = await self.db.execute(total_query)
+        total_events = total_result.scalar() or 0
 
-        # Calculate statistics
-        total_events = len(events)
-        apps_used: dict[str, int] = defaultdict(int)
-        categories: dict[str, int] = defaultdict(int)
-        hourly_activity: dict[int, int] = defaultdict(int)
+        # Query 2: Get top apps (GROUP BY app_name)
+        apps_query = (
+            select(
+                Event.app_name,
+                func.count(Event.id).label("count"),
+            )
+            .where(*base_conditions, Event.app_name.isnot(None))
+            .group_by(Event.app_name)
+            .order_by(func.count(Event.id).desc())
+            .limit(10)
+        )
+        apps_result = await self.db.execute(apps_query)
+        top_apps = [(row.app_name, row.count) for row in apps_result.all()]
 
-        for event in events:
-            if event.app_name:
-                apps_used[event.app_name] += 1
-            if event.category:
-                categories[event.category] += 1
-            hourly_activity[event.timestamp.hour] += 1
+        # Query 3: Get category breakdown (GROUP BY category)
+        categories_query = (
+            select(
+                Event.category,
+                func.count(Event.id).label("count"),
+            )
+            .where(*base_conditions, Event.category.isnot(None))
+            .group_by(Event.category)
+        )
+        categories_result = await self.db.execute(categories_query)
+        categories = {row.category: row.count for row in categories_result.all()}
+
+        # Query 4: Get hourly activity (GROUP BY hour)
+        hour_expr = func.extract("hour", Event.timestamp)
+        hourly_query = (
+            select(
+                hour_expr.label("hour"),
+                func.count(Event.id).label("count"),
+            )
+            .where(*base_conditions)
+            .group_by(hour_expr)
+        )
+        hourly_result = await self.db.execute(hourly_query)
+        hourly_activity = {int(row.hour): row.count for row in hourly_result.all()}
 
         return {
             "total_events": total_events,
@@ -58,13 +85,9 @@ class AnalyzerService:
                 "start": start_date.isoformat(),
                 "end": end_date.isoformat(),
             },
-            "top_apps": sorted(
-                apps_used.items(),
-                key=lambda x: x[1],
-                reverse=True,
-            )[:10],
-            "categories": dict(categories),
-            "hourly_activity": dict(hourly_activity),
+            "top_apps": top_apps,
+            "categories": categories,
+            "hourly_activity": hourly_activity,
         }
 
     async def get_category_breakdown(
@@ -101,9 +124,10 @@ class AnalyzerService:
         days: int = 7,
         limit: int = 20,
     ) -> list[dict[str, Any]]:
-        """Get app usage statistics."""
+        """Get app usage statistics using SQL aggregation."""
         start_date = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(days=days)
 
+        # Use SQL GROUP BY for efficient aggregation
         query = (
             select(
                 Event.app_name,
@@ -133,41 +157,55 @@ class AnalyzerService:
         self,
         device_id: str | None = None,
     ) -> dict[str, Any]:
-        """Calculate productivity score based on activity patterns."""
+        """Calculate productivity score using SQL aggregations."""
         today = datetime.now(timezone.utc).replace(
             hour=0, minute=0, second=0, microsecond=0, tzinfo=None
         )
 
-        query = select(Event).where(Event.timestamp >= today)
+        # Define productivity categories
+        productive_categories = ("coding", "writing", "design", "research")
+        semi_productive_categories = ("browsing", "reading")
 
+        # Base conditions
+        base_conditions = [Event.timestamp >= today]
         if device_id:
-            query = query.where(Event.device_id == device_id)
+            base_conditions.append(Event.device_id == device_id)
+
+        # Use SQL CASE expressions for conditional counting
+        productive_case = case(
+            (Event.category.in_(productive_categories), 1),
+            else_=0,
+        )
+        semi_productive_case = case(
+            (Event.category.in_(semi_productive_categories), 1),
+            else_=0,
+        )
+
+        # Single query to get all counts using SQL aggregations
+        query = select(
+            func.count(Event.id).label("total_count"),
+            func.sum(productive_case).label("productive_count"),
+            func.sum(semi_productive_case).label("semi_productive_count"),
+        ).where(*base_conditions)
 
         result = await self.db.execute(query)
-        events = result.scalars().all()
+        row = result.one()
 
-        # Calculate productivity metrics
-        # High productivity categories (full weight)
-        productive_categories = {"coding", "writing", "design", "research"}
-        # Semi-productive categories (half weight)
-        semi_productive = {"browsing", "reading"}
+        total_count = row.total_count or 0
+        productive_count = row.productive_count or 0
+        semi_productive_count = row.semi_productive_count or 0
 
-        productive_count = sum(
-            1 for e in events if e.category in productive_categories
-        )
-        semi_productive_count = sum(
-            1 for e in events if e.category in semi_productive
-        )
-        # Weighted score: full for productive, 0.5 for semi-productive
-        weighted_count = productive_count + (semi_productive_count * 0.5)
-        total_count = len(events) or 1
-
-        score = int((weighted_count / total_count) * 100)
+        # Calculate weighted score: full for productive, 0.5 for semi-productive
+        if total_count > 0:
+            weighted_count = productive_count + (semi_productive_count * 0.5)
+            score = int((weighted_count / total_count) * 100)
+        else:
+            score = 0
 
         return {
             "score": min(score, 100),
             "productive_events": productive_count,
-            "total_events": len(events),
+            "total_events": total_count,
             "trend": "up" if score > 50 else "down",
         }
 

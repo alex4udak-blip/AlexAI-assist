@@ -8,7 +8,7 @@ from uuid import uuid4
 import redis.asyncio as redis
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.api.deps import get_db_session
@@ -82,6 +82,16 @@ class ChatMessageOutput(BaseModel):
     role: str
     content: str
     timestamp: str
+
+
+class PaginatedChatHistory(BaseModel):
+    """Paginated chat history response."""
+
+    messages: list[ChatMessageOutput]
+    total: int
+    limit: int
+    offset: int
+    has_more: bool
 
 
 @router.post("", response_model=ChatResponse)
@@ -307,14 +317,28 @@ async def chat(
             status_code=500, detail="Failed to save chat messages"
         ) from e
 
-    # Invalidate cache for this session
+    # Invalidate cache for this session (all pagination variants)
     r = await get_redis()
     if r:
         try:
-            await r.delete(f"chat_history:{session_id}")
+            # Delete all cache keys for this session using pattern matching
+            pattern = f"chat_history:{session_id}:*"
+            cursor = 0
+            deleted_count = 0
+            while True:
+                cursor, keys = await r.scan(cursor, match=pattern, count=100)
+                if keys:
+                    await r.delete(*keys)
+                    deleted_count += len(keys)
+                if cursor == 0:
+                    break
             logger.debug(
                 "Cache invalidated",
-                extra={"event_type": "cache_invalidated", "session_id": session_id},
+                extra={
+                    "event_type": "cache_invalidated",
+                    "session_id": session_id,
+                    "deleted_keys": deleted_count,
+                },
             )
         except Exception as e:
             log_error(
@@ -353,7 +377,7 @@ async def chat(
     )
 
 
-@router.get("/history")
+@router.get("/history", response_model=PaginatedChatHistory)
 async def get_chat_history(
     session_id: str = Query(
         default="default",
@@ -362,18 +386,23 @@ async def get_chat_history(
         description="Session identifier",
     ),
     limit: int = Query(
-        default=50,
+        default=30,
         ge=1,
-        le=500,
+        le=100,
         description="Maximum number of messages to return",
     ),
+    offset: int = Query(
+        default=0,
+        ge=0,
+        description="Number of messages to skip (for pagination)",
+    ),
     db: AsyncSession = Depends(get_db_session),
-) -> list[ChatMessageOutput]:
-    """Get chat history from database with Redis caching."""
+) -> PaginatedChatHistory:
+    """Get paginated chat history from database with Redis caching."""
     # Validate session_id to prevent session forgery
     session_id = validate_session_id(session_id)
 
-    cache_key = f"chat_history:{session_id}"
+    cache_key = f"chat_history:{session_id}:limit={limit}:offset={offset}"
 
     # Try to get from Redis cache first
     r = await get_redis()
@@ -385,7 +414,7 @@ async def get_chat_history(
                     "Cache hit for chat history",
                     extra={"event_type": "cache_hit", "session_id": session_id},
                 )
-                return json.loads(cached)
+                return PaginatedChatHistory(**json.loads(cached))
         except Exception as e:
             log_error(
                 logger,
@@ -394,12 +423,22 @@ async def get_chat_history(
                 extra={"event_type": "cache_read_error", "session_id": session_id},
             )
 
-    # Get from database
+    # Get total count for pagination
+    count_query = (
+        select(func.count())
+        .select_from(ChatMessage)
+        .where(ChatMessage.session_id == session_id)
+    )
+    count_result = await db.execute(count_query)
+    total = count_result.scalar() or 0
+
+    # Get paginated messages from database (newest first, then reverse for display)
     query = (
         select(ChatMessage)
         .where(ChatMessage.session_id == session_id)
         .order_by(ChatMessage.timestamp.desc())
         .limit(limit)
+        .offset(offset)
     )
     result = await db.execute(query)
     messages = result.scalars().all()
@@ -415,13 +454,23 @@ async def get_chat_history(
         for msg in reversed(messages)
     ]
 
+    has_more = offset + len(messages) < total
+
+    paginated_response = PaginatedChatHistory(
+        messages=history,
+        total=total,
+        limit=limit,
+        offset=offset,
+        has_more=has_more,
+    )
+
     # Cache in Redis for 5 minutes
     if r and history:
         try:
             await r.setex(
                 cache_key,
                 300,  # 5 minutes TTL
-                json.dumps([h.model_dump() for h in history]),
+                json.dumps(paginated_response.model_dump()),
             )
             logger.debug(
                 "Chat history cached",
@@ -429,6 +478,7 @@ async def get_chat_history(
                     "event_type": "cache_write",
                     "session_id": session_id,
                     "message_count": len(history),
+                    "total": total,
                 },
             )
         except Exception as e:
@@ -439,7 +489,7 @@ async def get_chat_history(
                 extra={"event_type": "cache_write_error", "session_id": session_id},
             )
 
-    return history
+    return paginated_response
 
 
 @router.delete("/history")
@@ -472,11 +522,18 @@ async def clear_chat_history(
         },
     )
 
-    # Clear cache
+    # Clear cache (all pagination variants)
     r = await get_redis()
     if r:
         try:
-            await r.delete(f"chat_history:{session_id}")
+            pattern = f"chat_history:{session_id}:*"
+            cursor = 0
+            while True:
+                cursor, keys = await r.scan(cursor, match=pattern, count=100)
+                if keys:
+                    await r.delete(*keys)
+                if cursor == 0:
+                    break
         except Exception as e:
             log_error(
                 logger,
