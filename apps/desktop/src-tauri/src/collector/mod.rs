@@ -2,12 +2,13 @@ mod accessibility;
 mod apps;
 mod browser;
 mod messenger;
+#[allow(dead_code)]
 mod screenshots;
 
 pub use accessibility::macos::*;
-pub use browser::{BrowserMonitor, BrowserState, BrowserTab};
-pub use messenger::{Message, MessengerMonitor, MessengerState};
-pub use screenshots::{Screenshot, ScreenshotConfig, ScreenshotManager, ScreenshotStats};
+// Only export types that are actually used in Event struct
+pub use browser::BrowserTab;
+pub use messenger::Message;
 
 use crate::AppState;
 use chrono::{DateTime, Utc};

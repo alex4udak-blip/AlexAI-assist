@@ -13,20 +13,22 @@
     "withGlobalTauri": true,
     "macOSPrivateApi": true,
     "trayIcon": {
-      "iconPath": "icons/icon.png",
-      "iconAsTemplate": true
+      "iconPath": "icons/32x32.png",
+      "iconAsTemplate": false
     },
     "windows": [
       {
+        "label": "main",
         "title": "Observer",
         "width": 320,
         "height": 400,
-        "visible": false,
+        "visible": true,
         "resizable": false,
-        "decorations": false,
-        "transparent": true,
-        "skipTaskbar": true,
-        "alwaysOnTop": true
+        "decorations": true,
+        "transparent": false,
+        "skipTaskbar": false,
+        "alwaysOnTop": false,
+        "center": true
       }
     ],
     "security": {
