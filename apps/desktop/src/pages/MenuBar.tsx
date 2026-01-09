@@ -180,7 +180,7 @@ export default function MenuBar() {
       {/* Footer */}
       <div className="px-4 py-3 bg-bg-tertiary border-t border-border-subtle">
         <div className="flex items-center justify-between text-xs text-text-muted">
-          <span>v0.1.0</span>
+          <span>v0.1.1</span>
           <button
             onClick={openSettings}
             className="hover:text-text-secondary transition-colors"

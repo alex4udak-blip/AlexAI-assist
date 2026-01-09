@@ -78,6 +78,13 @@ jobs:
           echo "Generated icons:"
           ls -la
 
+      - name: Get version from tauri.conf.json
+        id: version
+        run: |
+          VERSION=$(jq -r '.version' apps/desktop/src-tauri/tauri.conf.json)
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Building version: $VERSION"
+
       - name: Build Tauri app (aarch64)
         run: |
           cd apps/desktop
@@ -94,6 +101,57 @@ jobs:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
 
+      - name: Create update bundles (tar.gz)
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+
+          # Create tar.gz from .app for aarch64
+          AARCH64_APP="apps/desktop/src-tauri/target/aarch64-apple-darwin/release/bundle/macos/Observer.app"
+          if [ -d "$AARCH64_APP" ]; then
+            cd apps/desktop/src-tauri/target/aarch64-apple-darwin/release/bundle/macos
+            tar -czf "Observer_${VERSION}_aarch64.app.tar.gz" Observer.app
+            echo "Created aarch64 tar.gz"
+            ls -la *.tar.gz
+            cd -
+          fi
+
+          # Create tar.gz from .app for x86_64
+          X64_APP="apps/desktop/src-tauri/target/x86_64-apple-darwin/release/bundle/macos/Observer.app"
+          if [ -d "$X64_APP" ]; then
+            cd apps/desktop/src-tauri/target/x86_64-apple-darwin/release/bundle/macos
+            tar -czf "Observer_${VERSION}_x64.app.tar.gz" Observer.app
+            echo "Created x86_64 tar.gz"
+            ls -la *.tar.gz
+            cd -
+          fi
+
+      - name: Sign update bundles
+        if: ${{ env.TAURI_SIGNING_PRIVATE_KEY != '' }}
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+
+          # Sign aarch64 bundle
+          AARCH64_TAR="apps/desktop/src-tauri/target/aarch64-apple-darwin/release/bundle/macos/Observer_${VERSION}_aarch64.app.tar.gz"
+          if [ -f "$AARCH64_TAR" ]; then
+            echo "$TAURI_SIGNING_PRIVATE_KEY" | base64 -d > /tmp/private_key
+            openssl dgst -sha256 -sign /tmp/private_key -out "${AARCH64_TAR}.sig" "$AARCH64_TAR"
+            base64 -i "${AARCH64_TAR}.sig" -o "${AARCH64_TAR}.sig.b64"
+            mv "${AARCH64_TAR}.sig.b64" "${AARCH64_TAR}.sig"
+            rm /tmp/private_key
+          fi
+
+          # Sign x86_64 bundle
+          X64_TAR="apps/desktop/src-tauri/target/x86_64-apple-darwin/release/bundle/macos/Observer_${VERSION}_x64.app.tar.gz"
+          if [ -f "$X64_TAR" ]; then
+            echo "$TAURI_SIGNING_PRIVATE_KEY" | base64 -d > /tmp/private_key
+            openssl dgst -sha256 -sign /tmp/private_key -out "${X64_TAR}.sig" "$X64_TAR"
+            base64 -i "${X64_TAR}.sig" -o "${X64_TAR}.sig.b64"
+            mv "${X64_TAR}.sig.b64" "${X64_TAR}.sig"
+            rm /tmp/private_key
+          fi
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+
       - name: Upload artifact (aarch64)
         uses: actions/upload-artifact@v4
         with:
@@ -108,17 +166,15 @@ jobs:
 
       - name: Generate latest.json for updater
         run: |
-          VERSION="0.1.0"
-          AARCH64_DMG="Observer_${VERSION}_aarch64.dmg"
-          X64_DMG="Observer_${VERSION}_x64.dmg"
+          VERSION="${{ steps.version.outputs.version }}"
           REPO_URL="https://github.com/alex4udak-blip/AlexAI-assist/releases/download/v${VERSION}"
 
           # Get signatures if they exist
           AARCH64_SIG=""
           X64_SIG=""
 
-          AARCH64_SIG_FILE="apps/desktop/src-tauri/target/aarch64-apple-darwin/release/bundle/dmg/${AARCH64_DMG}.sig"
-          X64_SIG_FILE="apps/desktop/src-tauri/target/x86_64-apple-darwin/release/bundle/dmg/${X64_DMG}.sig"
+          AARCH64_SIG_FILE="apps/desktop/src-tauri/target/aarch64-apple-darwin/release/bundle/macos/Observer_${VERSION}_aarch64.app.tar.gz.sig"
+          X64_SIG_FILE="apps/desktop/src-tauri/target/x86_64-apple-darwin/release/bundle/macos/Observer_${VERSION}_x64.app.tar.gz.sig"
 
           if [ -f "$AARCH64_SIG_FILE" ]; then
             AARCH64_SIG=$(cat "$AARCH64_SIG_FILE")
@@ -128,7 +184,7 @@ jobs:
             X64_SIG=$(cat "$X64_SIG_FILE")
           fi
 
-          # Create latest.json
+          # Create latest.json for Tauri updater (uses tar.gz, not dmg)
           cat > latest.json << EOF
           {
             "version": "${VERSION}",
@@ -137,11 +193,11 @@ jobs:
             "platforms": {
               "darwin-aarch64": {
                 "signature": "${AARCH64_SIG}",
-                "url": "${REPO_URL}/${AARCH64_DMG}"
+                "url": "${REPO_URL}/Observer_${VERSION}_aarch64.app.tar.gz"
               },
               "darwin-x86_64": {
                 "signature": "${X64_SIG}",
-                "url": "${REPO_URL}/${X64_DMG}"
+                "url": "${REPO_URL}/Observer_${VERSION}_x64.app.tar.gz"
               }
             }
           }
@@ -151,31 +207,34 @@ jobs:
 
       - name: Delete existing release and tag
         run: |
+          VERSION="${{ steps.version.outputs.version }}"
           # Delete release first (if exists)
-          gh release delete v0.1.0 --yes --cleanup-tag || true
+          gh release delete "v${VERSION}" --yes --cleanup-tag || true
           # Also delete tag manually if it still exists
-          git push origin :refs/tags/v0.1.0 || true
+          git push origin ":refs/tags/v${VERSION}" || true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Create Release
         uses: softprops/action-gh-release@v1
         with:
-          tag_name: v0.1.0
-          name: Observer v0.1.0
+          tag_name: v${{ steps.version.outputs.version }}
+          name: Observer v${{ steps.version.outputs.version }}
           draft: false
           prerelease: false
           fail_on_unmatched_files: false
           files: |
             apps/desktop/src-tauri/target/aarch64-apple-darwin/release/bundle/dmg/*.dmg
             apps/desktop/src-tauri/target/x86_64-apple-darwin/release/bundle/dmg/*.dmg
+            apps/desktop/src-tauri/target/aarch64-apple-darwin/release/bundle/macos/*.app.tar.gz
+            apps/desktop/src-tauri/target/x86_64-apple-darwin/release/bundle/macos/*.app.tar.gz
             latest.json
           body: |
-            ## Observer Desktop App v0.1.0
+            ## Observer Desktop App v${{ steps.version.outputs.version }}
 
             ### Downloads
-            - **Apple Silicon (M1/M2/M3)**: `Observer_0.1.0_aarch64.dmg`
-            - **Intel Mac**: `Observer_0.1.0_x64.dmg`
+            - **Apple Silicon (M1/M2/M3)**: `Observer_${{ steps.version.outputs.version }}_aarch64.dmg`
+            - **Intel Mac**: `Observer_${{ steps.version.outputs.version }}_x64.dmg`
 
             ### Installation
             1. Download the appropriate .dmg file for your Mac
