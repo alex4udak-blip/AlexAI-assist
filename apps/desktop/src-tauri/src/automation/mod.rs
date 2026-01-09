@@ -13,22 +13,15 @@ pub mod trust;
 pub mod ocr;
 pub mod sync;
 
-// Re-export commonly used types (allow unused for API stability)
-#[allow(unused_imports)]
+// Re-export commonly used types for public API
 pub use queue::{AutomationQueue, TaskPriority, QueueStatus};
-#[allow(unused_imports)]
 pub use trust::TrustLevel;
-#[allow(unused_imports)]
 pub use input::{click_at, type_text, press_hotkey};
-#[allow(unused_imports)]
 pub use screen::capture_screenshot;
-#[allow(unused_imports)]
 pub use browser::{get_browser_url, navigate_to_url, Browser};
-#[allow(unused_imports)]
 pub use ocr::extract_text_from_image;
 
 #[cfg(target_os = "macos")]
-#[allow(unused_imports)]
 pub use accessibility_ffi::{
     check_accessibility,
     request_accessibility,

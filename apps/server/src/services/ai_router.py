@@ -2,13 +2,14 @@
 
 import json
 from collections import defaultdict
-from datetime import datetime, timedelta, timezone
+from datetime import timedelta
 from enum import Enum
 from typing import Any
 
 from anthropic import Anthropic
 
 from src.core.config import settings
+from src.core.datetime_utils import utc_now_naive
 from src.core.logging import get_logger
 
 logger = get_logger(__name__)
@@ -30,11 +31,6 @@ class TaskComplexity(Enum):
     MEDIUM = 3  # Moderate reasoning, summaries
     COMPLEX = 4  # Deep analysis, multi-step reasoning
     EXPERT = 5  # Advanced reasoning, code generation
-
-
-def utc_now() -> datetime:
-    """Get current UTC time as naive datetime."""
-    return datetime.now(timezone.utc).replace(tzinfo=None)
 
 
 class AIRouter:
@@ -93,7 +89,7 @@ class AIRouter:
 
     def _get_today_key(self) -> str:
         """Get today's date key for usage tracking."""
-        return utc_now().strftime("%Y-%m-%d")
+        return utc_now_naive().strftime("%Y-%m-%d")
 
     def _select_model(
         self,
@@ -267,7 +263,7 @@ class AIRouter:
         cache_key = self._get_cache_key(prompt + context, model.value)
         if use_cache and cache_key in self.cache:
             cached = self.cache[cache_key]
-            if utc_now() - cached["timestamp"] < timedelta(seconds=cache_ttl):
+            if utc_now_naive() - cached["timestamp"] < timedelta(seconds=cache_ttl):
                 logger.info(
                     "Cache hit",
                     extra={"cache_key": cache_key[:50]},
@@ -324,7 +320,7 @@ class AIRouter:
             if use_cache:
                 self.cache[cache_key] = {
                     "response": response_text,
-                    "timestamp": utc_now(),
+                    "timestamp": utc_now_naive(),
                 }
 
             logger.info(
@@ -358,7 +354,7 @@ class AIRouter:
 
     def get_usage_stats(self, days: int = 7) -> dict[str, Any]:
         """Get usage statistics for dashboard."""
-        today = utc_now()
+        today = utc_now_naive()
         stats = {
             "daily_usage": [],
             "total_cost": 0.0,

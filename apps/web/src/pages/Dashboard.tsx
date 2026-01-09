@@ -95,10 +95,17 @@ const HolographicPanel = ({
     green: 'shadow-glow-green'
   }[glowColor];
 
+  const hoverGlowClass = {
+    cyan: 'hover:shadow-glow-cyan',
+    blue: 'hover:shadow-glow-blue',
+    purple: 'hover:shadow-[0_0_20px_rgba(139,92,246,0.5)]',
+    green: 'hover:shadow-glow-green'
+  }[glowColor];
+
   return (
     <div className={`relative ${className}`}>
       <div className={`relative rounded-xl bg-bg-secondary/40 backdrop-blur-xl border border-border-default
-                      ${glowClass} transition-all duration-300 hover:border-border-glow hover:${glowClass}
+                      ${glowClass} ${hoverGlowClass} transition-all duration-300 hover:border-border-glow
                       bg-gradient-to-br from-surface-primary to-transparent overflow-hidden`}>
         {showCorners && <HUDCorners />}
         {showScanLine && <ScanLine />}

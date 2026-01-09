@@ -168,7 +168,10 @@ impl EventDatabase {
         Ok(count as usize)
     }
 
-    /// Clear all events from database (used for testing/debugging)
+    /// Clear all events from database
+    ///
+    /// This is primarily used for testing/debugging purposes.
+    /// DO NOT use in production unless you want to permanently delete all events.
     #[allow(dead_code)]
     pub fn clear_all(&self) -> SqliteResult<()> {
         let conn = self.conn.lock().unwrap();

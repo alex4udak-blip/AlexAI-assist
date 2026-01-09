@@ -1,6 +1,6 @@
 """Event endpoints."""
 
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Any
 from uuid import UUID
 
@@ -10,23 +10,10 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.api.deps import get_db_session
+from src.core.datetime_utils import to_utc_naive
 from src.core.websocket import broadcast_events_batch
 from src.db.models import Device, Event
 from src.services.session_tracker import SessionTracker
-
-
-def normalize_datetime(dt: datetime | None) -> datetime | None:
-    """Convert any datetime to UTC naive datetime for PostgreSQL.
-
-    This handles both timezone-aware and naive datetimes,
-    converting everything to UTC without timezone info.
-    """
-    if dt is None:
-        return None
-    if dt.tzinfo is not None:
-        # Convert to UTC and remove timezone info
-        dt = dt.astimezone(timezone.utc).replace(tzinfo=None)
-    return dt
 
 router = APIRouter()
 session_tracker = SessionTracker()
@@ -156,7 +143,7 @@ async def create_events(
             event_id=event_data.event_id,
             device_id=event_data.device_id,
             event_type=event_data.event_type,
-            timestamp=normalize_datetime(event_data.timestamp),
+            timestamp=to_utc_naive(event_data.timestamp),
             app_name=event_data.app_name,
             window_title=event_data.window_title,
             url=event_data.url,
@@ -179,7 +166,7 @@ async def create_events(
         result = await db.execute(
             select(Event)
             .where(Event.device_id == event_data.device_id)
-            .where(Event.timestamp == normalize_datetime(event_data.timestamp))
+            .where(Event.timestamp == to_utc_naive(event_data.timestamp))
             .order_by(Event.created_at.desc())
             .limit(1)
         )
@@ -289,8 +276,6 @@ async def get_timeline(
     db: AsyncSession = Depends(get_db_session),
 ) -> list[Event]:
     """Get activity timeline for recent hours."""
-    from datetime import timedelta
-
     start = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(hours=hours)
     query = (
         select(Event)

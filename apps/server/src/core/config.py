@@ -58,6 +58,17 @@ class Settings(BaseSettings):
     debug: bool = False
     environment: str = "development"
 
+    # Agent Suggester Configuration
+    agent_lookback_days: int = 3
+    agent_min_sequence_occurrences: int = 2
+    agent_min_time_pattern_occurrences: int = 3
+    agent_min_switch_frequency: int = 5
+
+    # Session Tracking Configuration
+    session_break_minutes: int = 30
+    short_break_minutes: int = 5
+    min_session_minutes: int = 5
+
     @model_validator(mode="after")
     def validate_secret_key(self) -> "Settings":
         """Validate SECRET_KEY based on environment."""

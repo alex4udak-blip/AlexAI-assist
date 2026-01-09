@@ -20,7 +20,9 @@ RAILWAY (облако)
 └── Redis            → Очереди (Railway addon)
 
 GITHUB ACTIONS
-└── Собирает Mac приложение (.dmg) при каждом релизе
+├── Собирает Mac приложение (.dmg) при каждом пуше в main
+├── Автодеплой сервера на Railway
+└── Автодеплой веб-дашборда на Railway
 
 MAC (локально)
 └── Observer.app     → Меню-бар + Сборщик (Tauri)
@@ -87,10 +89,16 @@ VITE_WS_URL=              # WebSocket URL (wss://...)
 ## Структура проекта
 
 ```
-observer/
+AlexAI-assist/
 ├── CLAUDE.md                 # Инструкции для Claude Code
 ├── README.md
 ├── .github/workflows/        # CI/CD пайплайны
+│   ├── build-mac.yml        # Сборка Mac приложения
+│   ├── ci.yml               # CI проверки
+│   ├── deploy-server.yml    # Деплой сервера на Railway
+│   └── deploy-web.yml       # Деплой веб-дашборда на Railway
+├── docs/
+│   └── KNOWN_ISSUES.md      # Известные проблемы
 ├── apps/
 │   ├── server/              # FastAPI бэкенд
 │   ├── web/                 # React дашборд

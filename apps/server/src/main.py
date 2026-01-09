@@ -210,20 +210,30 @@ async def websocket_endpoint(websocket: WebSocket) -> None:
     try:
         while True:
             # Keep connection alive and receive messages
-            data = await websocket.receive_text()
-            logger.debug(
-                "WebSocket message received",
-                extra={"event_type": "websocket_message", "data_length": len(data)},
-            )
-            # Echo back for now
-            await websocket.send_json({"type": "echo", "data": data})
+            try:
+                data = await websocket.receive_text()
+                logger.debug(
+                    "WebSocket message received",
+                    extra={"event_type": "websocket_message", "data_length": len(data)},
+                )
+                # Echo back for now
+                await websocket.send_json({"type": "echo", "data": data})
+            except ValueError as e:
+                # JSON parsing or encoding error
+                logger.warning(
+                    "Invalid WebSocket message format",
+                    extra={"event_type": "websocket_invalid_message", "error": str(e)},
+                )
+                await websocket.send_json({
+                    "type": "error",
+                    "error": "Invalid message format",
+                })
     except WebSocketDisconnect:
-        active_connections.discard(websocket)
         logger.info(
             "WebSocket disconnected",
             extra={
                 "event_type": "websocket_disconnected",
-                "total_connections": len(active_connections),
+                "total_connections": len(active_connections) - 1,
             },
         )
     except Exception as e:
@@ -233,4 +243,10 @@ async def websocket_endpoint(websocket: WebSocket) -> None:
             error=e,
             extra={"event_type": "websocket_error"},
         )
+        try:
+            await websocket.close(code=1011, reason="Internal error")
+        except Exception:
+            pass  # Connection already closed
+    finally:
+        # Always cleanup connection
         active_connections.discard(websocket)

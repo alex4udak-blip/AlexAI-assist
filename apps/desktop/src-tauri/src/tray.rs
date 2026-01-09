@@ -109,18 +109,13 @@ pub fn create_tray(app: &App) -> Result<(), Box<dyn std::error::Error>> {
                     position,
                     ..
                 } => {
-                    println!("Tray icon clicked at position: {:?}", position);
                     let app = tray.app_handle();
                     if let Some(window) = app.get_webview_window("main") {
                         let is_visible = window.is_visible().unwrap_or(false);
-                        println!("Window visible: {}", is_visible);
 
                         if is_visible {
-                            println!("Hiding window");
                             let _ = window.hide();
                         } else {
-                            println!("Showing window");
-
                             // Position window near tray icon on macOS
                             #[cfg(target_os = "macos")]
                             {
@@ -129,20 +124,18 @@ pub fn create_tray(app: &App) -> Result<(), Box<dyn std::error::Error>> {
                                 // Position below tray icon, centered
                                 let x = position.x as i32 - (size.width as i32 / 2);
                                 let y = position.y as i32 + 5; // Small offset below tray
-                                println!("Setting window position to ({}, {})", x, y);
                                 let _ = window.set_position(tauri::PhysicalPosition::new(x, y));
                             }
 
                             let _ = window.show();
                             let _ = window.set_focus();
-                            println!("Window show and focus called");
                         }
                     } else {
-                        println!("ERROR: Could not find 'main' window!");
+                        eprintln!("ERROR: Could not find 'main' window!");
                     }
                 }
                 TrayIconEvent::DoubleClick { .. } => {
-                    println!("Tray icon double clicked");
+                    // Double click - no action needed
                 }
                 _ => {}
             }

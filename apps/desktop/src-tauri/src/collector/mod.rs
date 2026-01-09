@@ -2,6 +2,7 @@ mod accessibility;
 mod apps;
 mod browser;
 mod messenger;
+// Screenshots module is currently not used but kept for future use
 #[allow(dead_code)]
 mod screenshots;
 mod system_metrics;
@@ -148,15 +149,11 @@ pub async fn start_collector(
         eprintln!("Warning: Accessibility permission not granted. Some features will be limited.");
     }
 
-    println!("Collector started. Waiting for events...");
-
     loop {
         // Use select! to handle both the polling and shutdown signal
         tokio::select! {
             _ = shutdown_token.cancelled() => {
-                println!("Shutdown signal received. Flushing events and cleaning up...");
                 flush_events(&state).await;
-                println!("Collector shutdown complete.");
                 break;
             }
             _ = tokio::time::sleep(tokio::time::Duration::from_millis(500)) => {
@@ -353,14 +350,8 @@ pub async fn start_collector(
 
 /// Flush all remaining events in the buffer
 async fn flush_events(state: &Arc<Mutex<AppState>>) {
-    let state = state.lock().await;
-    let event_count = state.events_buffer.len();
-
-    if event_count > 0 {
-        println!("Flushing {} remaining events...", event_count);
-        // Events will be flushed by the periodic sync task or app shutdown
-        // This ensures we log the intention to flush
-    }
+    let _state = state.lock().await;
+    // Events will be flushed by the periodic sync task or app shutdown
 }
 
 fn categorize_app(app_name: &str) -> &'static str {

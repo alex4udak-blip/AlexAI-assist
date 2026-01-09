@@ -20,7 +20,7 @@ pub struct NotificationConfig {
     pub title: String,
     pub body: String,
     pub priority: NotificationPriority,
-    pub action: Option<String>,
+    // Note: Action field removed as tauri_plugin_notification doesn't support action buttons
 }
 
 /// Send a notification
@@ -29,10 +29,6 @@ pub fn send_notification(
     config: NotificationConfig,
 ) -> Result<(), String> {
     let notification = app.notification();
-
-    // Note: Action buttons are not supported in tauri_plugin_notification
-    // The action field in config is stored for potential future use
-    let _action = config.action; // Suppress unused warning
 
     notification.builder()
         .title(config.title)
@@ -52,7 +48,6 @@ pub fn notify_permission_required(
         title: "Permission Required".to_string(),
         body: format!("{} permission is required for automation features.", permission_name),
         priority: NotificationPriority::High,
-        action: Some("Open Settings".to_string()),
     };
 
     send_notification(app, config)
@@ -67,7 +62,6 @@ pub fn notify_task_started(
         title: "Automation Task Started".to_string(),
         body: format!("Running: {}", task_name),
         priority: NotificationPriority::Normal,
-        action: None,
     };
 
     send_notification(app, config)
@@ -91,7 +85,6 @@ pub fn notify_task_completed(
         } else {
             NotificationPriority::High
         },
-        action: None,
     };
 
     send_notification(app, config)
@@ -106,7 +99,6 @@ pub fn notify_error(
         title: "Error".to_string(),
         body: error.to_string(),
         priority: NotificationPriority::Urgent,
-        action: None,
     };
 
     send_notification(app, config)
@@ -126,7 +118,6 @@ pub fn notify_sync_status(
         },
         body: message.to_string(),
         priority: NotificationPriority::Low,
-        action: None,
     };
 
     send_notification(app, config)
@@ -141,7 +132,6 @@ pub fn notify_update_available(
         title: "Update Available".to_string(),
         body: format!("Version {} is now available.", version),
         priority: NotificationPriority::Normal,
-        action: Some("Update Now".to_string()),
     };
 
     send_notification(app, config)

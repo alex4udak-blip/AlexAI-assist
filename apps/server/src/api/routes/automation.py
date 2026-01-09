@@ -402,135 +402,155 @@ async def automation_websocket(
 
     try:
         while True:
-            data = await websocket.receive_json()
+            try:
+                data = await websocket.receive_json()
+            except ValueError as e:
+                logger.warning(
+                    "Invalid JSON received from device",
+                    extra={"device_id": device_id, "error": str(e)},
+                )
+                await websocket.send_json({
+                    "type": "error",
+                    "error": "Invalid JSON format",
+                })
+                continue
+
             message_type = data.get("type")
 
             if message_type == "status_update":
-                # Update device status in database
-                status_data = data.get("data", {})
-                device_status = await update_device_status(
-                    db,
-                    device_id,
-                    status=data.get("status", "idle"),
-                    status_data=status_data,
-                )
-                logger.debug(
-                    "Device status updated",
-                    extra={"device_id": device_id, "status": data.get("status")},
-                )
-                # Broadcast status update to web clients
-                await broadcast_device_update(device_id, {
-                    "connected": device_status.connected,
-                    "last_seen_at": device_status.last_seen_at,
-                    "status": device_status.status,
-                    **(device_status.status_data or {}),
-                })
+                try:
+                    # Update device status in database
+                    status_data = data.get("data", {})
+                    device_status = await update_device_status(
+                        db,
+                        device_id,
+                        status=data.get("status", "idle"),
+                        status_data=status_data,
+                    )
+                    logger.debug(
+                        "Device status updated",
+                        extra={"device_id": device_id, "status": data.get("status")},
+                    )
+                    # Broadcast status update to web clients
+                    await broadcast_device_update(device_id, {
+                        "connected": device_status.connected,
+                        "last_seen_at": device_status.last_seen_at,
+                        "status": device_status.status,
+                        **(device_status.status_data or {}),
+                    })
+                except Exception as e:
+                    log_error(logger, "Failed to process status update", error=e, extra={"device_id": device_id})
 
             elif message_type == "command_result":
-                # Store command result in database
-                command_id = data.get("command_id")
-                if command_id:
-                    result_data = data.get("result", {})
-                    success = data.get("success", False)
+                try:
+                    # Store command result in database
+                    command_id = data.get("command_id")
+                    if command_id:
+                        result_data = data.get("result", {})
+                        success = data.get("success", False)
 
-                    # Save to database
-                    await save_command_result_to_db(
-                        db,
-                        command_id=command_id,
-                        device_id=device_id,
-                        command_type="unknown",  # Will be updated from pending
-                        command_params=None,
-                        success=success,
-                        result_data=result_data,
-                        error=data.get("error"),
-                        duration_ms=data.get("duration_ms"),
-                    )
-
-                    # Store screenshot if present
-                    if isinstance(result_data, dict) and result_data.get("screenshot"):
-                        await save_screenshot_to_db(
+                        # Save to database
+                        await save_command_result_to_db(
                             db,
-                            device_id=device_id,
-                            screenshot_data=result_data["screenshot"],
                             command_id=command_id,
+                            device_id=device_id,
+                            command_type="unknown",  # Will be updated from pending
+                            command_params=None,
+                            success=success,
+                            result_data=result_data,
+                            error=data.get("error"),
+                            duration_ms=data.get("duration_ms"),
                         )
 
-                    logger.info(
-                        "Command result received and persisted",
-                        extra={
-                            "device_id": device_id,
-                            "command_id": command_id,
-                            "success": success,
-                        },
-                    )
+                        # Store screenshot if present
+                        if isinstance(result_data, dict) and result_data.get("screenshot"):
+                            await save_screenshot_to_db(
+                                db,
+                                device_id=device_id,
+                                screenshot_data=result_data["screenshot"],
+                                command_id=command_id,
+                            )
 
-                    # Broadcast command result to web clients
-                    await broadcast_command_result(command_id, device_id, {
-                        "success": success,
-                        "result": result_data,
-                        "error": data.get("error"),
-                        "duration_ms": data.get("duration_ms"),
-                        "completed_at": utc_now(),
-                    })
+                        logger.info(
+                            "Command result received and persisted",
+                            extra={
+                                "device_id": device_id,
+                                "command_id": command_id,
+                                "success": success,
+                            },
+                        )
+
+                        # Broadcast command result to web clients
+                        await broadcast_command_result(command_id, device_id, {
+                            "success": success,
+                            "result": result_data,
+                            "error": data.get("error"),
+                            "duration_ms": data.get("duration_ms"),
+                            "completed_at": utc_now(),
+                        })
+                except Exception as e:
+                    log_error(logger, "Failed to process command result", error=e, extra={"device_id": device_id})
 
             elif message_type == "task_result":
-                # Store task result from desktop
-                result_data = data.get("result", {})
-                task_id = result_data.get("task_id")
-                if task_id:
-                    output_data = result_data.get("output")
-                    success = result_data.get("success", False)
+                try:
+                    # Store task result from desktop
+                    result_data = data.get("result", {})
+                    task_id = result_data.get("task_id")
+                    if task_id:
+                        output_data = result_data.get("output")
+                        success = result_data.get("success", False)
 
-                    # Save to database
-                    await save_command_result_to_db(
-                        db,
-                        command_id=task_id,
-                        device_id=device_id,
-                        command_type="task",
-                        command_params=None,
-                        success=success,
-                        result_data=output_data if isinstance(output_data, dict) else {"output": output_data},
-                        error=result_data.get("error"),
-                        duration_ms=result_data.get("duration_ms"),
-                    )
-
-                    # Store screenshot if present
-                    if isinstance(output_data, dict) and output_data.get("screenshot"):
-                        await save_screenshot_to_db(
+                        # Save to database
+                        await save_command_result_to_db(
                             db,
-                            device_id=device_id,
-                            screenshot_data=output_data["screenshot"],
                             command_id=task_id,
+                            device_id=device_id,
+                            command_type="task",
+                            command_params=None,
+                            success=success,
+                            result_data=output_data if isinstance(output_data, dict) else {"output": output_data},
+                            error=result_data.get("error"),
+                            duration_ms=result_data.get("duration_ms"),
                         )
 
-                    logger.info(
-                        "Task result received and persisted",
-                        extra={
-                            "device_id": device_id,
-                            "task_id": task_id,
-                            "success": success,
-                        },
-                    )
+                        # Store screenshot if present
+                        if isinstance(output_data, dict) and output_data.get("screenshot"):
+                            await save_screenshot_to_db(
+                                db,
+                                device_id=device_id,
+                                screenshot_data=output_data["screenshot"],
+                                command_id=task_id,
+                            )
 
-                    # Broadcast task result to web clients
-                    await broadcast_command_result(task_id, device_id, {
-                        "success": success,
-                        "result": output_data,
-                        "error": result_data.get("error"),
-                        "duration_ms": result_data.get("duration_ms"),
-                        "completed_at": utc_now(),
-                    })
+                        logger.info(
+                            "Task result received and persisted",
+                            extra={
+                                "device_id": device_id,
+                                "task_id": task_id,
+                                "success": success,
+                            },
+                        )
+
+                        # Broadcast task result to web clients
+                        await broadcast_command_result(task_id, device_id, {
+                            "success": success,
+                            "result": output_data,
+                            "error": result_data.get("error"),
+                            "duration_ms": result_data.get("duration_ms"),
+                            "completed_at": utc_now(),
+                        })
+                except Exception as e:
+                    log_error(logger, "Failed to process task result", error=e, extra={"device_id": device_id})
 
             elif message_type == "ping":
-                # Respond to ping and update last_seen
-                await websocket.send_json({"type": "pong"})
-                await update_device_status(db, device_id)
+                try:
+                    # Respond to ping and update last_seen
+                    await websocket.send_json({"type": "pong"})
+                    await update_device_status(db, device_id)
+                except Exception as e:
+                    log_error(logger, "Failed to process ping", error=e, extra={"device_id": device_id})
 
     except WebSocketDisconnect:
-        connected_devices.pop(device_id, None)
-        await update_device_status(db, device_id, connected=False)
-        # Broadcast device disconnection
-        await broadcast_device_update(device_id, {"connected": False})
         logger.info(
             "Device disconnected from automation WebSocket",
             extra={"device_id": device_id},
@@ -542,12 +562,18 @@ async def automation_websocket(
             error=e,
             extra={"device_id": device_id},
         )
+        try:
+            await websocket.close(code=1011, reason="Internal error")
+        except Exception:
+            pass  # Connection already closed
+    finally:
+        # Always cleanup connection and update database
         connected_devices.pop(device_id, None)
         try:
             await update_device_status(db, device_id, connected=False)
             await broadcast_device_update(device_id, {"connected": False})
-        except Exception:
-            pass  # Best effort
+        except Exception as e:
+            log_error(logger, "Failed to cleanup device status", error=e, extra={"device_id": device_id})
 
 
 @router.post("/command/{device_id}", response_model=CommandResponse)

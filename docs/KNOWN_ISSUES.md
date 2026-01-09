@@ -4,26 +4,24 @@
 
 ## Критические (ломают функционал)
 
-### 1. Undefined variables в automation.py
-**Файл:** `apps/server/src/api/routes/automation.py:778, 790`
+### ✅ FIXED: 1. Undefined variables в automation.py
+**Исправлено:** 2026-01-09
+**Файл:** `apps/server/src/api/routes/automation.py:807-836`
 
-Переменные `device_statuses` и `pending_commands` используются но не определены. Endpoint `/devices/{device_id}/sync-status` упадёт с NameError.
-
-**Решение:** Удалить endpoint или реализовать через БД.
+Endpoint `/devices/{device_id}/sync-status` теперь использует правильные запросы к БД через модели `DeviceStatus` и `CommandResult`.
 
 ---
 
-### 2. Модели без миграций
-**Файлы:** `apps/server/src/db/models/automation.py`
+### ✅ FIXED: 2. Модели без миграций
+**Исправлено:** 2026-01-09
+**Миграция:** `007_automation_and_sessions.py`
 
-Новые модели не имеют миграций:
-- `DeviceStatus`
-- `CommandResult`
-- `Screenshot`
-- `Feedback`
-- `Session`
-
-**Решение:** Создать миграцию `alembic revision --autogenerate`
+Все модели automation теперь имеют миграции:
+- `DeviceStatus` ✅
+- `CommandResult` ✅
+- `Screenshot` ✅
+- `Feedback` ✅
+- `Session` ✅
 
 ---
 
@@ -103,10 +101,10 @@ Production Railway URLs захардкожены в нескольких мес�
 
 ---
 
-### 10. Недокументированные env variables
-Не все env vars описаны в `.env.example` файлах:
-- `OBSERVER_WS_URL`, `OBSERVER_API_KEY` для desktop
-- `VITE_API_KEY` для web
+### ✅ FIXED: 10. Недокументированные env variables
+**Исправлено:** 2026-01-09
+
+Все env vars теперь документированы в соответствующих `.env.example` файлах.
 
 ---
 

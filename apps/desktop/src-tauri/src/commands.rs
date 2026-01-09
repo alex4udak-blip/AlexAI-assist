@@ -130,8 +130,12 @@ pub async fn open_dashboard() -> Result<(), String> {
     // Validate URL before opening to prevent opening malicious URLs
     validate_url(&dashboard_url)?;
 
-    // Open the validated URL
-    open::that(dashboard_url).map_err(|e| e.to_string())
+    // Open the validated URL in a blocking thread to avoid blocking the async runtime
+    tokio::task::spawn_blocking(move || {
+        open::that(dashboard_url).map_err(|e| e.to_string())
+    })
+    .await
+    .map_err(|e| format!("Task join error: {}", e))?
 }
 
 /// Check if the app has accessibility permission (macOS)
@@ -187,9 +191,7 @@ pub fn open_settings() -> Result<(), String> {
 
         let mut opened = false;
         for cmd in &settings_commands {
-            if let Ok(_) = std::process::Command::new(cmd)
-                .spawn()
-            {
+            if std::process::Command::new(cmd).spawn().is_ok() {
                 opened = true;
                 break;
             }

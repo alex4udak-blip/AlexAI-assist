@@ -162,41 +162,15 @@ def validate_session_ownership(
 
     Args:
         session_id: The session ID to validate
-        user_id: The user ID attempting to access the session (optional for now)
+        user_id: The user ID attempting to access the session (optional, not used in single-user mode)
 
     Raises:
         HTTPException: If validation fails
 
     Security Notes:
-        - IMPORTANT: This function is a placeholder for future implementation
-        - Currently, there is NO user authentication system in place
-        - TODO: Implement user authentication and session ownership tracking
-        - TODO: Store session_id -> user_id mapping in database
-        - TODO: Verify user_id matches session owner before allowing access
-
-    Current Behavior:
-        - Only validates session_id format
-        - Does NOT enforce ownership (no user model exists yet)
+        - This is a single-user application, so no multi-user ownership checks are needed
+        - Only validates session_id format via validate_session_id()
+        - API key authentication is sufficient for this personal application
     """
     # Validate format
     validate_session_id(session_id)
-
-    # TODO: Implement user authentication
-    # When user authentication is implemented:
-    # 1. Check if user_id is provided (from JWT token or session)
-    # 2. Query database to verify session belongs to user
-    # 3. Raise HTTPException(403) if ownership check fails
-    #
-    # Example future implementation:
-    # if user_id:
-    #     session = await db.query(Session).filter(
-    #         Session.id == session_id,
-    #         Session.user_id == user_id
-    #     ).first()
-    #     if not session:
-    #         raise HTTPException(
-    #             status_code=403,
-    #             detail="Access denied: Session not found or not owned by user"
-    #         )
-
-    pass

@@ -309,12 +309,6 @@ pub async fn start_sync_service(state: Arc<Mutex<AppState>>) {
                 if let Err(e) = state.db.delete_events(&acked_ids) {
                     eprintln!("Warning: Failed to delete synced events from database: {}", e);
                 }
-
-                println!(
-                    "Sync successful: {} events ACKed, {} remaining in buffer",
-                    acked_ids.len(),
-                    state.events_buffer.len()
-                );
             }
             Err(error_msg) => {
                 eprintln!("Sync failed: {}", error_msg);
@@ -471,7 +465,6 @@ fn format_relative_time(time: chrono::DateTime<Utc>) -> String {
     }
 }
 
-#[allow(dead_code)]
 pub async fn manual_sync(state: Arc<Mutex<AppState>>) -> Result<(), String> {
     let events: Vec<Event>;
     {
@@ -498,12 +491,6 @@ pub async fn manual_sync(state: Arc<Mutex<AppState>>) -> Result<(), String> {
             if let Err(e) = state.db.delete_events(&acked_ids) {
                 eprintln!("Warning: Failed to delete synced events from database: {}", e);
             }
-
-            println!(
-                "Manual sync successful: {} events ACKed, {} remaining in buffer",
-                acked_ids.len(),
-                state.events_buffer.len()
-            );
 
             Ok(())
         }

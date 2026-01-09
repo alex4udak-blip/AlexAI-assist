@@ -13,7 +13,6 @@ pub async fn check_for_updates(app: AppHandle) {
             match updater.check().await {
                 Ok(Some(update)) => {
                     let version = update.version.clone();
-                    println!("Update available: v{}", version);
 
                     // Show notification about update
                     if let Err(e) = show_update_notification(&app, &version).await {
@@ -21,13 +20,12 @@ pub async fn check_for_updates(app: AppHandle) {
                     }
 
                     // Auto-download and install
-                    match download_and_install(update).await {
-                        Ok(_) => println!("Update downloaded successfully"),
-                        Err(e) => eprintln!("Failed to download update: {}", e),
+                    if let Err(e) = download_and_install(update).await {
+                        eprintln!("Failed to download update: {}", e);
                     }
                 }
                 Ok(None) => {
-                    println!("App is up to date");
+                    // App is up to date - no action needed
                 }
                 Err(e) => {
                     eprintln!("Failed to check for updates: {}", e);
@@ -70,22 +68,15 @@ async fn download_and_install(
 
     update
         .download_and_install(
-            move |chunk_length, content_length| {
-                let prev = downloaded_clone.fetch_add(chunk_length, Ordering::SeqCst);
-                let current = prev + chunk_length;
-                if let Some(total) = content_length {
-                    if total > 0 {
-                        let percent = (current as f64 / total as f64) * 100.0;
-                        println!("Downloading update: {:.1}%", percent);
-                    }
-                }
+            move |chunk_length, _content_length| {
+                downloaded_clone.fetch_add(chunk_length, Ordering::SeqCst);
+                // Download progress tracking removed - happens in background
             },
             || {
-                println!("Download complete, preparing to install...");
+                // Download complete - happens in background
             },
         )
         .await?;
 
-    println!("Update installed. Restart app to apply changes.");
     Ok(())
 }

@@ -162,8 +162,6 @@ mod custom_commands {
         command: &str,
         args: Vec<String>,
     ) -> Result<String, String> {
-        println!("Executing shell command: {} with args: {:?}", command, args);
-
         // Determine shell based on platform
         #[cfg(target_os = "windows")]
         let (shell, shell_arg) = ("cmd", "/C");
@@ -192,7 +190,6 @@ mod custom_commands {
             Ok(Ok(output)) => {
                 if output.status.success() {
                     let stdout = String::from_utf8_lossy(&output.stdout).to_string();
-                    println!("Command succeeded: {}", stdout.trim());
                     Ok(stdout)
                 } else {
                     let stderr = String::from_utf8_lossy(&output.stderr).to_string();
@@ -214,8 +211,6 @@ mod custom_commands {
     /// Execute AppleScript (macOS only)
     #[cfg(target_os = "macos")]
     pub async fn execute_applescript(script: &str) -> Result<String, String> {
-        println!("Executing AppleScript: {}", script.trim());
-
         // Sanitize script
         if script.contains('\0') {
             return Err("AppleScript contains null byte".to_string());
@@ -239,7 +234,6 @@ mod custom_commands {
             Ok(Ok(output)) => {
                 if output.status.success() {
                     let stdout = String::from_utf8_lossy(&output.stdout).to_string();
-                    println!("AppleScript succeeded: {}", stdout.trim());
                     Ok(stdout)
                 } else {
                     let stderr = String::from_utf8_lossy(&output.stderr).to_string();
@@ -417,18 +411,9 @@ impl AutomationQueue {
                 input::press_hotkey(&mods, key).map(|_| None)
             }
             TaskCommand::Screenshot { save_path: _ } => {
-                match screen::capture_screenshot() {
-                    Ok(img) => {
-                        match screen::encode_to_base64(&img) {
-                            Ok(base64) => {
-                                let output = serde_json::json!({ "base64": base64 });
-                                Ok(Some(output))
-                            }
-                            Err(e) => Err(e),
-                        }
-                    }
-                    Err(e) => Err(e),
-                }
+                let img = screen::capture_screenshot()?;
+                let base64 = screen::encode_to_base64(&img)?;
+                Ok(Some(serde_json::json!({ "base64": base64 })))
             }
             TaskCommand::BrowserNavigate { browser, url } => {
                 let browser_enum = match browser.as_str() {
@@ -538,8 +523,6 @@ impl AutomationQueue {
         name: &str,
         params: &serde_json::Value,
     ) -> Result<Option<serde_json::Value>, String> {
-        println!("Executing custom command: {} with params: {}", name, params);
-
         // Parse parameters
         let params_obj = params.as_object().ok_or("Custom command params must be an object")?;
 
@@ -645,8 +628,6 @@ impl AutomationQueue {
                     .text()
                     .await
                     .map_err(|e| format!("Failed to read response body: {}", e))?;
-
-                println!("HTTP request completed with status: {}", status);
 
                 Ok(Some(serde_json::json!({
                     "status": status,

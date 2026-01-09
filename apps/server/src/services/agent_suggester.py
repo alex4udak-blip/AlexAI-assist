@@ -10,6 +10,7 @@ from uuid import UUID
 from sqlalchemy import and_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from src.core.config import settings
 from src.core.logging import get_logger
 from src.db.models import Event
 from src.services.ai_router import AIRouter, TaskComplexity
@@ -25,29 +26,15 @@ def utc_now() -> datetime:
 class AgentSuggester:
     """Analyze patterns and suggest automation agents."""
 
-    # Default thresholds for pattern detection (more aggressive for faster agent creation)
-    DEFAULT_MIN_SEQUENCE_OCCURRENCES = 2
-    DEFAULT_MIN_TIME_PATTERN_OCCURRENCES = 3
-    DEFAULT_MIN_SWITCH_FREQUENCY = 5
-    DEFAULT_LOOKBACK_DAYS = 3
-
     def __init__(self, ai_router: AIRouter):
         """Initialize with AI router for generating suggestions."""
         self.ai_router = ai_router
 
-        # Load configurable thresholds from environment variables
-        self.MIN_SEQUENCE_OCCURRENCES = int(
-            os.getenv("AGENT_MIN_SEQUENCE_OCCURRENCES", self.DEFAULT_MIN_SEQUENCE_OCCURRENCES)
-        )
-        self.MIN_TIME_PATTERN_OCCURRENCES = int(
-            os.getenv("AGENT_MIN_TIME_PATTERN_OCCURRENCES", self.DEFAULT_MIN_TIME_PATTERN_OCCURRENCES)
-        )
-        self.MIN_SWITCH_FREQUENCY = int(
-            os.getenv("AGENT_MIN_SWITCH_FREQUENCY", self.DEFAULT_MIN_SWITCH_FREQUENCY)
-        )
-        self.LOOKBACK_DAYS = int(
-            os.getenv("AGENT_LOOKBACK_DAYS", self.DEFAULT_LOOKBACK_DAYS)
-        )
+        # Load configurable thresholds from centralized settings
+        self.MIN_SEQUENCE_OCCURRENCES = settings.agent_min_sequence_occurrences
+        self.MIN_TIME_PATTERN_OCCURRENCES = settings.agent_min_time_pattern_occurrences
+        self.MIN_SWITCH_FREQUENCY = settings.agent_min_switch_frequency
+        self.LOOKBACK_DAYS = settings.agent_lookback_days
 
         logger.info(
             "AgentSuggester initialized with thresholds",

@@ -297,36 +297,3 @@ class RateLimiterMiddleware(BaseHTTPMiddleware):
             response.headers[key] = value
 
         return response
-
-
-# Global rate limiter instance
-_rate_limiter: RateLimiter | None = None
-
-
-async def get_rate_limiter() -> RateLimiter:
-    """Get or create global rate limiter instance.
-
-    Returns:
-        RateLimiter instance
-    """
-    global _rate_limiter
-
-    if _rate_limiter is None:
-        redis_client: redis.Redis | None = None
-
-        try:
-            # Try to connect to Redis
-            redis_client = redis.from_url(
-                settings.redis_url,
-                encoding="utf-8",
-                decode_responses=False,  # Keep binary for sorted sets
-            )
-            await redis_client.ping()
-            logger.info("Rate limiter using Redis backend")
-        except Exception as e:
-            logger.warning(f"Redis not available for rate limiting, using in-memory fallback: {e}")
-            redis_client = None
-
-        _rate_limiter = RateLimiter(redis_client)
-
-    return _rate_limiter

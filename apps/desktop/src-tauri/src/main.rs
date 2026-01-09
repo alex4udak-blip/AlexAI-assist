@@ -42,11 +42,6 @@ fn main() {
             Vec::new()
         });
 
-    let events_count = existing_events.len();
-    if events_count > 0 {
-        println!("Loaded {} existing events from database", events_count);
-    }
-
     // Create app state with database
     let state = Arc::new(Mutex::new(AppState {
         collecting: true,
@@ -120,7 +115,6 @@ fn main() {
             let sync_for_results = sync.clone();
             tauri::async_runtime::spawn(async move {
                 while let Some(result) = result_rx.recv().await {
-                    println!("Task {} completed: {}", result.task_id, result.success);
                     if let Some(error) = &result.error {
                         eprintln!("Task error: {}", error);
                         // Send notification
@@ -188,11 +182,9 @@ async fn setup_signal_handlers(shutdown_token: CancellationToken) {
 
         tokio::select! {
             _ = sigterm.recv() => {
-                println!("Received SIGTERM signal");
                 shutdown_token.cancel();
             }
             _ = sigint.recv() => {
-                println!("Received SIGINT signal");
                 shutdown_token.cancel();
             }
         }
@@ -204,7 +196,6 @@ async fn setup_signal_handlers(shutdown_token: CancellationToken) {
 
         tokio::select! {
             _ = signal::ctrl_c() => {
-                println!("Received CTRL+C signal");
                 shutdown_token.cancel();
             }
         }

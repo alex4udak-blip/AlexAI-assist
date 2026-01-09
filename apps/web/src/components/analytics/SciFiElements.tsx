@@ -1,29 +1,6 @@
 import { motion } from 'framer-motion';
 import { ReactNode } from 'react';
-
-// Circuit pattern SVG background
-export function CircuitPattern() {
-  return (
-    <svg className="absolute inset-0 w-full h-full opacity-5" xmlns="http://www.w3.org/2000/svg">
-      <defs>
-        <pattern id="circuit" x="0" y="0" width="100" height="100" patternUnits="userSpaceOnUse">
-          <path
-            d="M10 10h20v20h20M50 10v20h20M30 50h20v20M10 70h20"
-            stroke="currentColor"
-            strokeWidth="0.5"
-            fill="none"
-            className="text-cyan-400"
-          />
-          <circle cx="30" cy="10" r="2" fill="currentColor" className="text-cyan-400" />
-          <circle cx="50" cy="30" r="2" fill="currentColor" className="text-purple-400" />
-          <circle cx="50" cy="50" r="2" fill="currentColor" className="text-cyan-400" />
-          <circle cx="10" cy="70" r="2" fill="currentColor" className="text-green-400" />
-        </pattern>
-      </defs>
-      <rect width="100%" height="100%" fill="url(#circuit)" />
-    </svg>
-  );
-}
+import { CircuitPattern as CircuitPatternComponent } from '../ui/CircuitPattern';
 
 // Scan line effect for HUD headers
 export function ScanLine() {
@@ -77,7 +54,7 @@ export function HoloCard({ children, className = '', glowColor = 'cyan' }: HoloC
                   ${glowStyles[glowColor]}
                   ${className}`}
     >
-      <CircuitPattern />
+      <CircuitPatternComponent variant="minimal" opacity={0.05} />
       <div className="relative z-10">{children}</div>
 
       {/* Corner accents */}

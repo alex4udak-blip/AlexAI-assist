@@ -20,7 +20,14 @@ async def broadcast_event(event_type: str, data: dict) -> None:
     for websocket in active_connections:
         try:
             await websocket.send_json(message)
-        except Exception:
+        except Exception as e:
+            # Log broadcast errors for debugging (connection errors are expected during disconnects)
+            from src.core.logging import get_logger
+            logger = get_logger(__name__)
+            logger.debug(
+                f"Failed to send WebSocket message during broadcast: {type(e).__name__}",
+                extra={"event_type": event_type, "error": str(e)},
+            )
             disconnected.add(websocket)
 
     # Clean up disconnected clients

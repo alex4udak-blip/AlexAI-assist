@@ -1,45 +1,29 @@
 """Session tracker service for detecting work sessions and breaks."""
 
-import os
-import uuid
 from collections import defaultdict
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
 from typing import Any
 
-from sqlalchemy import and_, desc, select
+from sqlalchemy import desc, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from src.core.config import settings
+from src.core.datetime_utils import utc_now_naive
 from src.core.logging import get_logger
 from src.db.models import Event, Session
 
 logger = get_logger(__name__)
 
 
-def utc_now() -> datetime:
-    """Get current UTC time as naive datetime."""
-    return datetime.now(timezone.utc).replace(tzinfo=None)
-
-
 class SessionTracker:
     """Track user work sessions and detect patterns."""
 
-    # Default thresholds (configurable via environment variables)
-    DEFAULT_SESSION_BREAK_MINUTES = 30
-    DEFAULT_SHORT_BREAK_MINUTES = 5
-    DEFAULT_MIN_SESSION_MINUTES = 5
-
     def __init__(self):
         """Initialize session tracker with configurable thresholds."""
-        # Load configurable thresholds from environment variables
-        self.SESSION_BREAK_MINUTES = int(
-            os.getenv("SESSION_BREAK_MINUTES", self.DEFAULT_SESSION_BREAK_MINUTES)
-        )
-        self.SHORT_BREAK_MINUTES = int(
-            os.getenv("SHORT_BREAK_MINUTES", self.DEFAULT_SHORT_BREAK_MINUTES)
-        )
-        self.MIN_SESSION_MINUTES = int(
-            os.getenv("MIN_SESSION_MINUTES", self.DEFAULT_MIN_SESSION_MINUTES)
-        )
+        # Load configurable thresholds from centralized settings
+        self.SESSION_BREAK_MINUTES = settings.session_break_minutes
+        self.SHORT_BREAK_MINUTES = settings.short_break_minutes
+        self.MIN_SESSION_MINUTES = settings.min_session_minutes
 
         logger.info(
             "SessionTracker initialized",
@@ -231,7 +215,7 @@ class SessionTracker:
 
         Returns list of ended session IDs.
         """
-        cutoff_time = utc_now() - timedelta(minutes=self.SESSION_BREAK_MINUTES)
+        cutoff_time = utc_now_naive() - timedelta(minutes=self.SESSION_BREAK_MINUTES)
 
         query = (
             select(Session)
@@ -267,7 +251,7 @@ class SessionTracker:
         days: int = 7,
     ) -> dict[str, Any]:
         """Get summary statistics for sessions over a time period."""
-        start_date = utc_now() - timedelta(days=days)
+        start_date = utc_now_naive() - timedelta(days=days)
 
         query = (
             select(Session)
@@ -326,7 +310,7 @@ class SessionTracker:
         days: int = 7,
     ) -> dict[str, Any]:
         """Detect patterns in user sessions (peak hours, session length trends, etc.)."""
-        start_date = utc_now() - timedelta(days=days)
+        start_date = utc_now_naive() - timedelta(days=days)
 
         query = (
             select(Session)

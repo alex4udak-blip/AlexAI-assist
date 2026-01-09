@@ -8,7 +8,8 @@ use tokio::sync::Mutex;
 use tokio::time::{sleep, Duration};
 use tokio_tungstenite::{connect_async, tungstenite::Message, MaybeTlsStream, WebSocketStream};
 
-const RECONNECT_DELAY: Duration = Duration::from_secs(5);
+const INITIAL_RECONNECT_DELAY: Duration = Duration::from_secs(5);
+const MAX_RECONNECT_DELAY: Duration = Duration::from_secs(300); // 5 minutes
 const PING_INTERVAL: Duration = Duration::from_secs(30);
 
 /// Type alias for WebSocket write handle
@@ -61,6 +62,7 @@ pub struct AutomationSync {
     is_connected: Arc<Mutex<bool>>,
     queue: Arc<crate::automation::queue::AutomationQueue>,
     ws_writer: Arc<Mutex<Option<WsWriter>>>,
+    reconnect_attempts: Arc<Mutex<u32>>,
 }
 
 impl AutomationSync {
@@ -72,6 +74,7 @@ impl AutomationSync {
             is_connected: Arc::new(Mutex::new(false)),
             queue,
             ws_writer: Arc::new(Mutex::new(None)),
+            reconnect_attempts: Arc::new(Mutex::new(0)),
         }
     }
 
@@ -90,7 +93,9 @@ impl AutomationSync {
         loop {
             match self.connect().await {
                 Ok(_) => {
-                    println!("WebSocket connection closed, reconnecting...");
+                    // Reset reconnect attempts on successful connection
+                    let mut attempts = self.reconnect_attempts.lock().await;
+                    *attempts = 0;
                 }
                 Err(e) => {
                     eprintln!("WebSocket connection error: {}", e);
@@ -103,15 +108,20 @@ impl AutomationSync {
                 *connected = false;
             }
 
-            // Wait before reconnecting
-            sleep(RECONNECT_DELAY).await;
+            // Calculate exponential backoff delay
+            let mut attempts = self.reconnect_attempts.lock().await;
+            *attempts += 1;
+
+            let delay_secs = INITIAL_RECONNECT_DELAY.as_secs() * 2u64.pow(*attempts - 1);
+            let delay = Duration::from_secs(delay_secs.min(MAX_RECONNECT_DELAY.as_secs()));
+
+            drop(attempts); // Release lock before sleeping
+            sleep(delay).await;
         }
     }
 
     /// Connect to WebSocket server
     async fn connect(&self) -> Result<(), String> {
-        println!("Connecting to WebSocket: {}", self.ws_url);
-
         let (ws_stream, _) = connect_async(&self.ws_url)
             .await
             .map_err(|e| format!("Failed to connect: {}", e))?;
@@ -146,11 +156,18 @@ impl AutomationSync {
             }
         }
 
-        // Spawn ping task using Arc reference to ws_writer
+        // Spawn ping task - it will stop when ws_writer is cleared
         let ws_writer_clone = Arc::clone(&self.ws_writer);
+        let is_connected_clone = Arc::clone(&self.is_connected);
         tokio::spawn(async move {
             loop {
                 sleep(PING_INTERVAL).await;
+
+                // Check if still connected
+                let connected = *is_connected_clone.lock().await;
+                if !connected {
+                    break;
+                }
 
                 let ping_msg = WsMessage::Ping {
                     timestamp: chrono::Utc::now().timestamp(),
@@ -159,12 +176,15 @@ impl AutomationSync {
                 if let Ok(json) = serde_json::to_string(&ping_msg) {
                     let mut writer = ws_writer_clone.lock().await;
                     if let Some(w) = writer.as_mut() {
-                        if w.send(Message::Text(json)).await.is_err() {
+                        if let Err(e) = w.send(Message::Text(json)).await {
+                            eprintln!("Failed to send ping: {}", e);
                             break;
                         }
                     } else {
                         break;
                     }
+                } else {
+                    eprintln!("Failed to serialize ping message");
                 }
             }
         });
@@ -178,17 +198,24 @@ impl AutomationSync {
                     }
                 }
                 Ok(Message::Close(_)) => {
-                    println!("WebSocket closed by server");
                     break;
                 }
                 Ok(Message::Ping(data)) => {
                     let mut writer = self.ws_writer.lock().await;
                     if let Some(w) = writer.as_mut() {
-                        let _ = w.send(Message::Pong(data)).await;
+                        if let Err(e) = w.send(Message::Pong(data)).await {
+                            eprintln!("Failed to send pong: {}", e);
+                            break;
+                        }
                     }
                 }
                 Err(e) => {
-                    eprintln!("WebSocket error: {}", e);
+                    // Differentiate between connection errors and protocol errors
+                    if !e.to_string().contains("Connection reset")
+                        && !e.to_string().contains("Broken pipe")
+                    {
+                        eprintln!("WebSocket protocol error: {}", e);
+                    }
                     break;
                 }
                 _ => {}
@@ -205,36 +232,28 @@ impl AutomationSync {
     }
 
     /// Handle incoming WebSocket message
-    async fn handle_message(
-        &self,
-        text: &str,
-    ) -> Result<(), String> {
+    async fn handle_message(&self, text: &str) -> Result<(), String> {
         let msg: WsMessage = serde_json::from_str(text)
             .map_err(|e| format!("Failed to parse message: {}", e))?;
 
         match msg {
             WsMessage::AutomationTask { task } => {
                 // Add task to queue
-                match self.queue.add_task(task).await {
-                    Ok(task_id) => {
-                        println!("Added task to queue: {}", task_id);
-                    }
-                    Err(e) => {
-                        eprintln!("Failed to add task: {}", e);
-                    }
+                if let Err(e) = self.queue.add_task(task).await {
+                    eprintln!("Failed to add task: {}", e);
                 }
             }
-            WsMessage::Pong { timestamp } => {
-                println!("Received pong: {}", timestamp);
+            WsMessage::Pong { .. } => {
+                // Pong received - connection alive
             }
-            WsMessage::AuthSuccess { device_id } => {
-                println!("Authentication successful: {}", device_id);
+            WsMessage::AuthSuccess { .. } => {
+                // Authentication successful
             }
             WsMessage::AuthError { message } => {
                 eprintln!("Authentication error: {}", message);
             }
             _ => {
-                println!("Received unknown message type");
+                // Unknown message type
             }
         }
 
@@ -342,7 +361,9 @@ fn get_device_id() -> String {
     }
 
     // Fallback to random ID
-    format!("mac-{}", uuid::Uuid::new_v4().to_string().split('-').next().unwrap_or("unknown"))
+    let uuid_str = uuid::Uuid::new_v4().to_string();
+    let prefix = uuid_str.split('-').next().unwrap_or("unknown");
+    format!("mac-{}", prefix)
 }
 
 /// Get WebSocket URL with authentication

@@ -345,7 +345,6 @@ impl ScreenshotManager {
                             match fs::remove_dir_all(&path) {
                                 Ok(_) => {
                                     deleted_count += 1;
-                                    println!("Deleted old screenshot directory: {:?}", path);
                                 }
                                 Err(e) => {
                                     eprintln!("Failed to delete directory {:?}: {}", path, e);
