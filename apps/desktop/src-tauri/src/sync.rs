@@ -47,7 +47,7 @@ fn get_api_key() -> Option<String> {
 }
 
 /// Check if we're running in development mode
-fn is_dev_mode() -> bool {
+pub fn is_dev_mode() -> bool {
     std::env::var("OBSERVER_DEV")
         .map(|v| v == "1" || v.to_lowercase() == "true")
         .unwrap_or(false)

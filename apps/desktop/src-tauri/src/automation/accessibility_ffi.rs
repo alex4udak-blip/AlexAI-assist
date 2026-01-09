@@ -1,7 +1,6 @@
 /// FFI bindings for macOS accessibility and screen recording APIs
 /// Uses ApplicationServices and CoreGraphics frameworks
 
-use std::ffi::c_void;
 use core_foundation::base::{CFTypeRef, TCFType};
 use core_foundation::boolean::CFBoolean;
 use core_foundation::dictionary::CFDictionary;
@@ -39,10 +38,9 @@ pub fn request_accessibility() -> bool {
         let prompt_key = CFString::from_static_string("AXTrustedCheckOptionPrompt");
         let prompt_value = CFBoolean::true_value();
 
-        let keys: Vec<CFTypeRef> = vec![prompt_key.as_CFTypeRef()];
-        let values: Vec<CFTypeRef> = vec![prompt_value.as_CFTypeRef()];
-
-        let options = CFDictionary::from_CFType_pairs(&keys, &values);
+        // Create pairs array for new CFDictionary API
+        let pairs = [(prompt_key, prompt_value)];
+        let options = CFDictionary::from_CFType_pairs(&pairs);
 
         AXIsProcessTrustedWithOptions(options.as_CFTypeRef())
     }
