@@ -67,6 +67,7 @@ impl Message {
 }
 
 /// Represents the current state of a messenger app
+#[allow(dead_code)]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MessengerState {
     pub app: String,
@@ -85,6 +86,7 @@ impl MessengerState {
 }
 
 /// Monitor for capturing messages from messenger applications
+#[allow(dead_code)]
 pub struct MessengerMonitor {
     supported_messengers: HashSet<String>,
 }

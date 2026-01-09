@@ -15,6 +15,7 @@ pub struct BrowserTab {
 }
 
 /// Represents the current state of all browsers
+#[allow(dead_code)]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BrowserState {
     /// Currently active browser name
@@ -26,6 +27,7 @@ pub struct BrowserState {
 }
 
 /// Browser monitor for macOS
+#[allow(dead_code)]
 pub struct BrowserMonitor;
 
 impl BrowserMonitor {
