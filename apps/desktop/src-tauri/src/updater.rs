@@ -61,17 +61,23 @@ async fn show_update_notification(app: &AppHandle, version: &str) -> Result<(), 
 async fn download_and_install(
     update: tauri_plugin_updater::Update,
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-    // Download the update
-    let mut downloaded = 0;
-    let total = update.content_length.unwrap_or(0);
+    use std::sync::atomic::{AtomicUsize, Ordering};
+    use std::sync::Arc;
+
+    // Track download progress
+    let downloaded = Arc::new(AtomicUsize::new(0));
+    let downloaded_clone = downloaded.clone();
 
     update
         .download_and_install(
-            |chunk_length, _content_length| {
-                downloaded += chunk_length;
-                if total > 0 {
-                    let percent = (downloaded as f64 / total as f64) * 100.0;
-                    println!("Downloading update: {:.1}%", percent);
+            move |chunk_length, content_length| {
+                let prev = downloaded_clone.fetch_add(chunk_length, Ordering::SeqCst);
+                let current = prev + chunk_length;
+                if let Some(total) = content_length {
+                    if total > 0 {
+                        let percent = (current as f64 / total as f64) * 100.0;
+                        println!("Downloading update: {:.1}%", percent);
+                    }
                 }
             },
             || {
