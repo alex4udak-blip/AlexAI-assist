@@ -1,58 +1,40 @@
 <svg width="1024" height="1024" viewBox="0 0 1024 1024" fill="none" xmlns="http://www.w3.org/2000/svg">
   <defs>
-    <!-- Main gradient for background - deep indigo -->
+    <!-- Main gradient - warm coral/terracotta like Claude but shifted to violet -->
     <linearGradient id="bgGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" style="stop-color:#818cf8"/>
-      <stop offset="50%" style="stop-color:#6366f1"/>
-      <stop offset="100%" style="stop-color:#4f46e5"/>
+      <stop offset="0%" style="stop-color:#a78bfa"/>
+      <stop offset="50%" style="stop-color:#8b5cf6"/>
+      <stop offset="100%" style="stop-color:#7c3aed"/>
     </linearGradient>
-    <!-- Eye white gradient -->
-    <radialGradient id="eyeWhite" cx="50%" cy="35%" r="60%">
-      <stop offset="0%" style="stop-color:#ffffff"/>
-      <stop offset="100%" style="stop-color:#f3f4f6"/>
-    </radialGradient>
-    <!-- Iris gradient - vibrant blue -->
-    <radialGradient id="irisGradient" cx="40%" cy="40%" r="60%">
-      <stop offset="0%" style="stop-color:#60a5fa"/>
-      <stop offset="50%" style="stop-color:#3b82f6"/>
-      <stop offset="100%" style="stop-color:#1d4ed8"/>
-    </radialGradient>
-    <!-- Pupil gradient -->
-    <radialGradient id="pupilGradient" cx="35%" cy="35%" r="65%">
-      <stop offset="0%" style="stop-color:#1f2937"/>
-      <stop offset="100%" style="stop-color:#030712"/>
+    <!-- Subtle inner glow -->
+    <radialGradient id="innerGlow" cx="30%" cy="30%" r="70%">
+      <stop offset="0%" style="stop-color:#c4b5fd;stop-opacity:0.4"/>
+      <stop offset="100%" style="stop-color:#8b5cf6;stop-opacity:0"/>
     </radialGradient>
   </defs>
 
-  <!-- macOS style rounded rectangle background (22.37% radius like Apple) -->
+  <!-- macOS style rounded square background (22.37% corner radius like Apple) -->
   <rect x="0" y="0" width="1024" height="1024" rx="228" ry="228" fill="url(#bgGradient)"/>
 
-  <!-- Subtle top shine -->
-  <ellipse cx="512" cy="200" rx="400" ry="150" fill="white" opacity="0.1"/>
+  <!-- Subtle shine overlay -->
+  <rect x="0" y="0" width="1024" height="1024" rx="228" ry="228" fill="url(#innerGlow)"/>
 
-  <!-- Eye white (sclera) - elegant almond shape -->
-  <ellipse cx="512" cy="512" rx="320" ry="200" fill="url(#eyeWhite)"/>
+  <!-- Observer eye symbol - minimalist style -->
+  <g transform="translate(512, 512)">
+    <!-- Outer eye shape - elegant almond -->
+    <ellipse cx="0" cy="0" rx="280" ry="160" fill="white" opacity="0.95"/>
 
-  <!-- Subtle shadow on eye white -->
-  <ellipse cx="512" cy="480" rx="310" ry="140" fill="black" opacity="0.03"/>
+    <!-- Iris ring -->
+    <circle cx="0" cy="0" r="120" fill="none" stroke="#7c3aed" stroke-width="24" opacity="0.9"/>
 
-  <!-- Iris -->
-  <circle cx="512" cy="512" r="145" fill="url(#irisGradient)"/>
+    <!-- Inner iris -->
+    <circle cx="0" cy="0" r="95" fill="#8b5cf6" opacity="0.3"/>
 
-  <!-- Iris texture rings -->
-  <circle cx="512" cy="512" r="130" fill="none" stroke="#2563eb" stroke-width="1" opacity="0.3"/>
-  <circle cx="512" cy="512" r="110" fill="none" stroke="#1d4ed8" stroke-width="1" opacity="0.2"/>
-  <circle cx="512" cy="512" r="90" fill="none" stroke="#1e40af" stroke-width="1" opacity="0.15"/>
+    <!-- Pupil -->
+    <circle cx="0" cy="0" r="50" fill="#1e1b4b"/>
 
-  <!-- Pupil -->
-  <circle cx="512" cy="512" r="60" fill="url(#pupilGradient)"/>
-
-  <!-- Main highlight reflection -->
-  <ellipse cx="465" cy="465" rx="28" ry="24" fill="white" opacity="0.95"/>
-
-  <!-- Secondary small highlight -->
-  <circle cx="555" cy="550" r="10" fill="white" opacity="0.6"/>
-
-  <!-- Subtle bottom reflection on iris -->
-  <ellipse cx="512" cy="590" rx="60" ry="20" fill="white" opacity="0.08"/>
+    <!-- Highlight -->
+    <circle cx="-25" cy="-20" r="18" fill="white" opacity="0.9"/>
+    <circle cx="15" cy="25" r="8" fill="white" opacity="0.5"/>
+  </g>
 </svg>
