@@ -58,6 +58,9 @@ class Settings(BaseSettings):
     debug: bool = False
     environment: str = "development"
 
+    # Data retention settings
+    retention_days: int = 30  # Number of days to retain data before cleanup
+
     @model_validator(mode="after")
     def validate_secret_key(self) -> "Settings":
         """Validate SECRET_KEY based on environment."""

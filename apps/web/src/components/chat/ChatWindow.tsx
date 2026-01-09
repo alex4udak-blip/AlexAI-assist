@@ -1,39 +1,50 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { motion } from 'framer-motion';
-import { Bot, Sparkles } from 'lucide-react';
+import { Bot, Sparkles, ChevronUp, Loader2 } from 'lucide-react';
 import { Message } from './Message';
 import { ChatInput } from './ChatInput';
 import { api, type ChatMessage } from '../../lib/api';
+
+const MESSAGES_PER_PAGE = 30;
 
 export function ChatWindow() {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [historyLoaded, setHistoryLoaded] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [hasMore, setHasMore] = useState(false);
+  const [totalMessages, setTotalMessages] = useState(0);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const messagesContainerRef = useRef<HTMLDivElement>(null);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
 
   useEffect(() => {
-    scrollToBottom();
-  }, [messages]);
+    // Only auto-scroll when sending new messages, not when loading more
+    if (!loadingMore) {
+      scrollToBottom();
+    }
+  }, [messages, loadingMore]);
 
-  // Load history and merge with any pending messages
+  // Load initial history
   useEffect(() => {
-    api.getChatHistory()
-      .then((history) => {
+    api.getChatHistory({ limit: MESSAGES_PER_PAGE, offset: 0 })
+      .then((response) => {
         setMessages((currentMessages) => {
           // Get IDs from history to avoid duplicates
-          const historyIds = new Set(history.map((m) => m.id));
+          const historyIds = new Set(response.messages.map((m) => m.id));
           // Keep local messages that aren't in history (sent before history loaded)
           const localOnlyMessages = currentMessages.filter(
             (m) => !historyIds.has(m.id)
           );
           // Merge: history first, then any local messages
-          return [...history, ...localOnlyMessages];
+          return [...response.messages, ...localOnlyMessages];
         });
+        setHasMore(response.has_more);
+        setTotalMessages(response.total);
         setHistoryLoaded(true);
       })
       .catch((err) => {
@@ -41,6 +52,45 @@ export function ChatWindow() {
         setHistoryLoaded(true); // Allow sending even if history fails
       });
   }, []);
+
+  // Load more older messages
+  const loadMoreMessages = useCallback(async () => {
+    if (loadingMore || !hasMore) return;
+
+    setLoadingMore(true);
+    const container = messagesContainerRef.current;
+    const scrollHeightBefore = container?.scrollHeight || 0;
+
+    try {
+      // Calculate offset based on currently loaded messages
+      const currentOffset = messages.length;
+      const response = await api.getChatHistory({
+        limit: MESSAGES_PER_PAGE,
+        offset: currentOffset,
+      });
+
+      setMessages((prev) => {
+        // Prepend older messages (they come in chronological order)
+        const newIds = new Set(response.messages.map((m) => m.id));
+        const existingMessages = prev.filter((m) => !newIds.has(m.id));
+        return [...response.messages, ...existingMessages];
+      });
+      setHasMore(response.has_more);
+      setTotalMessages(response.total);
+
+      // Preserve scroll position after loading more
+      requestAnimationFrame(() => {
+        if (container) {
+          const scrollHeightAfter = container.scrollHeight;
+          container.scrollTop = scrollHeightAfter - scrollHeightBefore;
+        }
+      });
+    } catch (err) {
+      console.error('Failed to load more messages:', err);
+    } finally {
+      setLoadingMore(false);
+    }
+  }, [loadingMore, hasMore, messages.length]);
 
   const handleSend = async () => {
     if (!input.trim() || loading) return;
@@ -85,7 +135,10 @@ export function ChatWindow() {
       <div className="absolute inset-0 bg-scanline opacity-10 pointer-events-none" />
 
       {/* Messages with custom scrollbar */}
-      <div className="flex-1 overflow-y-auto p-4 lg:p-6 relative z-10 custom-scrollbar">
+      <div
+        ref={messagesContainerRef}
+        className="flex-1 overflow-y-auto p-4 lg:p-6 relative z-10 custom-scrollbar"
+      >
         <style>
           {`
             .custom-scrollbar::-webkit-scrollbar {
@@ -107,6 +160,37 @@ export function ChatWindow() {
           `}
         </style>
         <div className="max-w-3xl mx-auto space-y-6">
+          {/* Load more button */}
+          {hasMore && messages.length > 0 && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              className="flex justify-center"
+            >
+              <button
+                onClick={loadMoreMessages}
+                disabled={loadingMore}
+                className="flex items-center gap-2 px-4 py-2 rounded-xl
+                           border border-hud-cyan/30 bg-gradient-to-br from-hud-cyan/10 to-hud-blue/5
+                           text-sm text-text-secondary
+                           hover:border-hud-cyan/50 hover:shadow-hud-sm
+                           disabled:opacity-50 disabled:cursor-not-allowed
+                           backdrop-blur-sm transition-all duration-150"
+              >
+                {loadingMore ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin text-hud-cyan" />
+                    <span>Loading...</span>
+                  </>
+                ) : (
+                  <>
+                    <ChevronUp className="w-4 h-4 text-hud-cyan" />
+                    <span>Load older messages ({totalMessages - messages.length} more)</span>
+                  </>
+                )}
+              </button>
+            </motion.div>
+          )}
           {messages.length === 0 ? (
             <motion.div
               initial={{ opacity: 0, y: 20 }}
