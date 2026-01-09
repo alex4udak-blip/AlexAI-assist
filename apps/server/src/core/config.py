@@ -37,9 +37,10 @@ class Settings(BaseSettings):
 
     # CORS - stored as comma-separated string, parsed via property
     # Default includes common development origins
-    # Override with ALLOWED_ORIGINS_STR env var for production (e.g., https://your-web-app.railway.app)
-    # Railway URLs below are fallback defaults - replace with your actual deployment URLs
-    allowed_origins_str: str = "http://localhost:5173,http://localhost:3000,https://web-production-20d71.up.railway.app,https://server-production-0b14.up.railway.app"
+    # IMPORTANT: In production, MUST set ALLOWED_ORIGINS_STR with actual deployment URLs
+    # Example: "https://your-web-app.railway.app,https://your-desktop-app.railway.app"
+    # Note: CORS does not support wildcards like *.railway.app - each URL must be explicit
+    allowed_origins_str: str = "http://localhost:5173,http://localhost:5174,http://localhost:3000"
 
     @property
     def allowed_origins(self) -> list[str]:
