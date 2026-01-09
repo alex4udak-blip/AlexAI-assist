@@ -11,15 +11,15 @@ interface WeeklyHeatmapProps {
   data?: HeatmapData[];
 }
 
-const DAYS = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];
+const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 const HOURS = Array.from({ length: 24 }, (_, i) => i);
 
 function getIntensityColor(value: number): string {
-  if (value === 0) return 'rgba(6, 182, 212, 0.05)';
-  if (value < 25) return 'rgba(6, 182, 212, 0.2)';
-  if (value < 50) return 'rgba(6, 182, 212, 0.4)';
-  if (value < 75) return 'rgba(6, 182, 212, 0.6)';
-  return 'rgba(6, 182, 212, 0.9)';
+  if (value === 0) return 'rgb(39, 39, 42)'; // zinc-800
+  if (value < 25) return 'rgb(63, 63, 70)'; // zinc-700
+  if (value < 50) return 'rgb(113, 113, 122)'; // zinc-500
+  if (value < 75) return 'rgb(161, 161, 170)'; // zinc-400
+  return 'rgb(212, 212, 216)'; // zinc-300
 }
 
 export function WeeklyHeatmap({ data = [] }: WeeklyHeatmapProps) {
@@ -41,33 +41,33 @@ export function WeeklyHeatmap({ data = [] }: WeeklyHeatmapProps) {
 
   return (
     <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      className="p-4 rounded-xl bg-bg-secondary/60 backdrop-blur-md border border-border-subtle
-                 shadow-inner-glow overflow-hidden"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={{ duration: 0.3 }}
+      className="p-5 rounded-xl bg-zinc-900/50 border border-zinc-800"
     >
-      <div className="flex items-center justify-between mb-3 gap-2">
-        <h3 className="text-xs text-text-muted uppercase tracking-wider font-mono flex-shrink-0">
+      <div className="flex items-center justify-between mb-4 gap-2">
+        <h3 className="text-xs text-zinc-500 font-medium tracking-wide">
           Weekly Activity
         </h3>
         {hoveredValue !== null && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
-            className="text-[10px] font-mono text-hud-cyan truncate"
+            className="text-xs text-zinc-400 tabular-nums"
           >
-            {DAYS[hoveredCell!.day]} {hoveredCell!.hour}:00 — {hoveredValue}%
+            {DAYS[hoveredCell!.day]} {hoveredCell!.hour}:00 - {hoveredValue}%
           </motion.div>
         )}
       </div>
 
-      <div className="flex gap-1">
+      <div className="flex gap-1.5">
         {/* Day labels */}
-        <div className="flex flex-col gap-1 pr-2">
+        <div className="flex flex-col gap-0.5 pr-2">
           {DAYS.map((day) => (
             <div
               key={day}
-              className="h-3 flex items-center text-[10px] text-text-muted font-mono"
+              className="h-3 flex items-center text-[10px] text-zinc-600"
             >
               {day}
             </div>
@@ -84,14 +84,13 @@ export function WeeklyHeatmap({ data = [] }: WeeklyHeatmapProps) {
                   return (
                     <motion.div
                       key={`${dayIndex}-${hour}`}
-                      initial={{ opacity: 0, scale: 0 }}
-                      animate={{ opacity: 1, scale: 1 }}
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
                       transition={{ delay: (dayIndex + hour) * 0.002 }}
-                      className="w-3 h-3 rounded-sm cursor-pointer transition-all duration-150
-                                 hover:ring-1 hover:ring-hud-cyan"
+                      className="w-3 h-3 rounded-[3px] cursor-pointer transition-colors duration-150
+                                 hover:ring-1 hover:ring-zinc-500"
                       style={{
                         backgroundColor: getIntensityColor(value),
-                        boxShadow: value > 50 ? `0 0 4px rgba(6, 182, 212, ${value / 200})` : 'none',
                       }}
                       onMouseEnter={() => setHoveredCell({ day: dayIndex, hour })}
                       onMouseLeave={() => setHoveredCell(null)}
@@ -103,11 +102,11 @@ export function WeeklyHeatmap({ data = [] }: WeeklyHeatmapProps) {
           </div>
 
           {/* Hour labels */}
-          <div className="flex gap-0.5 mt-1">
+          <div className="flex gap-0.5 mt-1.5">
             {HOURS.filter((h) => h % 4 === 0).map((hour) => (
               <div
                 key={hour}
-                className="text-[10px] text-text-muted font-mono"
+                className="text-[10px] text-zinc-600"
                 style={{ width: `${(100 / 6)}%` }}
               >
                 {hour}:00
@@ -118,16 +117,16 @@ export function WeeklyHeatmap({ data = [] }: WeeklyHeatmapProps) {
       </div>
 
       {/* Legend */}
-      <div className="flex items-center justify-end gap-2 mt-3">
-        <span className="text-[10px] text-text-muted font-mono">Меньше</span>
+      <div className="flex items-center justify-end gap-1.5 mt-4">
+        <span className="text-[10px] text-zinc-600">Less</span>
         {[0, 25, 50, 75, 100].map((v) => (
           <div
             key={v}
-            className="w-3 h-3 rounded-sm"
+            className="w-3 h-3 rounded-[3px]"
             style={{ backgroundColor: getIntensityColor(v) }}
           />
         ))}
-        <span className="text-[10px] text-text-muted font-mono">Больше</span>
+        <span className="text-[10px] text-zinc-600">More</span>
       </div>
     </motion.div>
   );

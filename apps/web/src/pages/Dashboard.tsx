@@ -1,387 +1,85 @@
-import { motion, AnimatePresence } from 'framer-motion';
-import { useMemo, useCallback, useState, useEffect } from 'react';
+import { motion } from 'framer-motion';
+import { useMemo, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  Activity,
-  Bot,
-  Clock,
-  Command,
-  TrendingUp,
-  Zap,
-  ChevronRight,
-  Play,
-  Pause,
-  CheckCircle2,
-  Sparkles,
-  Monitor,
-  Search,
-  Plus,
-  Settings,
-  MessageSquare,
-  BarChart3,
-  Calendar,
-  Cpu,
-  Wifi,
-  WifiOff,
-  DollarSign,
-} from 'lucide-react';
-import { useAnalyticsSummary, useTimeline, useProductivity, useCategories, useAppUsage, useAIUsage } from '../hooks/useAnalytics';
+  // Desktop components
+  StatusBar,
+  ActivityRings,
+  WeeklyHeatmap,
+  CurrentFocus,
+  AgentGrid,
+  AgentActivityStream,
+  AIInsights,
+  Achievements,
+  QuickActions,
+  LiveTimeline,
+  // Mobile components
+  MobileHeader,
+  AgentCarousel,
+  CompactHeatmap,
+  UnifiedFeed,
+  MobileAchievements,
+} from '../components/hud';
+import { Plus } from 'lucide-react';
+import { useAnalyticsSummary, useTimeline, useProductivity } from '../hooks/useAnalytics';
 import { useAgents } from '../hooks/useAgents';
 import { useSuggestions } from '../hooks/usePatterns';
 import { useMutation } from '../hooks/useApi';
 import { api } from '../lib/api';
+import { useIsMobile, useIsTablet } from '../hooks/useMediaQuery';
 import { useEventsCreated } from '../hooks/useWebSocketSync';
 import { useWebSocket } from '../hooks/useWebSocket';
 
-// Animation variants
-const fadeIn = {
-  hidden: { opacity: 0, y: 10 },
-  show: { opacity: 1, y: 0, transition: { duration: 0.3 } },
-};
-
-const stagger = {
+const container = {
   hidden: { opacity: 0 },
-  show: { opacity: 1, transition: { staggerChildren: 0.05 } },
+  show: {
+    opacity: 1,
+    transition: { staggerChildren: 0.05 },
+  },
 };
 
-// Metric Card Component
-function MetricCard({
-  label,
-  value,
-  subValue,
-  icon: Icon,
-  trend,
-  accentColor = 'cyan',
-}: {
-  label: string;
-  value: string | number;
-  subValue?: string;
-  icon: React.ElementType;
-  trend?: 'up' | 'down' | 'neutral';
-  accentColor?: 'cyan' | 'green' | 'purple' | 'orange';
-}) {
-  const colors = {
-    cyan: 'text-cyan-400 bg-cyan-400/10 border-cyan-400/20',
-    green: 'text-emerald-400 bg-emerald-400/10 border-emerald-400/20',
-    purple: 'text-violet-400 bg-violet-400/10 border-violet-400/20',
-    orange: 'text-orange-400 bg-orange-400/10 border-orange-400/20',
-  };
+const item = {
+  hidden: { opacity: 0, y: 20 },
+  show: { opacity: 1, y: 0 },
+};
 
-  return (
-    <motion.div
-      variants={fadeIn}
-      className="relative group"
-    >
-      <div className="p-4 rounded-xl bg-zinc-900/50 border border-zinc-800
-                      hover:border-zinc-700 transition-all duration-200
-                      hover:bg-zinc-900/80">
-        <div className="flex items-start justify-between mb-3">
-          <div className={`p-2 rounded-lg ${colors[accentColor]}`}>
-            <Icon className="w-4 h-4" />
-          </div>
-          {trend && (
-            <span className={`text-xs px-2 py-0.5 rounded-full ${
-              trend === 'up' ? 'text-emerald-400 bg-emerald-400/10' :
-              trend === 'down' ? 'text-red-400 bg-red-400/10' :
-              'text-zinc-400 bg-zinc-400/10'
-            }`}>
-              {trend === 'up' ? '+12%' : trend === 'down' ? '-5%' : '0%'}
-            </span>
-          )}
-        </div>
-        <div className="space-y-1">
-          <div className="text-2xl font-semibold text-white tracking-tight">
-            {value}
-          </div>
-          <div className="text-xs text-zinc-500 uppercase tracking-wider">
-            {label}
-          </div>
-          {subValue && (
-            <div className="text-xs text-zinc-400 mt-1">
-              {subValue}
-            </div>
-          )}
-        </div>
-      </div>
-    </motion.div>
-  );
-}
+// Mobile-optimized animation variants
+const mobileContainer = {
+  hidden: { opacity: 0 },
+  show: {
+    opacity: 1,
+    transition: { staggerChildren: 0.03 },
+  },
+};
 
-// Agent Card Component
-function AgentCard({
-  agent,
-  onRun,
-  onToggle,
-  onClick,
-}: {
-  agent: {
-    id: string;
-    name: string;
-    status: string;
-    run_count: number;
-    success_count: number;
-    last_run_at: string | null;
-    total_time_saved_seconds: number;
-  };
-  onRun: () => void;
-  onToggle: () => void;
-  onClick: () => void;
-}) {
-  const isActive = agent.status === 'active';
-  const successRate = agent.run_count > 0
-    ? Math.round((agent.success_count / agent.run_count) * 100)
-    : 0;
+const mobileItem = {
+  hidden: { opacity: 0, y: 10 },
+  show: { opacity: 1, y: 0 },
+};
 
-  return (
-    <motion.div
-      variants={fadeIn}
-      className="group relative"
-    >
-      <div
-        onClick={onClick}
-        className="p-4 rounded-xl bg-zinc-900/50 border border-zinc-800
-                   hover:border-zinc-700 transition-all duration-200 cursor-pointer
-                   hover:bg-zinc-900/80"
-      >
-        <div className="flex items-start justify-between mb-3">
-          <div className={`p-2 rounded-lg ${
-            isActive ? 'bg-emerald-400/10 text-emerald-400' : 'bg-zinc-800 text-zinc-500'
-          }`}>
-            <Bot className="w-4 h-4" />
-          </div>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={(e) => { e.stopPropagation(); onRun(); }}
-              className="p-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700
-                         text-zinc-400 hover:text-white transition-colors"
-              title="Run agent"
-            >
-              <Play className="w-3.5 h-3.5" />
-            </button>
-            <button
-              onClick={(e) => { e.stopPropagation(); onToggle(); }}
-              className={`p-1.5 rounded-lg transition-colors ${
-                isActive
-                  ? 'bg-emerald-400/10 text-emerald-400 hover:bg-emerald-400/20'
-                  : 'bg-zinc-800 text-zinc-500 hover:bg-zinc-700'
-              }`}
-              title={isActive ? 'Disable' : 'Enable'}
-            >
-              {isActive ? <Pause className="w-3.5 h-3.5" /> : <Play className="w-3.5 h-3.5" />}
-            </button>
-          </div>
-        </div>
-
-        <h3 className="font-medium text-white mb-1 truncate">{agent.name}</h3>
-
-        <div className="flex items-center gap-3 text-xs text-zinc-500">
-          <span className="flex items-center gap-1">
-            <Zap className="w-3 h-3" />
-            {agent.run_count} runs
-          </span>
-          <span className={successRate >= 80 ? 'text-emerald-400' : successRate >= 50 ? 'text-orange-400' : 'text-red-400'}>
-            {successRate}% success
-          </span>
-        </div>
-
-        {agent.total_time_saved_seconds > 0 && (
-          <div className="mt-2 text-xs text-cyan-400">
-            <Clock className="w-3 h-3 inline mr-1" />
-            {Math.round(agent.total_time_saved_seconds / 60)}m saved
-          </div>
-        )}
-      </div>
-    </motion.div>
-  );
-}
-
-// Activity Item Component
-function ActivityItem({
-  event,
-}: {
-  event: {
-    id: string;
-    app_name: string | null;
-    window_title?: string | null;
-    timestamp: string;
-    category?: string | null;
-  };
-}) {
-  const timeAgo = useMemo(() => {
-    const diff = Date.now() - new Date(event.timestamp).getTime();
-    const minutes = Math.floor(diff / 60000);
-    if (minutes < 1) return 'now';
-    if (minutes < 60) return `${minutes}m ago`;
-    const hours = Math.floor(minutes / 60);
-    if (hours < 24) return `${hours}h ago`;
-    return `${Math.floor(hours / 24)}d ago`;
-  }, [event.timestamp]);
-
-  return (
-    <div className="flex items-center gap-3 py-2 px-3 rounded-lg hover:bg-zinc-800/50 transition-colors">
-      <div className="p-1.5 rounded-md bg-zinc-800">
-        <Monitor className="w-3.5 h-3.5 text-zinc-400" />
-      </div>
-      <div className="flex-1 min-w-0">
-        <div className="text-sm text-white truncate">{event.app_name || 'Unknown'}</div>
-        {event.window_title && (
-          <div className="text-xs text-zinc-500 truncate">{event.window_title}</div>
-        )}
-      </div>
-      <div className="text-xs text-zinc-500 whitespace-nowrap">{timeAgo}</div>
-    </div>
-  );
-}
-
-// Command Palette Component
-function CommandPalette({
-  isOpen,
-  onClose,
-  onNavigate,
-}: {
-  isOpen: boolean;
-  onClose: () => void;
-  onNavigate: (path: string) => void;
-}) {
-  const [query, setQuery] = useState('');
-
-  const commands = [
-    { id: 'agents', label: 'Go to Agents', icon: Bot, path: '/agents' },
-    { id: 'analytics', label: 'View Analytics', icon: BarChart3, path: '/analytics' },
-    { id: 'history', label: 'Activity History', icon: Calendar, path: '/history' },
-    { id: 'chat', label: 'Open Chat', icon: MessageSquare, path: '/chat' },
-    { id: 'settings', label: 'Settings', icon: Settings, path: '/settings' },
-    { id: 'create-agent', label: 'Create Agent', icon: Plus, path: '/agents' },
-  ];
-
-  const filtered = query
-    ? commands.filter(c => c.label.toLowerCase().includes(query.toLowerCase()))
-    : commands;
-
-  useEffect(() => {
-    if (isOpen) {
-      setQuery('');
-    }
-  }, [isOpen]);
-
-  return (
-    <AnimatePresence>
-      {isOpen && (
-        <>
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50"
-            onClick={onClose}
-          />
-          <motion.div
-            initial={{ opacity: 0, scale: 0.95, y: -20 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.95, y: -20 }}
-            className="fixed top-[20%] left-1/2 -translate-x-1/2 w-full max-w-lg z-50"
-          >
-            <div className="bg-zinc-900 border border-zinc-800 rounded-xl shadow-2xl overflow-hidden">
-              <div className="flex items-center gap-3 px-4 py-3 border-b border-zinc-800">
-                <Search className="w-4 h-4 text-zinc-500" />
-                <input
-                  type="text"
-                  value={query}
-                  onChange={(e) => setQuery(e.target.value)}
-                  placeholder="Type a command or search..."
-                  className="flex-1 bg-transparent text-white placeholder-zinc-500
-                             outline-none text-sm"
-                  autoFocus
-                />
-                <kbd className="px-2 py-0.5 text-xs text-zinc-500 bg-zinc-800 rounded">
-                  ESC
-                </kbd>
-              </div>
-              <div className="p-2 max-h-80 overflow-auto">
-                {filtered.map((cmd) => (
-                  <button
-                    key={cmd.id}
-                    onClick={() => { onNavigate(cmd.path); onClose(); }}
-                    className="w-full flex items-center gap-3 px-3 py-2 rounded-lg
-                               hover:bg-zinc-800 transition-colors text-left"
-                  >
-                    <cmd.icon className="w-4 h-4 text-zinc-400" />
-                    <span className="text-sm text-white">{cmd.label}</span>
-                    <ChevronRight className="w-4 h-4 text-zinc-600 ml-auto" />
-                  </button>
-                ))}
-                {filtered.length === 0 && (
-                  <div className="px-3 py-8 text-center text-sm text-zinc-500">
-                    No commands found
-                  </div>
-                )}
-              </div>
-            </div>
-          </motion.div>
-        </>
-      )}
-    </AnimatePresence>
-  );
-}
-
-// Empty State Component
-function EmptyState({
-  icon: Icon,
-  title,
-  description,
-  action,
-}: {
-  icon: React.ElementType;
-  title: string;
-  description: string;
-  action?: { label: string; onClick: () => void };
-}) {
-  return (
-    <div className="flex flex-col items-center justify-center py-12 px-4 text-center">
-      <div className="p-3 rounded-xl bg-zinc-800/50 mb-4">
-        <Icon className="w-6 h-6 text-zinc-500" />
-      </div>
-      <h3 className="text-sm font-medium text-white mb-1">{title}</h3>
-      <p className="text-xs text-zinc-500 max-w-[200px] mb-4">{description}</p>
-      {action && (
-        <button
-          onClick={action.onClick}
-          className="px-3 py-1.5 text-xs font-medium text-cyan-400
-                     bg-cyan-400/10 rounded-lg hover:bg-cyan-400/20 transition-colors"
-        >
-          {action.label}
-        </button>
-      )}
-    </div>
-  );
-}
-
-// Main Dashboard Component
 export default function Dashboard() {
   const navigate = useNavigate();
-  const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
+  const isMobile = useIsMobile();
+  const isTablet = useIsTablet();
 
-  // WebSocket connection
-  const { isConnected } = useWebSocket();
+  // Connect to WebSocket for real-time updates
+  useWebSocket();
 
-  // Data hooks
   const { data: summary } = useAnalyticsSummary();
   const { data: productivity } = useProductivity();
   const { data: timeline, refetch: refetchTimeline } = useTimeline(24);
   const { data: agents, refetch: refetchAgents } = useAgents();
   const { data: suggestions } = useSuggestions({ status: 'pending' });
-  const { data: categories } = useCategories({ days: 7 });
-  const { data: appUsage } = useAppUsage({ days: 7, limit: 10 });
-  const { data: aiUsage } = useAIUsage(7);
 
-  // Real-time updates
+  // Handle real-time event updates
   const handleEventsCreated = useCallback(() => {
+    // Refetch timeline and analytics when new events arrive
     refetchTimeline();
   }, [refetchTimeline]);
 
+  // Subscribe to real-time events
   useEventsCreated(handleEventsCreated);
 
-  // Agent mutations
   const { mutate: runAgent } = useMutation(api.runAgent);
   const { mutate: enableAgent } = useMutation(api.enableAgent);
   const { mutate: disableAgent } = useMutation(api.disableAgent);
@@ -400,352 +98,531 @@ export default function Dashboard() {
     refetchAgents();
   };
 
-  // Keyboard shortcut for command palette
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
-        e.preventDefault();
-        setCommandPaletteOpen(prev => !prev);
-      }
-      if (e.key === 'Escape') {
-        setCommandPaletteOpen(false);
-      }
+  const handleCreateAgent = () => {
+    navigate('/agents');
+  };
+
+  const handleRefresh = async () => {
+    await Promise.all([refetchAgents(), refetchTimeline()]);
+  };
+
+  // Calculate activity rings data
+  const ringsData = useMemo(() => ({
+    productivity: productivity?.score ?? 0,
+    focus: Math.min(100, (summary?.total_events ?? 0) / 5),
+    automation: agents?.filter(a => a.status === 'active').length
+      ? Math.min(100, agents.reduce((acc, a) => acc + a.total_time_saved_seconds, 0) / 36)
+      : 0,
+  }), [productivity, summary, agents]);
+
+  // Generate weekly heatmap data from timeline
+  const heatmapData = useMemo(() => {
+    if (!timeline) return [];
+    const data: { day: number; hour: number; value: number }[] = [];
+    const counts: Record<string, number> = {};
+
+    timeline.forEach(event => {
+      const date = new Date(event.timestamp);
+      const day = (date.getDay() + 6) % 7;
+      const hour = date.getHours();
+      const key = `${day}-${hour}`;
+      counts[key] = (counts[key] || 0) + 1;
+    });
+
+    const maxCount = Math.max(...Object.values(counts), 1);
+    Object.entries(counts).forEach(([key, count]) => {
+      const [day, hour] = key.split('-').map(Number);
+      data.push({ day, hour, value: Math.round((count / maxCount) * 100) });
+    });
+
+    return data;
+  }, [timeline]);
+
+  // Current focus from latest timeline event
+  const currentFocus = useMemo(() => {
+    if (!timeline || timeline.length === 0) return null;
+    const latest = timeline[0];
+    const startTime = new Date(latest.timestamp);
+    const now = new Date();
+    const minutes = Math.round((now.getTime() - startTime.getTime()) / 60000);
+    return {
+      appName: latest.app_name || 'Unknown',
+      sessionMinutes: Math.min(minutes, 120),
+      category: latest.category ?? undefined,
     };
+  }, [timeline]);
 
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, []);
+  // Generate AI insights from data
+  const insights = useMemo(() => {
+    const result: { id: string; type: 'positive' | 'negative' | 'neutral' | 'suggestion'; message: string; metric?: string }[] = [];
 
-  // Calculated values
+    if (summary && summary.total_events > 0) {
+      const topApp = summary.top_apps?.[0];
+      if (topApp) {
+        result.push({
+          id: '1',
+          type: 'neutral',
+          message: `Сегодня больше всего времени в ${topApp[0]}`,
+          metric: `${topApp[1]} событий`,
+        });
+      }
+
+      if (productivity && productivity.score >= 70) {
+        result.push({
+          id: '2',
+          type: 'positive',
+          message: 'Высокая продуктивность сегодня!',
+          metric: `${productivity.score}%`,
+        });
+      }
+    }
+
+    if (suggestions && suggestions.length > 0) {
+      result.push({
+        id: '3',
+        type: 'suggestion',
+        message: `Найдено ${suggestions.length} паттернов для автоматизации`,
+      });
+    }
+
+    const activeAgents = agents?.filter(a => a.status === 'active') || [];
+    if (activeAgents.length > 0) {
+      const totalSaved = activeAgents.reduce((acc, a) => acc + a.total_time_saved_seconds, 0);
+      if (totalSaved > 60) {
+        result.push({
+          id: '4',
+          type: 'positive',
+          message: 'Агенты экономят ваше время',
+          metric: `${Math.round(totalSaved / 60)}м сэкономлено`,
+        });
+      }
+    }
+
+    return result;
+  }, [summary, productivity, suggestions, agents]);
+
+  // Calculate activity streak (consecutive days with activity)
+  const activityStreak = useMemo(() => {
+    if (!timeline || timeline.length === 0) return 0;
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    // Get unique days with activity
+    const daysWithActivity = new Set<string>();
+    timeline.forEach(event => {
+      const date = new Date(event.timestamp);
+      date.setHours(0, 0, 0, 0);
+      daysWithActivity.add(date.toISOString());
+    });
+
+    // Count consecutive days from today backwards
+    let streak = 0;
+    let checkDate = new Date(today);
+
+    while (true) {
+      if (daysWithActivity.has(checkDate.toISOString())) {
+        streak++;
+        checkDate.setDate(checkDate.getDate() - 1);
+      } else {
+        break;
+      }
+    }
+
+    return streak;
+  }, [timeline]);
+
+  // Generate achievements
+  const achievements = useMemo(() => {
+    const result: {
+      id: string;
+      title: string;
+      description: string;
+      icon: 'trophy' | 'flame' | 'zap' | 'clock' | 'bot' | 'target';
+      progress: number;
+      completed: boolean;
+      value?: string;
+    }[] = [];
+
+    const agentCount = agents?.length ?? 0;
+    result.push({
+      id: '1',
+      title: 'Создатель агентов',
+      description: 'Создайте 10 агентов',
+      icon: 'bot',
+      progress: Math.min(100, (agentCount / 10) * 100),
+      completed: agentCount >= 10,
+      value: `${agentCount}/10`,
+    });
+
+    const totalEvents = summary?.total_events ?? 0;
+    result.push({
+      id: '2',
+      title: 'Активный пользователь',
+      description: '1000 событий за день',
+      icon: 'target',
+      progress: Math.min(100, (totalEvents / 1000) * 100),
+      completed: totalEvents >= 1000,
+      value: `${totalEvents}/1000`,
+    });
+
+    const savedTime = agents?.reduce((acc, a) => acc + a.total_time_saved_seconds, 0) ?? 0;
+    const savedHours = savedTime / 3600;
+    result.push({
+      id: '3',
+      title: 'Мастер автоматизации',
+      description: 'Сэкономьте 5 часов с агентами',
+      icon: 'clock',
+      progress: Math.min(100, (savedHours / 5) * 100),
+      completed: savedHours >= 5,
+      value: `${savedHours.toFixed(1)}/5ч`,
+    });
+
+    return result;
+  }, [agents, summary]);
+
+  // Calculate system health based on recent events
+  const { systemHealth, lastEventMinutesAgo } = useMemo(() => {
+    if (!timeline || timeline.length === 0) {
+      return { systemHealth: 'warning' as const, lastEventMinutesAgo: 999 };
+    }
+
+    const latestEvent = new Date(timeline[0].timestamp);
+    const now = new Date();
+    const minutesAgo = Math.round((now.getTime() - latestEvent.getTime()) / 60000);
+
+    if (minutesAgo < 5) return { systemHealth: 'healthy' as const, lastEventMinutesAgo: minutesAgo };
+    if (minutesAgo < 30) return { systemHealth: 'warning' as const, lastEventMinutesAgo: minutesAgo };
+    return { systemHealth: 'critical' as const, lastEventMinutesAgo: minutesAgo };
+  }, [timeline]);
+
+  // Generate agent activity stream
+  const agentActivities = useMemo(() => {
+    if (!agents) return [];
+    return agents
+      .filter(a => a.last_run_at)
+      .map(agent => ({
+        id: agent.id,
+        agentName: agent.name,
+        action: agent.last_error ? `Ошибка: ${agent.last_error}` : 'Выполнен успешно',
+        status: agent.last_error ? 'error' as const : 'success' as const,
+        timestamp: agent.last_run_at!,
+        details: `${agent.run_count} запусков всего`,
+      }))
+      .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+  }, [agents]);
+
+  // Generate timeline events
+  const timelineEvents = useMemo(() => {
+    if (!timeline) return [];
+    return timeline.slice(0, 50).map(event => ({
+      id: event.id,
+      type: 'app' as const,
+      name: event.app_name || 'Unknown',
+      startTime: event.timestamp,
+      category: event.category ?? undefined,
+    }));
+  }, [timeline]);
+
+  // Generate unified feed for mobile
+  const unifiedFeedItems = useMemo(() => {
+    const items: {
+      id: string;
+      type: 'agent' | 'activity' | 'insight';
+      title: string;
+      description: string;
+      timestamp: string;
+      status?: 'success' | 'error' | 'warning' | 'info';
+      icon?: 'bot' | 'monitor' | 'lightbulb' | 'trending-up' | 'trending-down' | 'sparkles';
+    }[] = [];
+
+    // Add agent activities
+    agentActivities.forEach(activity => {
+      items.push({
+        id: `agent-${activity.id}`,
+        type: 'agent',
+        title: activity.agentName,
+        description: activity.action,
+        timestamp: activity.timestamp,
+        status: activity.status,
+        icon: 'bot',
+      });
+    });
+
+    // Add timeline events (last 10)
+    timeline?.slice(0, 10).forEach(event => {
+      items.push({
+        id: `activity-${event.id}`,
+        type: 'activity',
+        title: event.app_name || 'Unknown',
+        description: event.window_title || 'Активность',
+        timestamp: event.timestamp,
+        status: 'info',
+        icon: 'monitor',
+      });
+    });
+
+    // Add insights
+    insights.forEach(insight => {
+      items.push({
+        id: `insight-${insight.id}`,
+        type: 'insight',
+        title: insight.type === 'positive' ? 'Хорошие новости' :
+               insight.type === 'suggestion' ? 'Рекомендация' : 'Наблюдение',
+        description: insight.message,
+        timestamp: new Date().toISOString(),
+        status: insight.type === 'positive' ? 'success' :
+                insight.type === 'negative' ? 'warning' : 'info',
+        icon: insight.type === 'suggestion' ? 'sparkles' :
+              insight.type === 'positive' ? 'trending-up' : 'lightbulb',
+      });
+    });
+
+    // Sort by timestamp
+    return items.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+  }, [agentActivities, timeline, insights]);
+
   const activeAgents = agents?.filter(a => a.status === 'active') || [];
-  const totalTimeSaved = agents?.reduce((acc, a) => acc + a.total_time_saved_seconds, 0) ?? 0;
-  const topApp = summary?.top_apps?.[0];
 
-  // ROI calculations
-  const aiCost7Days = aiUsage?.total_cost ?? 0;
-  const timeSavedHours = totalTimeSaved / 3600;
-  const hourlyRate = 50; // Default hourly rate for value calculation
-  const valueSaved = timeSavedHours * hourlyRate;
-  const roi = aiCost7Days > 0 ? ((valueSaved - aiCost7Days) / aiCost7Days) * 100 : 0;
+  // Mobile Layout
+  if (isMobile) {
+    return (
+      <>
+        <motion.div
+          variants={mobileContainer}
+          initial="hidden"
+          animate="show"
+          className="pb-24"
+        >
+          {/* Mobile Header */}
+          <MobileHeader
+            productivity={ringsData.productivity}
+            focus={ringsData.focus}
+            automation={ringsData.automation}
+            focusTime={currentFocus?.sessionMinutes}
+            currentApp={currentFocus?.appName}
+            category={currentFocus?.category}
+          />
 
-  return (
-    <>
-      <CommandPalette
-        isOpen={commandPaletteOpen}
-        onClose={() => setCommandPaletteOpen(false)}
-        onNavigate={navigate}
-      />
+          {/* Agent Carousel */}
+          <motion.div variants={mobileItem} className="mt-4">
+            <div className="px-4 mb-3">
+              <h3 className="text-xs text-text-muted uppercase tracking-wider font-mono">
+                Агенты
+              </h3>
+            </div>
+            <AgentCarousel
+              agents={agents ?? []}
+              onRunAgent={handleRunAgent}
+              onToggleAgent={handleToggleAgent}
+              onViewDetails={(id) => navigate(`/agents/${id}`)}
+            />
+          </motion.div>
 
+          {/* Achievements (horizontal scroll) */}
+          <motion.div variants={mobileItem}>
+            <MobileAchievements achievements={achievements} streak={activityStreak} />
+          </motion.div>
+
+          {/* Compact Heatmap */}
+          <motion.div variants={mobileItem} className="px-4 mt-4">
+            <CompactHeatmap data={heatmapData} />
+          </motion.div>
+
+          {/* Unified Feed */}
+          <motion.div variants={mobileItem} className="mt-4 h-[400px]">
+            <UnifiedFeed
+              items={unifiedFeedItems}
+              onRefresh={handleRefresh}
+            />
+          </motion.div>
+        </motion.div>
+
+        {/* FAB Button for creating agent */}
+        <motion.button
+          initial={{ scale: 0 }}
+          animate={{ scale: 1 }}
+          whileTap={{ scale: 0.9 }}
+          onClick={handleCreateAgent}
+          className="fixed right-4 bottom-20 z-50 w-14 h-14 rounded-full
+                     bg-hud-gradient shadow-hud flex items-center justify-center
+                     active:shadow-hud-lg transition-shadow touch-manipulation"
+          style={{ marginBottom: 'env(safe-area-inset-bottom, 0px)' }}
+        >
+          <Plus className="w-6 h-6 text-white" />
+        </motion.button>
+      </>
+    );
+  }
+
+  // Tablet Layout
+  if (isTablet) {
+    return (
       <motion.div
-        variants={stagger}
+        variants={container}
         initial="hidden"
         animate="show"
-        className="space-y-6 max-w-7xl mx-auto"
+        className="space-y-4 max-w-[1200px] mx-auto px-4"
       >
-        {/* Header */}
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-semibold text-white">Dashboard</h1>
-            <p className="text-sm text-zinc-500 mt-1">
-              {new Date().toLocaleDateString('ru-RU', {
-                weekday: 'long',
-                day: 'numeric',
-                month: 'long'
-              })}
-            </p>
-          </div>
-
-          <div className="flex items-center gap-3">
-            {/* Connection Status */}
-            <div className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs ${
-              isConnected
-                ? 'bg-emerald-400/10 text-emerald-400'
-                : 'bg-red-400/10 text-red-400'
-            }`}>
-              {isConnected ? <Wifi className="w-3.5 h-3.5" /> : <WifiOff className="w-3.5 h-3.5" />}
-              {isConnected ? 'Connected' : 'Offline'}
-            </div>
-
-            {/* Command Palette Trigger */}
-            <button
-              onClick={() => setCommandPaletteOpen(true)}
-              className="flex items-center gap-2 px-3 py-1.5 rounded-lg
-                         bg-zinc-800 hover:bg-zinc-700 transition-colors
-                         text-sm text-zinc-400"
-            >
-              <Command className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">Search</span>
-              <kbd className="hidden sm:inline px-1.5 py-0.5 text-xs bg-zinc-700 rounded">
-                K
-              </kbd>
-            </button>
-          </div>
-        </div>
-
-        {/* Metrics Grid */}
-        <motion.div variants={fadeIn} className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          <MetricCard
-            label="Productivity"
-            value={`${Math.round(productivity?.score ?? 0)}%`}
-            subValue={productivity?.productive_events
-              ? `${productivity.productive_events} productive events`
-              : undefined}
-            icon={TrendingUp}
-            accentColor="green"
-            trend={productivity?.score && productivity.score >= 70 ? 'up' : 'neutral'}
-          />
-          <MetricCard
-            label="Events Today"
-            value={summary?.total_events ?? 0}
-            subValue={topApp ? `Most used: ${topApp[0]}` : undefined}
-            icon={Activity}
-            accentColor="cyan"
-          />
-          <MetricCard
-            label="Active Agents"
-            value={`${activeAgents.length}/${agents?.length ?? 0}`}
-            subValue={suggestions?.length ? `${suggestions.length} suggestions` : undefined}
-            icon={Bot}
-            accentColor="purple"
-          />
-          <MetricCard
-            label="Time Saved"
-            value={totalTimeSaved > 0 ? `${Math.round(totalTimeSaved / 60)}m` : '0m'}
-            subValue="By automation"
-            icon={Clock}
-            accentColor="orange"
+        {/* Status Bar */}
+        <motion.div variants={item}>
+          <StatusBar
+            focusTime={currentFocus?.sessionMinutes}
+            activeAgents={activeAgents.length}
+            totalAgents={agents?.length ?? 0}
+            systemHealth={systemHealth}
+            lastEventMinutesAgo={lastEventMinutesAgo}
           />
         </motion.div>
 
-        {/* Main Content Grid */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Agents Section */}
-          <motion.div variants={fadeIn} className="lg:col-span-2">
-            <div className="rounded-xl bg-zinc-900/50 border border-zinc-800 overflow-hidden">
-              <div className="flex items-center justify-between px-4 py-3 border-b border-zinc-800">
-                <div className="flex items-center gap-2">
-                  <Cpu className="w-4 h-4 text-cyan-400" />
-                  <h2 className="font-medium text-white">Agents</h2>
-                  <span className="text-xs text-zinc-500">
-                    {activeAgents.length} active
-                  </span>
-                </div>
-                <button
-                  onClick={() => navigate('/agents')}
-                  className="flex items-center gap-1 text-xs text-zinc-400
-                             hover:text-white transition-colors"
-                >
-                  View all
-                  <ChevronRight className="w-3.5 h-3.5" />
-                </button>
-              </div>
+        {/* Two Column Grid for Tablet */}
+        <div className="grid grid-cols-2 gap-4">
+          {/* Left Column */}
+          <div className="space-y-4">
+            <motion.div variants={item}>
+              <ActivityRings
+                productivity={ringsData.productivity}
+                focus={ringsData.focus}
+                automation={ringsData.automation}
+              />
+            </motion.div>
 
-              <div className="p-4">
-                {agents && agents.length > 0 ? (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    {agents.slice(0, 4).map((agent) => (
-                      <AgentCard
-                        key={agent.id}
-                        agent={agent}
-                        onRun={() => handleRunAgent(agent.id)}
-                        onToggle={() => handleToggleAgent(
-                          agent.id,
-                          agent.status !== 'active'
-                        )}
-                        onClick={() => navigate(`/agents/${agent.id}`)}
-                      />
-                    ))}
-                  </div>
-                ) : (
-                  <EmptyState
-                    icon={Bot}
-                    title="No agents yet"
-                    description="Create your first agent to automate repetitive tasks"
-                    action={{
-                      label: 'Create Agent',
-                      onClick: () => navigate('/agents'),
-                    }}
-                  />
-                )}
-              </div>
-            </div>
-          </motion.div>
+            <motion.div variants={item}>
+              <CurrentFocus
+                appName={currentFocus?.appName}
+                sessionMinutes={currentFocus?.sessionMinutes}
+                category={currentFocus?.category}
+              />
+            </motion.div>
 
-          {/* Activity Feed */}
-          <motion.div variants={fadeIn}>
-            <div className="rounded-xl bg-zinc-900/50 border border-zinc-800 overflow-hidden h-full">
-              <div className="flex items-center justify-between px-4 py-3 border-b border-zinc-800">
-                <div className="flex items-center gap-2">
-                  <Activity className="w-4 h-4 text-cyan-400" />
-                  <h2 className="font-medium text-white">Activity</h2>
-                  <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                </div>
-                <button
-                  onClick={() => navigate('/history')}
-                  className="flex items-center gap-1 text-xs text-zinc-400
-                             hover:text-white transition-colors"
-                >
-                  History
-                  <ChevronRight className="w-3.5 h-3.5" />
-                </button>
-              </div>
+            <motion.div variants={item}>
+              <AIInsights insights={insights} />
+            </motion.div>
+          </div>
 
-              <div className="p-2 max-h-[400px] overflow-auto">
-                {timeline && timeline.length > 0 ? (
-                  <div className="space-y-1">
-                    {timeline.slice(0, 15).map((event) => (
-                      <ActivityItem key={event.id} event={event} />
-                    ))}
-                  </div>
-                ) : (
-                  <EmptyState
-                    icon={Monitor}
-                    title="No activity yet"
-                    description="Activity will appear here as you use your devices"
-                  />
-                )}
+          {/* Right Column */}
+          <div className="space-y-4">
+            <motion.div variants={item}>
+              <div className="p-5 rounded-xl bg-bg-secondary/60 backdrop-blur-md border border-border-subtle
+                             shadow-inner-glow">
+                <h3 className="text-xs text-text-muted uppercase tracking-wider font-mono mb-4">
+                  Agent Command Center
+                </h3>
+                <AgentGrid
+                  agents={agents?.slice(0, 4) ?? []}
+                  onRunAgent={handleRunAgent}
+                  onToggleAgent={handleToggleAgent}
+                />
               </div>
-            </div>
-          </motion.div>
+            </motion.div>
+
+            <motion.div variants={item}>
+              <Achievements achievements={achievements} streak={activityStreak} />
+            </motion.div>
+          </div>
         </div>
 
-        {/* Bottom Section */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* App Usage */}
-          <motion.div variants={fadeIn}>
-            <div className="rounded-xl bg-zinc-900/50 border border-zinc-800 overflow-hidden">
-              <div className="flex items-center justify-between px-4 py-3 border-b border-zinc-800">
-                <div className="flex items-center gap-2">
-                  <BarChart3 className="w-4 h-4 text-cyan-400" />
-                  <h2 className="font-medium text-white">Top Apps</h2>
-                  <span className="text-xs text-zinc-500">7 days</span>
-                </div>
-              </div>
+        {/* Full Width Bottom Section */}
+        <motion.div variants={item}>
+          <WeeklyHeatmap data={heatmapData} />
+        </motion.div>
 
-              <div className="p-4">
-                {appUsage && appUsage.length > 0 ? (
-                  <div className="space-y-3">
-                    {appUsage.slice(0, 5).map((app, index) => {
-                      const maxCount = appUsage[0].event_count;
-                      const percentage = (app.event_count / maxCount) * 100;
+        <motion.div variants={item} className="h-[250px]">
+          <AgentActivityStream activities={agentActivities} />
+        </motion.div>
 
-                      return (
-                        <div key={app.app_name} className="space-y-1.5">
-                          <div className="flex items-center justify-between text-sm">
-                            <span className="text-white truncate">{app.app_name}</span>
-                            <span className="text-zinc-400 text-xs">
-                              {app.event_count} events
-                            </span>
-                          </div>
-                          <div className="h-1.5 bg-zinc-800 rounded-full overflow-hidden">
-                            <motion.div
-                              initial={{ width: 0 }}
-                              animate={{ width: `${percentage}%` }}
-                              transition={{ duration: 0.5, delay: index * 0.1 }}
-                              className="h-full bg-gradient-to-r from-cyan-500 to-cyan-400 rounded-full"
-                            />
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                ) : (
-                  <EmptyState
-                    icon={BarChart3}
-                    title="No app data"
-                    description="App usage statistics will appear here"
-                  />
-                )}
-              </div>
-            </div>
-          </motion.div>
-
-          {/* AI Insights */}
-          <motion.div variants={fadeIn}>
-            <div className="rounded-xl bg-zinc-900/50 border border-zinc-800 overflow-hidden">
-              <div className="flex items-center justify-between px-4 py-3 border-b border-zinc-800">
-                <div className="flex items-center gap-2">
-                  <Sparkles className="w-4 h-4 text-cyan-400" />
-                  <h2 className="font-medium text-white">AI Insights</h2>
-                </div>
-                <button
-                  onClick={() => navigate('/chat')}
-                  className="flex items-center gap-1 text-xs text-zinc-400
-                             hover:text-white transition-colors"
-                >
-                  Ask AI
-                  <ChevronRight className="w-3.5 h-3.5" />
-                </button>
-              </div>
-
-              <div className="p-4 space-y-3">
-                {productivity && productivity.score >= 70 && (
-                  <div className="flex items-start gap-3 p-3 rounded-lg bg-emerald-400/5 border border-emerald-400/10">
-                    <CheckCircle2 className="w-4 h-4 text-emerald-400 mt-0.5" />
-                    <div>
-                      <div className="text-sm text-white">Great productivity today!</div>
-                      <div className="text-xs text-zinc-500">
-                        {productivity.productive_events} productive events
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {suggestions && suggestions.length > 0 && (
-                  <div className="flex items-start gap-3 p-3 rounded-lg bg-cyan-400/5 border border-cyan-400/10">
-                    <Sparkles className="w-4 h-4 text-cyan-400 mt-0.5" />
-                    <div>
-                      <div className="text-sm text-white">Automation opportunities</div>
-                      <div className="text-xs text-zinc-500">
-                        {suggestions.length} patterns detected that could be automated
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {categories && categories.length > 0 && (
-                  <div className="flex items-start gap-3 p-3 rounded-lg bg-violet-400/5 border border-violet-400/10">
-                    <BarChart3 className="w-4 h-4 text-violet-400 mt-0.5" />
-                    <div>
-                      <div className="text-sm text-white">Category breakdown</div>
-                      <div className="text-xs text-zinc-500">
-                        Top: {categories[0]?.category} ({categories[0]?.count} events)
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {/* ROI Card - always show if there's any usage or time saved */}
-                {(aiCost7Days > 0 || totalTimeSaved > 0) && (
-                  <div className="flex items-start gap-3 p-3 rounded-lg bg-amber-400/5 border border-amber-400/10">
-                    <DollarSign className="w-4 h-4 text-amber-400 mt-0.5" />
-                    <div className="flex-1">
-                      <div className="text-sm text-white">AI ROI (7 days)</div>
-                      <div className="text-xs text-zinc-500 space-y-0.5 mt-1">
-                        <div>AI Cost: ${aiCost7Days.toFixed(2)}</div>
-                        <div>Time Saved: {timeSavedHours.toFixed(1)}h (${valueSaved.toFixed(0)} value)</div>
-                        {roi > 0 && <div className="text-emerald-400">ROI: +{roi.toFixed(0)}%</div>}
-                        {roi <= 0 && aiCost7Days > 0 && <div className="text-zinc-400">ROI: Building up...</div>}
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {(!productivity || productivity.score < 70) &&
-                 (!suggestions || suggestions.length === 0) &&
-                 (!categories || categories.length === 0) &&
-                 aiCost7Days === 0 && totalTimeSaved === 0 && (
-                  <EmptyState
-                    icon={Sparkles}
-                    title="Gathering insights"
-                    description="AI insights will appear as more data is collected"
-                  />
-                )}
-              </div>
-            </div>
-          </motion.div>
-        </div>
+        <motion.div variants={item}>
+          <QuickActions onCreateAgent={handleCreateAgent} />
+        </motion.div>
       </motion.div>
-    </>
+    );
+  }
+
+  // Desktop Layout (Original)
+  return (
+    <motion.div
+      variants={container}
+      initial="hidden"
+      animate="show"
+      className="space-y-4 max-w-[1600px] mx-auto"
+    >
+      {/* Status Bar */}
+      <motion.div variants={item}>
+        <StatusBar
+          focusTime={currentFocus?.sessionMinutes}
+          activeAgents={activeAgents.length}
+          totalAgents={agents?.length ?? 0}
+          systemHealth={systemHealth}
+          lastEventMinutesAgo={lastEventMinutesAgo}
+        />
+      </motion.div>
+
+      {/* Main Bento Grid */}
+      <div className="grid grid-cols-12 gap-4">
+        {/* Left Column - YOU */}
+        <div className="col-span-12 lg:col-span-3 space-y-4">
+          <motion.div variants={item}>
+            <ActivityRings
+              productivity={ringsData.productivity}
+              focus={ringsData.focus}
+              automation={ringsData.automation}
+            />
+          </motion.div>
+
+          <motion.div variants={item}>
+            <CurrentFocus
+              appName={currentFocus?.appName}
+              sessionMinutes={currentFocus?.sessionMinutes}
+              category={currentFocus?.category}
+            />
+          </motion.div>
+
+          <motion.div variants={item}>
+            <WeeklyHeatmap data={heatmapData} />
+          </motion.div>
+        </div>
+
+        {/* Center Column - AGENTS */}
+        <div className="col-span-12 lg:col-span-6 space-y-4">
+          <motion.div variants={item}>
+            <div className="p-5 rounded-xl bg-bg-secondary/60 backdrop-blur-md border border-border-subtle
+                           shadow-inner-glow">
+              <h3 className="text-xs text-text-muted uppercase tracking-wider font-mono mb-4">
+                Agent Command Center
+              </h3>
+              <AgentGrid
+                agents={agents?.slice(0, 4) ?? []}
+                onRunAgent={handleRunAgent}
+                onToggleAgent={handleToggleAgent}
+              />
+            </div>
+          </motion.div>
+
+          <motion.div variants={item} className="h-[300px]">
+            <AgentActivityStream activities={agentActivities} />
+          </motion.div>
+        </div>
+
+        {/* Right Column - INSIGHTS & GAMIFICATION */}
+        <div className="col-span-12 lg:col-span-3 space-y-4">
+          <motion.div variants={item}>
+            <AIInsights insights={insights} />
+          </motion.div>
+
+          <motion.div variants={item}>
+            <Achievements achievements={achievements} streak={activityStreak} />
+          </motion.div>
+
+          <motion.div variants={item}>
+            <QuickActions onCreateAgent={handleCreateAgent} />
+          </motion.div>
+        </div>
+      </div>
+
+      {/* Bottom - Timeline */}
+      <motion.div variants={item}>
+        <LiveTimeline events={timelineEvents} />
+      </motion.div>
+    </motion.div>
   );
 }

@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion';
-import { Monitor, Clock, Zap } from 'lucide-react';
+import { Monitor, Clock } from 'lucide-react';
 import { useEffect, useState } from 'react';
 
 interface CurrentFocusProps {
@@ -34,7 +34,7 @@ export function CurrentFocus({
     if (h > 0) {
       return `${h}:${m.toString().padStart(2, '0')}`;
     }
-    return `${m}м`;
+    return `${m}m`;
   };
 
   if (!appName) {
@@ -42,65 +42,58 @@ export function CurrentFocus({
       <motion.div
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
-        className="p-5 rounded-xl bg-bg-secondary/60 backdrop-blur-md border border-border-subtle
-                   shadow-inner-glow flex flex-col items-center justify-center min-h-[160px]"
+        transition={{ duration: 0.3 }}
+        className="p-5 rounded-xl bg-zinc-900/50 border border-zinc-800
+                   flex flex-col items-center justify-center min-h-[160px]"
       >
-        <Monitor className="w-8 h-8 text-text-muted mb-2" />
-        <p className="text-sm text-text-muted">Ожидание активности...</p>
+        <Monitor className="w-7 h-7 text-zinc-600 mb-3" />
+        <p className="text-sm text-zinc-500">Waiting for activity...</p>
       </motion.div>
     );
   }
 
   return (
     <motion.div
-      initial={{ opacity: 0, scale: 0.95 }}
-      animate={{ opacity: 1, scale: 1 }}
-      className="p-4 rounded-xl bg-bg-secondary/60 backdrop-blur-md border border-border-subtle
-                 shadow-inner-glow relative overflow-hidden"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={{ duration: 0.3 }}
+      className="p-5 rounded-xl bg-zinc-900/50 border border-zinc-800"
     >
-      {/* Animated background glow */}
-      <div className="absolute inset-0 bg-hud-radial opacity-50 pointer-events-none" />
-
-      <h3 className="text-xs text-text-muted uppercase tracking-wider font-mono mb-4 relative">
+      <h3 className="text-xs text-zinc-500 font-medium tracking-wide mb-4">
         Current Focus
       </h3>
 
-      <div className="relative">
-        {/* App Icon & Name */}
-        <div className="flex items-center gap-3 mb-4">
-          <div className="w-14 h-14 rounded-xl bg-hud-gradient border border-border-default
-                          flex items-center justify-center shadow-hud flex-shrink-0">
-            <Monitor className="w-7 h-7 text-hud-cyan" />
-          </div>
-          <div className="min-w-0 flex-1">
-            <h4 className="text-lg font-semibold text-text-primary truncate">{appName}</h4>
-            {category && (
-              <span className="text-xs font-mono text-hud-cyan uppercase tracking-wider">
-                {category}
-              </span>
-            )}
-          </div>
+      {/* App Icon & Name */}
+      <div className="flex items-center gap-4 mb-5">
+        <div className="w-12 h-12 rounded-xl bg-zinc-800 border border-zinc-700
+                        flex items-center justify-center flex-shrink-0">
+          <Monitor className="w-6 h-6 text-zinc-400" />
         </div>
-
-        {/* Timer */}
-        <div className="flex items-center gap-4">
-          <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-hud-muted
-                          border border-border-subtle">
-            <Clock className="w-4 h-4 text-hud-cyan" />
-            <span className="text-2xl font-mono font-bold text-text-primary">
-              {formatTime(displayTime)}
+        <div className="min-w-0 flex-1">
+          <h4 className="text-lg font-semibold text-zinc-100 truncate">{appName}</h4>
+          {category && (
+            <span className="text-xs text-zinc-500">
+              {category}
             </span>
-          </div>
-
-          <div className="flex items-center gap-1.5 text-xs text-text-muted">
-            <Zap className="w-3.5 h-3.5 text-status-success" />
-            <span>Активная сессия</span>
-          </div>
+          )}
         </div>
       </div>
 
-      {/* Scanline effect */}
-      <div className="absolute inset-0 bg-scanline pointer-events-none opacity-30" />
+      {/* Timer */}
+      <div className="flex items-center gap-4">
+        <div className="flex items-center gap-2.5 px-4 py-2.5 rounded-lg bg-zinc-800/50
+                        border border-zinc-700/50">
+          <Clock className="w-4 h-4 text-zinc-500" />
+          <span className="text-2xl font-semibold text-zinc-100 tabular-nums">
+            {formatTime(displayTime)}
+          </span>
+        </div>
+
+        <div className="flex items-center gap-1.5">
+          <div className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+          <span className="text-sm text-zinc-400">Active session</span>
+        </div>
+      </div>
     </motion.div>
   );
 }

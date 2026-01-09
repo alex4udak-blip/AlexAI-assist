@@ -18,12 +18,12 @@ export default {
           hover: 'rgba(6, 182, 212, 0.06)',
           active: 'rgba(6, 182, 212, 0.1)',
         },
-        // Borders - Cyan glow
+        // Borders - Subtle zinc
         border: {
-          subtle: 'rgba(6, 182, 212, 0.1)',
-          default: 'rgba(6, 182, 212, 0.2)',
-          strong: 'rgba(6, 182, 212, 0.3)',
-          glow: 'rgba(6, 182, 212, 0.5)',
+          subtle: 'rgba(63, 63, 70, 0.5)',
+          default: 'rgba(82, 82, 91, 0.6)',
+          strong: 'rgba(113, 113, 122, 0.5)',
+          glow: 'rgba(6, 182, 212, 0.3)',
         },
         // Text
         text: {
@@ -83,14 +83,14 @@ export default {
         wider: '0.1em',
       },
       boxShadow: {
-        'hud': '0 0 30px rgba(6, 182, 212, 0.3)',
-        'hud-sm': '0 0 15px rgba(6, 182, 212, 0.2)',
-        'hud-lg': '0 0 50px rgba(6, 182, 212, 0.4)',
-        'glow-cyan': '0 0 20px rgba(6, 182, 212, 0.5)',
-        'glow-blue': '0 0 20px rgba(59, 130, 246, 0.5)',
-        'glow-green': '0 0 20px rgba(34, 197, 94, 0.5)',
-        'glow-orange': '0 0 20px rgba(249, 115, 22, 0.5)',
-        'inner-glow': 'inset 0 0 20px rgba(6, 182, 212, 0.1)',
+        'hud': '0 1px 3px rgba(0, 0, 0, 0.3)',
+        'hud-sm': '0 1px 2px rgba(0, 0, 0, 0.2)',
+        'hud-lg': '0 4px 12px rgba(0, 0, 0, 0.4)',
+        'glow-cyan': '0 0 8px rgba(6, 182, 212, 0.2)',
+        'glow-blue': '0 0 8px rgba(59, 130, 246, 0.2)',
+        'glow-green': '0 0 8px rgba(34, 197, 94, 0.2)',
+        'glow-orange': '0 0 8px rgba(249, 115, 22, 0.2)',
+        'inner-glow': 'inset 0 1px 2px rgba(0, 0, 0, 0.1)',
       },
       backgroundImage: {
         'accent-gradient': 'linear-gradient(135deg, #06b6d4 0%, #3b82f6 100%)',
@@ -128,8 +128,8 @@ export default {
           to: { opacity: '1', transform: 'translateY(0)' },
         },
         'pulse-glow': {
-          '0%, 100%': { opacity: '1', filter: 'brightness(1)' },
-          '50%': { opacity: '0.8', filter: 'brightness(1.2)' },
+          '0%, 100%': { opacity: '1' },
+          '50%': { opacity: '0.7' },
         },
         'scan': {
           '0%': { transform: 'translateY(-100%)' },

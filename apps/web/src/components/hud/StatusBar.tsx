@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion';
-import { Activity, Shield, Wifi, WifiOff } from 'lucide-react';
+import { Circle } from 'lucide-react';
 import { useWebSocket } from '../../hooks/useWebSocket';
 
 interface StatusBarProps {
@@ -23,42 +23,33 @@ export function StatusBar({
     const hours = Math.floor(minutes / 60);
     const mins = minutes % 60;
     if (hours > 0) {
-      return `${hours}ч ${mins}м`;
+      return `${hours}h ${mins}m`;
     }
-    return `${mins}м`;
+    return `${mins}m`;
   };
 
-  // More descriptive health config with tooltips
   const getHealthConfig = () => {
     if (!isConnected) {
       return {
-        color: 'bg-status-error',
-        glow: 'shadow-glow-orange',
-        label: 'Нет связи',
-        tooltip: 'WebSocket отключен'
+        dotColor: 'bg-red-500',
+        label: 'Disconnected',
       };
     }
     if (lastEventMinutesAgo > 30) {
       return {
-        color: 'bg-status-warning',
-        glow: 'shadow-glow-orange',
-        label: 'Нет данных',
-        tooltip: `Последнее событие ${lastEventMinutesAgo}м назад`
+        dotColor: 'bg-amber-500',
+        label: 'No data',
       };
     }
     if (lastEventMinutesAgo > 5) {
       return {
-        color: 'bg-status-warning',
-        glow: 'shadow-glow-orange',
-        label: 'Ожидание',
-        tooltip: `Последнее событие ${lastEventMinutesAgo}м назад`
+        dotColor: 'bg-amber-500',
+        label: 'Idle',
       };
     }
     return {
-      color: 'bg-status-success',
-      glow: 'shadow-glow-green',
-      label: 'Активно',
-      tooltip: 'Данные поступают в реальном времени'
+      dotColor: 'bg-emerald-500',
+      label: 'Active',
     };
   };
 
@@ -66,89 +57,45 @@ export function StatusBar({
 
   return (
     <motion.div
-      initial={{ opacity: 0, y: -20 }}
-      animate={{ opacity: 1, y: 0 }}
-      className="flex items-center justify-between gap-3 px-4 py-3 rounded-xl
-                 bg-bg-secondary/80 backdrop-blur-md border border-border-subtle
-                 shadow-inner-glow overflow-hidden"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={{ duration: 0.2 }}
+      className="flex items-center justify-between gap-6 px-5 py-3 rounded-xl
+                 bg-zinc-900/50 border border-zinc-800"
     >
       {/* Focus Status */}
-      <div className="flex items-center gap-2 min-w-0 flex-1">
-        <div className="relative flex-shrink-0">
-          <div className="w-9 h-9 rounded-lg bg-hud-cyan/10 flex items-center justify-center
-                          border border-hud-cyan/30">
-            <Activity className="w-4 h-4 text-hud-cyan" />
-          </div>
-          <span className="absolute -top-1 -right-1 w-2 h-2 bg-status-success rounded-full
-                          animate-pulse-glow" />
+      <div className="flex items-center gap-3 min-w-0">
+        <div className="flex items-center gap-2">
+          <Circle className="w-2 h-2 fill-emerald-500 text-emerald-500" />
+          <span className="text-xs text-zinc-400">Focus</span>
         </div>
-        <div className="min-w-0">
-          <p className="text-[10px] text-text-muted uppercase tracking-wider font-mono">Статус</p>
-          <p className="text-xs font-medium text-text-primary truncate">
-            {focusTime > 0 ? `В фокусе ${formatFocusTime(focusTime)}` : 'Ожидание'}
-          </p>
-        </div>
+        <span className="text-sm font-medium text-zinc-200 tabular-nums">
+          {focusTime > 0 ? formatFocusTime(focusTime) : '--'}
+        </span>
       </div>
+
+      <div className="w-px h-4 bg-zinc-800" />
 
       {/* Active Agents */}
-      <div className="flex items-center gap-2 min-w-0 flex-1">
-        <div className="flex items-center gap-1 flex-shrink-0">
-          {[...Array(Math.min(totalAgents, 5))].map((_, i) => (
-            <motion.div
-              key={i}
-              initial={{ scale: 0 }}
-              animate={{ scale: 1 }}
-              transition={{ delay: i * 0.1 }}
-              className={`w-1.5 h-1.5 rounded-full ${
-                i < activeAgents
-                  ? 'bg-status-success animate-pulse-glow'
-                  : 'bg-text-muted/30'
-              }`}
-            />
-          ))}
-        </div>
-        <div className="min-w-0">
-          <p className="text-[10px] text-text-muted uppercase tracking-wider font-mono">Агенты</p>
-          <p className="text-xs font-medium text-text-primary font-mono truncate">
-            {activeAgents}/{totalAgents}
-          </p>
-        </div>
+      <div className="flex items-center gap-3 min-w-0">
+        <span className="text-xs text-zinc-400">Agents</span>
+        <span className="text-sm font-medium text-zinc-200 tabular-nums">
+          {activeAgents}/{totalAgents}
+        </span>
       </div>
+
+      <div className="w-px h-4 bg-zinc-800" />
 
       {/* System Health */}
-      <div className="flex items-center gap-2 min-w-0 flex-1 group relative">
-        <div className={`w-9 h-9 rounded-lg ${health.color}/10 flex items-center justify-center
-                        border ${health.color}/30 flex-shrink-0`}>
-          <Shield className={`w-4 h-4 ${
-            health.color.includes('success') ? 'text-status-success' :
-            health.color.includes('warning') ? 'text-status-warning' : 'text-status-error'
-          }`} />
-        </div>
-        <div className="min-w-0">
-          <p className="text-[10px] text-text-muted uppercase tracking-wider font-mono">Система</p>
-          <p className="text-xs font-medium text-text-primary truncate">{health.label}</p>
-        </div>
-        {/* Tooltip */}
-        <div className="absolute left-0 top-full mt-1 px-2 py-1 bg-bg-tertiary rounded text-[10px]
-                        text-text-secondary opacity-0 group-hover:opacity-100 transition-opacity
-                        pointer-events-none whitespace-nowrap z-50 border border-border-subtle">
-          {health.tooltip}
-        </div>
+      <div className="flex items-center gap-2 min-w-0">
+        <div className={`w-1.5 h-1.5 rounded-full ${health.dotColor}`} />
+        <span className="text-sm text-zinc-300">{health.label}</span>
       </div>
 
-      {/* Connection Status */}
-      <div className="flex items-center gap-1.5 flex-shrink-0">
-        {isConnected ? (
-          <>
-            <Wifi className="w-3.5 h-3.5 text-status-success" />
-            <span className="text-[10px] text-status-success font-mono hidden sm:inline">OK</span>
-          </>
-        ) : (
-          <>
-            <WifiOff className="w-3.5 h-3.5 text-status-error" />
-            <span className="text-[10px] text-status-error font-mono hidden sm:inline">OFF</span>
-          </>
-        )}
+      {/* Connection indicator */}
+      <div className="flex items-center gap-1.5 ml-auto">
+        <div className={`w-1.5 h-1.5 rounded-full ${isConnected ? 'bg-emerald-500' : 'bg-red-500'}`} />
+        <span className="text-xs text-zinc-500">{isConnected ? 'Connected' : 'Offline'}</span>
       </div>
     </motion.div>
   );
