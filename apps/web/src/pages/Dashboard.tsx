@@ -11,7 +11,6 @@ import {
   ChevronRight,
   Play,
   Pause,
-  AlertCircle,
   CheckCircle2,
   Sparkles,
   Monitor,
@@ -120,7 +119,7 @@ function AgentCard({
     status: string;
     run_count: number;
     success_count: number;
-    last_run_at?: string;
+    last_run_at: string | null;
     total_time_saved_seconds: number;
   };
   onRun: () => void;
@@ -201,10 +200,10 @@ function ActivityItem({
 }: {
   event: {
     id: string;
-    app_name: string;
-    window_title?: string;
+    app_name: string | null;
+    window_title?: string | null;
     timestamp: string;
-    category?: string;
+    category?: string | null;
   };
 }) {
   const timeAgo = useMemo(() => {
@@ -223,7 +222,7 @@ function ActivityItem({
         <Monitor className="w-3.5 h-3.5 text-zinc-400" />
       </div>
       <div className="flex-1 min-w-0">
-        <div className="text-sm text-white truncate">{event.app_name}</div>
+        <div className="text-sm text-white truncate">{event.app_name || 'Unknown'}</div>
         {event.window_title && (
           <div className="text-xs text-zinc-500 truncate">{event.window_title}</div>
         )}
@@ -479,8 +478,8 @@ export default function Dashboard() {
           <MetricCard
             label="Productivity"
             value={`${Math.round(productivity?.score ?? 0)}%`}
-            subValue={productivity?.productive_minutes
-              ? `${Math.round(productivity.productive_minutes)}m productive`
+            subValue={productivity?.productive_events
+              ? `${productivity.productive_events} productive events`
               : undefined}
             icon={TrendingUp}
             accentColor="green"
@@ -618,15 +617,15 @@ export default function Dashboard() {
                 {appUsage && appUsage.length > 0 ? (
                   <div className="space-y-3">
                     {appUsage.slice(0, 5).map((app, index) => {
-                      const maxMinutes = appUsage[0].time_minutes;
-                      const percentage = (app.time_minutes / maxMinutes) * 100;
+                      const maxCount = appUsage[0].event_count;
+                      const percentage = (app.event_count / maxCount) * 100;
 
                       return (
                         <div key={app.app_name} className="space-y-1.5">
                           <div className="flex items-center justify-between text-sm">
                             <span className="text-white truncate">{app.app_name}</span>
                             <span className="text-zinc-400 text-xs">
-                              {Math.round(app.time_minutes)}m
+                              {app.event_count} events
                             </span>
                           </div>
                           <div className="h-1.5 bg-zinc-800 rounded-full overflow-hidden">
@@ -677,7 +676,7 @@ export default function Dashboard() {
                     <div>
                       <div className="text-sm text-white">Great productivity today!</div>
                       <div className="text-xs text-zinc-500">
-                        {Math.round(productivity.productive_minutes)}m in productive apps
+                        {productivity.productive_events} productive events
                       </div>
                     </div>
                   </div>
@@ -701,7 +700,7 @@ export default function Dashboard() {
                     <div>
                       <div className="text-sm text-white">Category breakdown</div>
                       <div className="text-xs text-zinc-500">
-                        Top: {categories[0]?.category} ({Math.round(categories[0]?.percentage ?? 0)}%)
+                        Top: {categories[0]?.category} ({categories[0]?.count} events)
                       </div>
                     </div>
                   </div>
