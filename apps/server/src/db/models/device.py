@@ -1,11 +1,16 @@
 """Device model."""
 
-from datetime import datetime
+from datetime import datetime, timezone
 
 from sqlalchemy import String
 from sqlalchemy.orm import Mapped, mapped_column
 
 from src.db.base import Base
+
+
+def utc_now() -> datetime:
+    """Get current UTC time as naive datetime."""
+    return datetime.now(timezone.utc).replace(tzinfo=None)
 
 
 class Device(Base):
@@ -19,4 +24,4 @@ class Device(Base):
     os_version: Mapped[str | None] = mapped_column(String(50))
     app_version: Mapped[str | None] = mapped_column(String(50))
     last_seen_at: Mapped[datetime | None] = mapped_column()
-    created_at: Mapped[datetime] = mapped_column(default=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(default=utc_now)

@@ -1,6 +1,6 @@
 """Event endpoints."""
 
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 from typing import Any
 from uuid import UUID
 
@@ -12,6 +12,20 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from src.api.deps import get_db_session
 from src.core.websocket import broadcast_event
 from src.db.models import Device, Event
+
+
+def normalize_datetime(dt: datetime | None) -> datetime | None:
+    """Convert any datetime to UTC naive datetime for PostgreSQL.
+
+    This handles both timezone-aware and naive datetimes,
+    converting everything to UTC without timezone info.
+    """
+    if dt is None:
+        return None
+    if dt.tzinfo is not None:
+        # Convert to UTC and remove timezone info
+        dt = dt.astimezone(timezone.utc).replace(tzinfo=None)
+    return dt
 
 router = APIRouter()
 
@@ -111,14 +125,14 @@ async def create_events(
             )
             db.add(device)
 
-        device.last_seen_at = datetime.now(UTC)
+        device.last_seen_at = datetime.now(timezone.utc).replace(tzinfo=None)
 
     # Create events
     for event_data in batch.events:
         event = Event(
             device_id=event_data.device_id,
             event_type=event_data.event_type,
-            timestamp=event_data.timestamp,
+            timestamp=normalize_datetime(event_data.timestamp),
             app_name=event_data.app_name,
             window_title=event_data.window_title,
             url=event_data.url,
@@ -212,7 +226,7 @@ async def get_timeline(
     """Get activity timeline for recent hours."""
     from datetime import timedelta
 
-    start = datetime.now(UTC) - timedelta(hours=hours)
+    start = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(hours=hours)
     query = (
         select(Event)
         .where(Event.timestamp >= start)
