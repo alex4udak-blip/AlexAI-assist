@@ -3,6 +3,7 @@
 mod automation;
 mod collector;
 mod commands;
+mod db;
 mod notifications;
 mod permissions;
 mod sync;
@@ -24,22 +25,37 @@ pub struct AppState {
     pub last_sync: String,
     pub events_buffer: Vec<collector::Event>,
     pub buffer_warnings_logged: bool,
-}
-
-impl Default for AppState {
-    fn default() -> Self {
-        Self {
-            collecting: true,
-            events_today: 0,
-            last_sync: "Never".to_string(),
-            events_buffer: Vec::new(),
-            buffer_warnings_logged: false,
-        }
-    }
+    pub db: Arc<db::EventDatabase>,
 }
 
 fn main() {
-    let state = Arc::new(Mutex::new(AppState::default()));
+    // Initialize database
+    let db = Arc::new(
+        db::EventDatabase::new()
+            .expect("Failed to initialize event database")
+    );
+
+    // Load existing events from database
+    let existing_events = db.load_all_events()
+        .unwrap_or_else(|e| {
+            eprintln!("Warning: Failed to load events from database: {}", e);
+            Vec::new()
+        });
+
+    let events_count = existing_events.len();
+    if events_count > 0 {
+        println!("Loaded {} existing events from database", events_count);
+    }
+
+    // Create app state with database
+    let state = Arc::new(Mutex::new(AppState {
+        collecting: true,
+        events_today: 0,
+        last_sync: "Never".to_string(),
+        events_buffer: existing_events,
+        buffer_warnings_logged: false,
+        db: db.clone(),
+    }));
     let shutdown_token = CancellationToken::new();
 
     // Create automation queue

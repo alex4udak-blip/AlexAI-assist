@@ -35,6 +35,11 @@ session_tracker = SessionTracker()
 class EventCreate(BaseModel):
     """Event creation schema."""
 
+    event_id: str | None = Field(
+        default=None,
+        max_length=255,
+        description="Client-generated event ID for deduplication",
+    )
     device_id: str = Field(
         ...,
         min_length=1,
@@ -106,11 +111,11 @@ class EventResponse(BaseModel):
         from_attributes = True
 
 
-@router.post("", response_model=dict[str, int])
+@router.post("")
 async def create_events(
     batch: EventBatch,
     db: AsyncSession = Depends(get_db_session),
-) -> dict[str, int]:
+) -> dict[str, Any]:
     """Receive events from collector."""
     # Ensure device exists
     device_ids = {e.device_id for e in batch.events}
@@ -129,10 +134,26 @@ async def create_events(
 
         device.last_seen_at = datetime.now(timezone.utc).replace(tzinfo=None)
 
-    # Create events and track sessions
+    # Create events with deduplication
     session_events = []
+    acked_event_ids = []
+    skipped_count = 0
+
     for event_data in batch.events:
+        # Check for duplicates if event_id is provided
+        if event_data.event_id:
+            result = await db.execute(
+                select(Event).where(Event.event_id == event_data.event_id)
+            )
+            existing = result.scalar_one_or_none()
+            if existing:
+                # Event already exists, skip but acknowledge
+                acked_event_ids.append(event_data.event_id)
+                skipped_count += 1
+                continue
+
         event = Event(
+            event_id=event_data.event_id,
             device_id=event_data.device_id,
             event_type=event_data.event_type,
             timestamp=normalize_datetime(event_data.timestamp),
@@ -143,6 +164,10 @@ async def create_events(
             category=event_data.category,
         )
         db.add(event)
+
+        # Track acknowledged event ID
+        if event_data.event_id:
+            acked_event_ids.append(event_data.event_id)
 
     await db.commit()
 
@@ -180,11 +205,14 @@ async def create_events(
             "data": e.data,
         }
         for e in batch.events
+        if not e.event_id or e.event_id in acked_event_ids
     ]
     await broadcast_events_batch(events_data, list(device_ids))
 
     return {
-        "created": len(batch.events),
+        "created": len(batch.events) - skipped_count,
+        "skipped": skipped_count,
+        "acked_event_ids": acked_event_ids,
         "session_events": session_events,
     }
 

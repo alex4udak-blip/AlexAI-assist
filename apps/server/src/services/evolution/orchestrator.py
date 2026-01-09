@@ -527,16 +527,89 @@ Respond with JSON:
 
         try:
             if subsystem == EvolutionSubsystem.MEMORY:
-                # Snapshot key memory metrics
-                fact_count = await self.db.scalar(
-                    select(func.count()).select_from(MemoryFact)
+                # Snapshot memories that might be affected by evolution
+                confidence_threshold = 0.3
+                min_age_days = 7
+                cutoff_date = datetime.now(UTC) - timedelta(days=min_age_days)
+                thirty_days_ago = datetime.now(UTC) - timedelta(days=30)
+
+                # Capture low-confidence facts that might be pruned
+                facts_result = await self.db.execute(
+                    select(MemoryFact)
+                    .where(MemoryFact.confidence < confidence_threshold)
+                    .where(MemoryFact.created_at < cutoff_date)
                 )
-                experience_count = await self.db.scalar(
-                    select(func.count()).select_from(MemoryExperience)
+                low_confidence_facts = facts_result.scalars().all()
+
+                # Capture low-confidence beliefs that might be pruned
+                beliefs_result = await self.db.execute(
+                    select(MemoryBelief)
+                    .where(MemoryBelief.confidence < confidence_threshold)
+                    .where(MemoryBelief.created_at < cutoff_date)
+                    .where(MemoryBelief.status == "active")
                 )
+                low_confidence_beliefs = beliefs_result.scalars().all()
+
+                # Capture low-confidence relationships that might be pruned
+                relationships_result = await self.db.execute(
+                    select(MemoryRelationship)
+                    .where(MemoryRelationship.confidence < confidence_threshold)
+                    .where(MemoryRelationship.created_at < cutoff_date)
+                )
+                low_confidence_relationships = relationships_result.scalars().all()
+
+                # Capture recent facts that might be consolidated
+                recent_facts_result = await self.db.execute(
+                    select(MemoryFact)
+                    .where(MemoryFact.created_at >= thirty_days_ago)
+                    .order_by(MemoryFact.fact_type, MemoryFact.created_at.desc())
+                )
+                recent_facts = recent_facts_result.scalars().all()
+
                 snapshot_data = {
-                    "fact_count": fact_count,
-                    "experience_count": experience_count,
+                    "facts": [
+                        {
+                            "id": str(f.id),
+                            "content": f.content,
+                            "fact_type": f.fact_type,
+                            "confidence": f.confidence,
+                            "access_count": f.access_count,
+                            "heat_score": f.heat_score,
+                            "created_at": f.created_at.isoformat() if f.created_at else None,
+                            "embedding": f.embedding,
+                        }
+                        for f in (list(low_confidence_facts) + list(recent_facts))
+                    ],
+                    "beliefs": [
+                        {
+                            "id": str(b.id),
+                            "content": b.content,
+                            "confidence": b.confidence,
+                            "status": b.status,
+                            "created_at": b.created_at.isoformat() if b.created_at else None,
+                        }
+                        for b in low_confidence_beliefs
+                    ],
+                    "relationships": [
+                        {
+                            "id": str(r.id),
+                            "source_id": str(r.source_id) if r.source_id else None,
+                            "target_id": str(r.target_id) if r.target_id else None,
+                            "relationship_type": r.relationship_type,
+                            "confidence": r.confidence,
+                            "created_at": r.created_at.isoformat() if r.created_at else None,
+                        }
+                        for r in low_confidence_relationships
+                    ],
+                }
+
+            elif subsystem == EvolutionSubsystem.BEHAVIOR:
+                # Snapshot behavior parameters
+                # Currently behavior evolution only suggests changes without applying them,
+                # but we store a snapshot for future rollback capability
+                snapshot_data = {
+                    "parameters": {},
+                    "note": "Behavior evolution currently only suggests parameter changes without applying them"
                 }
 
             elif subsystem == EvolutionSubsystem.AGENTS:
@@ -895,7 +968,106 @@ Suggest specific behavior adjustments as JSON:
 
         try:
             # Subsystem-specific rollback logic
-            if snapshot.subsystem == EvolutionSubsystem.AGENTS:
+            if snapshot.subsystem == EvolutionSubsystem.MEMORY:
+                # Restore memory state from snapshot
+                restored_count = 0
+
+                # Restore facts that were deleted during evolution
+                for fact_data in snapshot.snapshot_data.get("facts", []):
+                    fact_id = UUID(fact_data["id"])
+                    # Check if fact still exists
+                    result = await self.db.execute(
+                        select(MemoryFact).where(MemoryFact.id == fact_id)
+                    )
+                    existing_fact = result.scalar_one_or_none()
+
+                    if not existing_fact:
+                        # Fact was deleted, restore it
+                        restored_fact = MemoryFact(
+                            id=fact_id,
+                            content=fact_data["content"],
+                            fact_type=fact_data["fact_type"],
+                            confidence=fact_data["confidence"],
+                            access_count=fact_data["access_count"],
+                            heat_score=fact_data["heat_score"],
+                            embedding=fact_data["embedding"],
+                        )
+                        if fact_data["created_at"]:
+                            restored_fact.created_at = datetime.fromisoformat(
+                                fact_data["created_at"]
+                            )
+                        self.db.add(restored_fact)
+                        restored_count += 1
+
+                # Restore beliefs that were modified or deleted
+                for belief_data in snapshot.snapshot_data.get("beliefs", []):
+                    belief_id = UUID(belief_data["id"])
+                    result = await self.db.execute(
+                        select(MemoryBelief).where(MemoryBelief.id == belief_id)
+                    )
+                    existing_belief = result.scalar_one_or_none()
+
+                    if existing_belief:
+                        # Restore original status if it was changed
+                        if existing_belief.status != belief_data["status"]:
+                            existing_belief.status = belief_data["status"]
+                            restored_count += 1
+                    else:
+                        # Belief was deleted, restore it
+                        restored_belief = MemoryBelief(
+                            id=belief_id,
+                            content=belief_data["content"],
+                            confidence=belief_data["confidence"],
+                            status=belief_data["status"],
+                        )
+                        if belief_data["created_at"]:
+                            restored_belief.created_at = datetime.fromisoformat(
+                                belief_data["created_at"]
+                            )
+                        self.db.add(restored_belief)
+                        restored_count += 1
+
+                # Restore relationships that were deleted
+                for rel_data in snapshot.snapshot_data.get("relationships", []):
+                    rel_id = UUID(rel_data["id"])
+                    result = await self.db.execute(
+                        select(MemoryRelationship).where(MemoryRelationship.id == rel_id)
+                    )
+                    existing_rel = result.scalar_one_or_none()
+
+                    if not existing_rel:
+                        # Relationship was deleted, restore it
+                        restored_rel = MemoryRelationship(
+                            id=rel_id,
+                            source_id=UUID(rel_data["source_id"]) if rel_data["source_id"] else None,
+                            target_id=UUID(rel_data["target_id"]) if rel_data["target_id"] else None,
+                            relationship_type=rel_data["relationship_type"],
+                            confidence=rel_data["confidence"],
+                        )
+                        if rel_data["created_at"]:
+                            restored_rel.created_at = datetime.fromisoformat(
+                                rel_data["created_at"]
+                            )
+                        self.db.add(restored_rel)
+                        restored_count += 1
+
+                await self.db.commit()
+                logger.info(f"Restored {restored_count} memory items from snapshot")
+
+            elif snapshot.subsystem == EvolutionSubsystem.BEHAVIOR:
+                # Restore behavior parameters from snapshot
+                # Currently behavior evolution only suggests changes without applying them,
+                # so no actual rollback is needed
+                parameters = snapshot.snapshot_data.get("parameters", {})
+
+                if parameters:
+                    # If parameters were stored, restore them here
+                    # For now, just log since no parameters are currently modified
+                    logger.info(f"Behavior rollback: {len(parameters)} parameters to restore")
+                else:
+                    logger.info("Behavior rollback: No parameter changes were applied, nothing to restore")
+
+            elif snapshot.subsystem == EvolutionSubsystem.AGENTS:
                 # Restore agent states from snapshot
                 for agent_data in snapshot.snapshot_data.get("agents", []):
                     agent_id = UUID(agent_data["id"])
@@ -912,12 +1084,11 @@ Suggest specific behavior adjustments as JSON:
 
                 await self.db.commit()
 
-            # Add more subsystem-specific rollback logic here
-
             return "success"
 
         except Exception as e:
             logger.error(f"Snapshot rollback failed: {e}", exc_info=True)
+            await self.db.rollback()
             return f"failed: {e}"
 
     def _cleanup_old_snapshots(self) -> None:

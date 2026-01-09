@@ -1,14 +1,17 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Modal } from '../ui/Modal';
 import { Input, Textarea } from '../ui/Input';
 import { Select } from '../ui/Select';
 import { Button } from '../ui/Button';
+import type { Agent } from '../../lib/api';
 
 interface CreateAgentModalProps {
   isOpen: boolean;
   onClose: () => void;
   onCreate: (data: AgentFormData) => void;
   loading?: boolean;
+  initialData?: Agent;
+  isEdit?: boolean;
 }
 
 interface AgentFormData {
@@ -38,6 +41,8 @@ export function CreateAgentModal({
   onClose,
   onCreate,
   loading,
+  initialData,
+  isEdit = false,
 }: CreateAgentModalProps) {
   const [formData, setFormData] = useState<AgentFormData>({
     name: '',
@@ -46,6 +51,26 @@ export function CreateAgentModal({
     trigger_type: 'schedule',
     trigger_value: '',
   });
+
+  useEffect(() => {
+    if (initialData && isEdit) {
+      setFormData({
+        name: initialData.name,
+        description: initialData.description || '',
+        agent_type: initialData.agent_type,
+        trigger_type: (initialData.trigger_config?.type as string) || 'schedule',
+        trigger_value: (initialData.trigger_config?.value as string) || '',
+      });
+    } else if (!isOpen) {
+      setFormData({
+        name: '',
+        description: '',
+        agent_type: 'automation',
+        trigger_type: 'schedule',
+        trigger_value: '',
+      });
+    }
+  }, [initialData, isEdit, isOpen]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -64,7 +89,7 @@ export function CreateAgentModal({
   };
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title="Создать агента" size="lg">
+    <Modal isOpen={isOpen} onClose={onClose} title={isEdit ? "Редактировать агента" : "Создать агента"} size="lg">
       <form onSubmit={handleSubmit} className="space-y-4">
         <Input
           label="Название"
@@ -117,7 +142,7 @@ export function CreateAgentModal({
             Отмена
           </Button>
           <Button type="submit" loading={loading}>
-            Создать агента
+            {isEdit ? "Сохранить изменения" : "Создать агента"}
           </Button>
         </div>
       </form>

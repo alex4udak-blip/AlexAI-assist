@@ -21,6 +21,12 @@ class Event(Base):
         primary_key=True,
         default=uuid.uuid4,
     )
+    event_id: Mapped[str | None] = mapped_column(
+        String(255),
+        unique=True,
+        index=True,
+        nullable=True,
+    )
     device_id: Mapped[str] = mapped_column(
         String(64),
         ForeignKey("devices.id"),

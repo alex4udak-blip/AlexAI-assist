@@ -19,6 +19,7 @@ from src.api.routes import (
     memory,
     patterns,
     sessions,
+    settings as settings_router,
     suggestions,
 )
 from src.core.config import settings
@@ -121,6 +122,7 @@ app.include_router(analytics.router, prefix="/api/v1/analytics", tags=["Analytic
 app.include_router(chat.router, prefix="/api/v1/chat", tags=["Chat"])
 app.include_router(memory.router, prefix="/api/v1/memory", tags=["Memory"])
 app.include_router(automation.router, prefix="/api/v1/automation", tags=["Automation"])
+app.include_router(settings_router.router, prefix="/api/v1/settings", tags=["Settings"])
 
 
 @app.exception_handler(Exception)

@@ -95,3 +95,21 @@ export function getStatusBadgeClass(status: string): string {
       return 'badge';
   }
 }
+
+/**
+ * Get or generate a unique device ID for the browser
+ */
+export function getDeviceId(): string {
+  const key = 'observer-device-id';
+
+  // Check if device ID already exists in localStorage
+  let deviceId = localStorage.getItem(key);
+
+  if (!deviceId) {
+    // Generate a new device ID using timestamp and random values
+    deviceId = `web-${Date.now()}-${Math.random().toString(36).substring(2, 15)}`;
+    localStorage.setItem(key, deviceId);
+  }
+
+  return deviceId;
+}

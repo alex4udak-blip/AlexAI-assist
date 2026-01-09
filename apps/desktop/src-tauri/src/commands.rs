@@ -164,10 +164,40 @@ pub fn open_settings() -> Result<(), String> {
             .map_err(|e| e.to_string())?;
     }
 
-    #[cfg(not(target_os = "macos"))]
+    #[cfg(target_os = "windows")]
     {
-        // For other platforms, we could open app settings or system settings
-        println!("Settings not yet implemented for this platform");
+        // Open Windows Settings app (ms-settings: URI scheme)
+        std::process::Command::new("cmd")
+            .args(["/C", "start", "ms-settings:"])
+            .spawn()
+            .map_err(|e| e.to_string())?;
+    }
+
+    #[cfg(target_os = "linux")]
+    {
+        // Try various common settings applications on Linux
+        let settings_commands = [
+            "gnome-control-center",  // GNOME
+            "unity-control-center",  // Unity
+            "systemsettings5",       // KDE Plasma 5
+            "xfce4-settings-manager", // XFCE
+            "mate-control-center",   // MATE
+            "lxqt-config",           // LXQt
+        ];
+
+        let mut opened = false;
+        for cmd in &settings_commands {
+            if let Ok(_) = std::process::Command::new(cmd)
+                .spawn()
+            {
+                opened = true;
+                break;
+            }
+        }
+
+        if !opened {
+            return Err("Could not find a settings application. Please install gnome-control-center or your desktop environment's settings manager.".to_string());
+        }
     }
 
     Ok(())
