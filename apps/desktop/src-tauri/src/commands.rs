@@ -3,6 +3,8 @@ use crate::collector::{
 };
 use crate::sync::{get_dashboard_url, validate_url};
 use crate::AppState;
+use crate::automation;
+use crate::permissions;
 use serde::Serialize;
 use std::sync::Arc;
 use tauri::State;
@@ -173,4 +175,183 @@ pub fn open_settings() -> Result<(), String> {
     }
 
     Ok(())
+}
+
+// ============================================================================
+// AUTOMATION COMMANDS
+// ============================================================================
+
+/// Check all automation permissions
+#[tauri::command]
+pub fn check_all_permissions() -> permissions::AllPermissions {
+    permissions::check_all_permissions()
+}
+
+/// Request specific permission
+#[tauri::command]
+pub fn request_permission(permission: String) -> Result<bool, String> {
+    let perm_type = match permission.as_str() {
+        "accessibility" => permissions::PermissionType::Accessibility,
+        "screen_recording" => permissions::PermissionType::ScreenRecording,
+        _ => return Err(format!("Unknown permission type: {}", permission)),
+    };
+
+    permissions::request_permission(perm_type)
+}
+
+/// Open permission settings
+#[tauri::command]
+pub fn open_permission_settings(permission: String) -> Result<(), String> {
+    let perm_type = match permission.as_str() {
+        "accessibility" => permissions::PermissionType::Accessibility,
+        "screen_recording" => permissions::PermissionType::ScreenRecording,
+        _ => return Err(format!("Unknown permission type: {}", permission)),
+    };
+
+    permissions::open_permission_settings(perm_type)
+}
+
+/// Click at coordinates
+#[tauri::command]
+pub fn automation_click(x: i32, y: i32, button: Option<String>) -> Result<(), String> {
+    let btn = match button.as_deref() {
+        Some("right") => automation::input::MouseButton::Right,
+        Some("middle") => automation::input::MouseButton::Middle,
+        _ => automation::input::MouseButton::Left,
+    };
+
+    automation::input::click_at(x, y, btn)
+}
+
+/// Type text
+#[tauri::command]
+pub fn automation_type(text: String) -> Result<(), String> {
+    automation::input::type_text(&text)
+}
+
+/// Press hotkey
+#[tauri::command]
+pub fn automation_hotkey(modifiers: Vec<String>, key: String) -> Result<(), String> {
+    let mods: Vec<automation::input::Modifier> = modifiers
+        .iter()
+        .filter_map(|m| match m.as_str() {
+            "control" | "ctrl" => Some(automation::input::Modifier::Control),
+            "alt" | "option" => Some(automation::input::Modifier::Alt),
+            "shift" => Some(automation::input::Modifier::Shift),
+            "meta" | "cmd" | "command" => Some(automation::input::Modifier::Meta),
+            _ => None,
+        })
+        .collect();
+
+    automation::input::press_hotkey(&mods, &key)
+}
+
+/// Capture screenshot
+#[tauri::command]
+pub fn automation_screenshot() -> Result<String, String> {
+    let image = automation::screen::capture_screenshot()?;
+    automation::screen::encode_to_base64(&image)
+}
+
+/// Capture screenshot as JPEG
+#[tauri::command]
+pub fn automation_screenshot_jpeg(quality: Option<u8>) -> Result<String, String> {
+    let image = automation::screen::capture_screenshot()?;
+    let q = quality.unwrap_or(85);
+    automation::screen::encode_to_base64_jpeg(&image, q)
+}
+
+/// Get list of monitors
+#[tauri::command]
+pub fn automation_get_monitors() -> Result<Vec<automation::screen::MonitorInfo>, String> {
+    automation::screen::get_monitors()
+}
+
+/// Extract text from screenshot using OCR
+#[tauri::command]
+pub fn automation_ocr() -> Result<automation::ocr::OcrResult, String> {
+    let image = automation::screen::capture_screenshot()?;
+    automation::ocr::extract_text_from_image(&image)
+}
+
+/// Get current browser URL
+#[tauri::command]
+pub fn automation_browser_url(browser: String) -> Result<String, String> {
+    let browser_enum = parse_browser(&browser)?;
+    automation::browser::get_browser_url(browser_enum)
+}
+
+/// Navigate browser to URL
+#[tauri::command]
+pub fn automation_browser_navigate(browser: String, url: String) -> Result<(), String> {
+    let browser_enum = parse_browser(&browser)?;
+    automation::browser::navigate_to_url(browser_enum, &url)
+}
+
+/// Detect active browser
+#[tauri::command]
+pub fn automation_detect_browser() -> Result<Option<String>, String> {
+    match automation::browser::detect_active_browser()? {
+        Some(browser) => Ok(Some(format!("{:?}", browser).to_lowercase())),
+        None => Ok(None),
+    }
+}
+
+/// Add task to automation queue
+#[tauri::command]
+pub async fn queue_add_task(
+    queue: State<'_, Arc<automation::queue::AutomationQueue>>,
+    task: automation::queue::AutomationTask,
+) -> Result<String, String> {
+    queue.add_task(task).await
+}
+
+/// Get queue status
+#[tauri::command]
+pub async fn queue_status(
+    queue: State<'_, Arc<automation::queue::AutomationQueue>>,
+) -> Result<automation::queue::QueueStatus, String> {
+    Ok(queue.status().await)
+}
+
+/// Pause queue
+#[tauri::command]
+pub async fn queue_pause(
+    queue: State<'_, Arc<automation::queue::AutomationQueue>>,
+) -> Result<(), String> {
+    queue.pause().await;
+    Ok(())
+}
+
+/// Resume queue
+#[tauri::command]
+pub async fn queue_resume(
+    queue: State<'_, Arc<automation::queue::AutomationQueue>>,
+) -> Result<(), String> {
+    queue.resume().await;
+    Ok(())
+}
+
+/// Clear queue
+#[tauri::command]
+pub async fn queue_clear(
+    queue: State<'_, Arc<automation::queue::AutomationQueue>>,
+) -> Result<(), String> {
+    queue.clear().await;
+    Ok(())
+}
+
+// ============================================================================
+// HELPER FUNCTIONS
+// ============================================================================
+
+/// Parse browser string to enum
+fn parse_browser(browser: &str) -> Result<automation::browser::Browser, String> {
+    match browser.to_lowercase().as_str() {
+        "chrome" => Ok(automation::browser::Browser::Chrome),
+        "safari" => Ok(automation::browser::Browser::Safari),
+        "arc" => Ok(automation::browser::Browser::Arc),
+        "firefox" => Ok(automation::browser::Browser::Firefox),
+        _ => Err(format!("Unknown browser: {}", browser)),
+    }
 }

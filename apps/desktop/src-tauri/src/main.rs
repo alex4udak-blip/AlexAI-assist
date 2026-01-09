@@ -1,7 +1,10 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+mod automation;
 mod collector;
 mod commands;
+mod notifications;
+mod permissions;
 mod sync;
 mod tray;
 mod updater;
@@ -39,6 +42,10 @@ fn main() {
     let state = Arc::new(Mutex::new(AppState::default()));
     let shutdown_token = CancellationToken::new();
 
+    // Create automation queue
+    let (automation_queue, mut result_rx) = automation::queue::AutomationQueue::new();
+    let automation_queue = Arc::new(automation_queue);
+
     // Set up signal handlers for graceful shutdown
     let shutdown_token_clone = shutdown_token.clone();
     tauri::async_runtime::spawn(async move {
@@ -54,6 +61,7 @@ fn main() {
         ))
         .plugin(tauri_plugin_updater::Builder::new().build())
         .manage(state.clone())
+        .manage(automation_queue.clone())
         .setup(move |app| {
             // Create system tray
             tray::create_tray(app)?;
@@ -78,6 +86,35 @@ fn main() {
                 sync::start_sync_service(state_clone).await;
             });
 
+            // Start automation queue processor
+            let queue_clone = automation_queue.clone();
+            tauri::async_runtime::spawn(async move {
+                queue_clone.process().await;
+            });
+
+            // Handle automation task results
+            let app_handle = app.handle().clone();
+            tauri::async_runtime::spawn(async move {
+                while let Some(result) = result_rx.recv().await {
+                    println!("Task {} completed: {}", result.task_id, result.success);
+                    if let Some(error) = &result.error {
+                        eprintln!("Task error: {}", error);
+                        // Optionally send notification
+                        let _ = notifications::notify_error(&app_handle, error);
+                    }
+                }
+            });
+
+            // Start WebSocket automation sync
+            let ws_url = automation::sync::get_websocket_url();
+            let sync = Arc::new(automation::sync::AutomationSync::new(
+                ws_url,
+                automation_queue.clone(),
+            ));
+            tauri::async_runtime::spawn(async move {
+                sync.start().await;
+            });
+
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -90,6 +127,25 @@ fn main() {
             commands::check_permissions,
             commands::request_permissions,
             commands::get_focus,
+            // Automation commands
+            commands::check_all_permissions,
+            commands::request_permission,
+            commands::open_permission_settings,
+            commands::automation_click,
+            commands::automation_type,
+            commands::automation_hotkey,
+            commands::automation_screenshot,
+            commands::automation_screenshot_jpeg,
+            commands::automation_get_monitors,
+            commands::automation_ocr,
+            commands::automation_browser_url,
+            commands::automation_browser_navigate,
+            commands::automation_detect_browser,
+            commands::queue_add_task,
+            commands::queue_status,
+            commands::queue_pause,
+            commands::queue_resume,
+            commands::queue_clear,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
