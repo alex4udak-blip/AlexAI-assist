@@ -7,7 +7,7 @@ from uuid import uuid4
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, WebSocket, WebSocketDisconnect
 from pydantic import BaseModel, Field
-from sqlalchemy import desc, select, update
+from sqlalchemy import desc, func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.api.deps import get_db_session
@@ -773,28 +773,35 @@ class SyncStatus(BaseModel):
 
 
 @router.get("/devices/{device_id}/sync-status", response_model=SyncStatus)
-async def get_sync_status(device_id: str) -> dict[str, Any]:
-    """Get device sync status."""
-    status = device_statuses.get(device_id)
+async def get_sync_status(
+    device_id: str,
+    db: AsyncSession = Depends(get_db_session),
+) -> dict[str, Any]:
+    """Get device sync status from database."""
+    # Get device status from DB
+    result = await db.execute(
+        select(DeviceStatus).where(DeviceStatus.device_id == device_id)
+    )
+    status = result.scalar_one_or_none()
+
     if not status:
         raise HTTPException(
             status_code=404,
             detail=f"Device {device_id} not found",
         )
 
-    last_sync = status.get("last_sync_at")
-    connected = status.get("connected", False)
-
-    # Count pending commands for this device as events since sync
-    events_since_sync = sum(
-        1 for cmd in pending_commands.values()
-        if cmd.get("device_id") == device_id
+    # Count pending commands for this device
+    pending_result = await db.execute(
+        select(func.count(CommandResult.id))
+        .where(CommandResult.device_id == device_id)
+        .where(CommandResult.success.is_(None))  # Pending = no result yet
     )
+    events_since_sync = pending_result.scalar() or 0
 
     return {
-        "last_sync_at": last_sync,
+        "last_sync_at": status.last_seen_at,
         "events_since_sync": events_since_sync,
-        "sync_status": "connected" if connected else "disconnected",
+        "sync_status": "connected" if status.connected else "disconnected",
     }
 
 
