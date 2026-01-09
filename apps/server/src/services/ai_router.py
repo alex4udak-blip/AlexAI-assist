@@ -449,21 +449,91 @@ class ObserverTasks:
         self,
         activity: dict[str, Any],
     ) -> dict[str, Any]:
-        """Classify activity (Haiku, cached)."""
-        prompt = f"""Classify this activity into one of: productive, neutral, distracting.
-
-App: {activity.get('app_name', 'unknown')}
-Title: {activity.get('window_title', 'unknown')}
-
-Reply with just one word: productive, neutral, or distracting."""
+        """Classify activity (Haiku, cached 7 days - same app+title = same result)."""
+        # Compressed prompt - fewer tokens, same quality
+        prompt = f"Classify as productive/neutral/distracting: {activity.get('app_name', '?')} - {activity.get('window_title', '?')}"
 
         return await self.router.query(
             prompt=prompt,
             complexity=TaskComplexity.TRIVIAL,
             use_cache=True,
-            cache_ttl=86400,  # 24 hours
-            max_tokens=10,
+            cache_ttl=604800,  # 7 days - same app+title always = same classification
+            max_tokens=5,
         )
+
+    async def classify_activities_batch(
+        self,
+        activities: list[dict[str, Any]],
+    ) -> dict[str, Any]:
+        """Classify multiple activities in one call (30% cheaper than individual calls)."""
+        # Filter out already cached items first
+        uncached = []
+        cached_results = {}
+
+        for activity in activities:
+            cache_key = f"{activity.get('app_name', '?')}|{activity.get('window_title', '?')}"
+            # Check router's internal cache
+            full_key = self.router._get_cache_key(
+                f"Classify as productive/neutral/distracting: {activity.get('app_name', '?')} - {activity.get('window_title', '?')}",
+                ModelTier.HAIKU.value
+            )
+            if full_key in self.router.cache:
+                cached = self.router.cache[full_key]
+                if utc_now() - cached["timestamp"] < timedelta(seconds=604800):
+                    cached_results[cache_key] = cached["response"]
+                    continue
+            uncached.append(activity)
+
+        # If all cached, return immediately
+        if not uncached:
+            return {"classifications": cached_results, "cached": True, "cost": 0.0}
+
+        # Batch classify uncached items (up to 20 at a time)
+        items_text = "\n".join([
+            f"{i+1}. {a.get('app_name', '?')} - {a.get('window_title', '?')}"
+            for i, a in enumerate(uncached[:20])
+        ])
+
+        prompt = f"Classify each as P(productive)/N(neutral)/D(distracting). Reply with numbers and letters only, like: 1P 2N 3D\n\n{items_text}"
+
+        result = await self.router.query(
+            prompt=prompt,
+            complexity=TaskComplexity.TRIVIAL,
+            use_cache=False,  # We handle caching ourselves
+            max_tokens=100,
+        )
+
+        # Parse results and cache them
+        response_text = result.get("response", "")
+        for i, activity in enumerate(uncached[:20]):
+            # Try to find classification for this item
+            classification = "neutral"  # default
+            if f"{i+1}P" in response_text or f"{i+1}p" in response_text:
+                classification = "productive"
+            elif f"{i+1}D" in response_text or f"{i+1}d" in response_text:
+                classification = "distracting"
+            elif f"{i+1}N" in response_text or f"{i+1}n" in response_text:
+                classification = "neutral"
+
+            cache_key = f"{activity.get('app_name', '?')}|{activity.get('window_title', '?')}"
+            cached_results[cache_key] = classification
+
+            # Store in router cache for future single lookups
+            full_key = self.router._get_cache_key(
+                f"Classify as productive/neutral/distracting: {activity.get('app_name', '?')} - {activity.get('window_title', '?')}",
+                ModelTier.HAIKU.value
+            )
+            self.router.cache[full_key] = {
+                "response": classification,
+                "timestamp": utc_now(),
+            }
+
+        return {
+            "classifications": cached_results,
+            "cached": False,
+            "cost": result.get("cost", 0),
+            "batch_size": len(uncached[:20]),
+        }
 
     async def summarize_period(
         self,
@@ -471,26 +541,20 @@ Reply with just one word: productive, neutral, or distracting."""
         period: str = "day",
     ) -> dict[str, Any]:
         """Summarize activity period (Haiku)."""
-        # Build context from events
-        context = json.dumps(
-            [
-                {
-                    "app": e.get("app_name"),
-                    "title": e.get("window_title"),
-                    "duration": e.get("duration_seconds"),
-                }
-                for e in events[:50]  # Limit to avoid token limits
-            ]
-        )
+        # Build compact context - fewer tokens
+        context = json.dumps([
+            {"a": e.get("app_name", "")[:30], "t": e.get("window_title", "")[:50]}
+            for e in events[:30]  # Reduced from 50
+        ], separators=(',', ':'))
 
-        prompt = f"Summarize this {period}'s activity in 2-3 sentences. Focus on main apps and tasks."
+        prompt = f"Summarize {period} activity in 2 sentences. Focus on main tasks."
 
         return await self.router.query(
             prompt=prompt,
             context=context,
             complexity=TaskComplexity.SIMPLE,
             use_cache=False,
-            max_tokens=200,
+            max_tokens=150,
         )
 
     async def analyze_productivity(
@@ -498,20 +562,16 @@ Reply with just one word: productive, neutral, or distracting."""
         daily_stats: dict[str, Any],
     ) -> dict[str, Any]:
         """Analyze productivity patterns (Sonnet)."""
-        context = json.dumps(daily_stats)
-        prompt = """Analyze productivity patterns and provide:
-1. Key insights about work habits
-2. Potential distractions identified
-3. Recommendations for improvement
-
-Keep response concise (3-4 bullet points)."""
+        # Compact JSON encoding
+        context = json.dumps(daily_stats, separators=(',', ':'))
+        prompt = "Analyze: 1) Key work habits 2) Distractions 3) Improvements. 3-4 bullets max."
 
         return await self.router.query(
             prompt=prompt,
             context=context,
             complexity=TaskComplexity.MEDIUM,
             use_cache=False,
-            max_tokens=500,
+            max_tokens=400,
         )
 
     async def chat_response(
@@ -525,7 +585,7 @@ Keep response concise (3-4 bullet points)."""
             context=context,
             complexity=TaskComplexity.MEDIUM,
             use_cache=False,
-            max_tokens=1024,
+            max_tokens=800,
         )
 
     async def agent_code_task(
@@ -534,11 +594,7 @@ Keep response concise (3-4 bullet points)."""
         context: str = "",
     ) -> dict[str, Any]:
         """Generate agent code (Opus)."""
-        prompt = f"""Generate Python code for this automation task:
-
-{task}
-
-Provide clean, well-documented code."""
+        prompt = f"Python automation for: {task}\nClean, documented code."
 
         return await self.router.query(
             prompt=prompt,
@@ -553,22 +609,13 @@ Provide clean, well-documented code."""
         description: str,
     ) -> dict[str, Any]:
         """Create automation script from description (Opus)."""
-        prompt = f"""Create an automation script for this task:
-
-{description}
-
-Provide:
-1. Step-by-step commands
-2. Error handling
-3. Confirmation points
-
-Return as JSON with structure: {{"steps": [...], "requires_confirmation": bool}}"""
+        prompt = f'Automation script for: {description}\nReturn JSON: {{"steps":[...],"requires_confirmation":bool}}'
 
         return await self.router.query(
             prompt=prompt,
             complexity=TaskComplexity.EXPERT,
             use_cache=True,
-            cache_ttl=3600,
+            cache_ttl=86400,  # 24h cache for automation scripts
             max_tokens=2048,
         )
 

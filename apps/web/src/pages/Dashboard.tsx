@@ -23,8 +23,9 @@ import {
   Cpu,
   Wifi,
   WifiOff,
+  DollarSign,
 } from 'lucide-react';
-import { useAnalyticsSummary, useTimeline, useProductivity, useCategories, useAppUsage } from '../hooks/useAnalytics';
+import { useAnalyticsSummary, useTimeline, useProductivity, useCategories, useAppUsage, useAIUsage } from '../hooks/useAnalytics';
 import { useAgents } from '../hooks/useAgents';
 import { useSuggestions } from '../hooks/usePatterns';
 import { useMutation } from '../hooks/useApi';
@@ -371,6 +372,7 @@ export default function Dashboard() {
   const { data: suggestions } = useSuggestions({ status: 'pending' });
   const { data: categories } = useCategories({ days: 7 });
   const { data: appUsage } = useAppUsage({ days: 7, limit: 10 });
+  const { data: aiUsage } = useAIUsage(7);
 
   // Real-time updates
   const handleEventsCreated = useCallback(() => {
@@ -418,6 +420,13 @@ export default function Dashboard() {
   const activeAgents = agents?.filter(a => a.status === 'active') || [];
   const totalTimeSaved = agents?.reduce((acc, a) => acc + a.total_time_saved_seconds, 0) ?? 0;
   const topApp = summary?.top_apps?.[0];
+
+  // ROI calculations
+  const aiCost7Days = aiUsage?.total_cost ?? 0;
+  const timeSavedHours = totalTimeSaved / 3600;
+  const hourlyRate = 50; // Default hourly rate for value calculation
+  const valueSaved = timeSavedHours * hourlyRate;
+  const roi = aiCost7Days > 0 ? ((valueSaved - aiCost7Days) / aiCost7Days) * 100 : 0;
 
   return (
     <>
@@ -706,9 +715,26 @@ export default function Dashboard() {
                   </div>
                 )}
 
+                {/* ROI Card - always show if there's any usage or time saved */}
+                {(aiCost7Days > 0 || totalTimeSaved > 0) && (
+                  <div className="flex items-start gap-3 p-3 rounded-lg bg-amber-400/5 border border-amber-400/10">
+                    <DollarSign className="w-4 h-4 text-amber-400 mt-0.5" />
+                    <div className="flex-1">
+                      <div className="text-sm text-white">AI ROI (7 days)</div>
+                      <div className="text-xs text-zinc-500 space-y-0.5 mt-1">
+                        <div>AI Cost: ${aiCost7Days.toFixed(2)}</div>
+                        <div>Time Saved: {timeSavedHours.toFixed(1)}h (${valueSaved.toFixed(0)} value)</div>
+                        {roi > 0 && <div className="text-emerald-400">ROI: +{roi.toFixed(0)}%</div>}
+                        {roi <= 0 && aiCost7Days > 0 && <div className="text-zinc-400">ROI: Building up...</div>}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
                 {(!productivity || productivity.score < 70) &&
                  (!suggestions || suggestions.length === 0) &&
-                 (!categories || categories.length === 0) && (
+                 (!categories || categories.length === 0) &&
+                 aiCost7Days === 0 && totalTimeSaved === 0 && (
                   <EmptyState
                     icon={Sparkles}
                     title="Gathering insights"
