@@ -52,6 +52,19 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     )
     logger.info(f"CORS origins: {settings.allowed_origins}")
 
+    # Run database migrations automatically
+    try:
+        from alembic import command
+        from alembic.config import Config
+        import os
+
+        alembic_cfg = Config(os.path.join(os.path.dirname(__file__), "..", "alembic.ini"))
+        alembic_cfg.set_main_option("script_location", os.path.join(os.path.dirname(__file__), "..", "alembic"))
+        command.upgrade(alembic_cfg, "head")
+        logger.info("Database migrations completed successfully")
+    except Exception as e:
+        logger.warning(f"Could not run migrations (may already be up to date): {e}")
+
     # Try to upgrade rate limiter to Redis (optional)
     try:
         import redis.asyncio as redis
