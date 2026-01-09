@@ -515,10 +515,10 @@ export function AutomationPanel() {
                     </div>
                   )}
 
-                  {lastResult.data && (
+                  {lastResult.data ? (
                     <div className="space-y-3">
                       {/* OCR Results Section */}
-                      {(lastResult.data.text || lastResult.data.ocr_text) && (
+                      {(typeof lastResult.data.text === 'string' || typeof lastResult.data.ocr_text === 'string') ? (
                         <div>
                           <div className="flex items-center justify-between mb-2">
                             <div className="flex items-center gap-2">
@@ -566,10 +566,10 @@ export function AutomationPanel() {
                             )}
                           </div>
                         </div>
-                      )}
+                      ) : null}
 
                       {/* Screenshot Section */}
-                      {lastResult.data.screenshot && (
+                      {typeof lastResult.data.screenshot === 'string' ? (
                         <div>
                           <div className="flex items-center gap-2 mb-2">
                             <ImageIcon className="w-4 h-4 text-accent-primary" />
@@ -583,7 +583,7 @@ export function AutomationPanel() {
                             className="rounded-lg border border-border-default max-w-full h-auto"
                           />
                         </div>
-                      )}
+                      ) : null}
 
                       {/* Other Result Data */}
                       {Object.keys(lastResult.data).some(
@@ -591,7 +591,7 @@ export function AutomationPanel() {
                           !['text', 'ocr_text', 'screenshot', 'confidence'].includes(
                             key
                           )
-                      ) && (
+                      ) ? (
                         <div>
                           <span className="text-xs text-text-tertiary block mb-1">
                             Additional Data
@@ -611,9 +611,9 @@ export function AutomationPanel() {
                             )}
                           </pre>
                         </div>
-                      )}
+                      ) : null}
                     </div>
-                  )}
+                  ) : null}
                 </>
               )}
             </CardContent>
