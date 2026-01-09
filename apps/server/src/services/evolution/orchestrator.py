@@ -11,10 +11,15 @@ This orchestrator:
 
 import json
 import logging
-from datetime import UTC, datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from enum import Enum
 from typing import Any
 from uuid import UUID, uuid4
+
+
+def _utc_now() -> datetime:
+    """Get current UTC time as naive datetime for database compatibility."""
+    return datetime.now(timezone.utc).replace(tzinfo=None)
 
 from sqlalchemy import func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -83,7 +88,7 @@ class FeedbackSource:
         self.subsystem = subsystem
         self.content = content
         self.metadata = metadata or {}
-        self.timestamp = datetime.now(UTC)
+        self.timestamp = _utc_now()
 
 
 class EvolutionOrchestrator:
@@ -109,7 +114,7 @@ class EvolutionOrchestrator:
             Summary of evolution cycle results
         """
         logger.info("Starting evolution cycle")
-        cycle_start = datetime.now(UTC)
+        cycle_start = _utc_now()
 
         try:
             # Step 1: Collect feedback from all sources
@@ -161,7 +166,7 @@ class EvolutionOrchestrator:
             # Step 7: Cleanup old snapshots
             self._cleanup_old_snapshots()
 
-            cycle_duration = (datetime.now(UTC) - cycle_start).total_seconds()
+            cycle_duration = (_utc_now() - cycle_start).total_seconds()
 
             return {
                 "status": "completed",
@@ -170,7 +175,7 @@ class EvolutionOrchestrator:
                 "feedback_collected": len(feedback),
                 "evolutions_performed": results,
                 "health_check": health_check,
-                "timestamp": datetime.now(UTC).isoformat(),
+                "timestamp": _utc_now().isoformat(),
             }
 
         except Exception as e:
@@ -179,7 +184,7 @@ class EvolutionOrchestrator:
                 "status": "failed",
                 "error": str(e),
                 "cycle_start": cycle_start.isoformat(),
-                "timestamp": datetime.now(UTC).isoformat(),
+                "timestamp": _utc_now().isoformat(),
             }
 
     async def trigger_immediate_evolution(
@@ -280,7 +285,7 @@ class EvolutionOrchestrator:
         feedback: list[FeedbackSource] = []
 
         # Get recent failed agent executions
-        one_day_ago = datetime.now(UTC) - timedelta(days=1)
+        one_day_ago = _utc_now() - timedelta(days=1)
         result = await self.db.execute(
             select(AgentLog)
             .where(AgentLog.level == "error")
@@ -311,7 +316,7 @@ class EvolutionOrchestrator:
         feedback: list[FeedbackSource] = []
 
         # Get recent memory operations with low confidence
-        one_day_ago = datetime.now(UTC) - timedelta(days=1)
+        one_day_ago = _utc_now() - timedelta(days=1)
         result = await self.db.execute(
             select(MemoryOperation)
             .where(MemoryOperation.created_at >= one_day_ago)
@@ -530,8 +535,8 @@ Respond with JSON:
                 # Snapshot memories that might be affected by evolution
                 confidence_threshold = 0.3
                 min_age_days = 7
-                cutoff_date = datetime.now(UTC) - timedelta(days=min_age_days)
-                thirty_days_ago = datetime.now(UTC) - timedelta(days=30)
+                cutoff_date = _utc_now() - timedelta(days=min_age_days)
+                thirty_days_ago = _utc_now() - timedelta(days=30)
 
                 # Capture low-confidence facts that might be pruned
                 facts_result = await self.db.execute(
@@ -629,7 +634,7 @@ Respond with JSON:
 
             snapshot = EvolutionState(
                 subsystem=subsystem,
-                timestamp=datetime.now(UTC),
+                timestamp=_utc_now(),
                 snapshot_data=snapshot_data,
             )
 
@@ -643,7 +648,7 @@ Respond with JSON:
             # Return empty snapshot
             return EvolutionState(
                 subsystem=subsystem,
-                timestamp=datetime.now(UTC),
+                timestamp=_utc_now(),
                 snapshot_data={},
             )
 
@@ -688,7 +693,7 @@ Respond with JSON:
             return {
                 "status": "completed",
                 "actions": actions_taken,
-                "timestamp": datetime.now(UTC).isoformat(),
+                "timestamp": _utc_now().isoformat(),
             }
 
         except Exception as e:
@@ -748,7 +753,7 @@ Suggest specific behavior adjustments as JSON:
             return {
                 "status": "completed",
                 "actions": actions_taken,
-                "timestamp": datetime.now(UTC).isoformat(),
+                "timestamp": _utc_now().isoformat(),
             }
 
         except Exception as e:
@@ -804,7 +809,7 @@ Suggest specific behavior adjustments as JSON:
             return {
                 "status": "completed",
                 "actions": actions_taken,
-                "timestamp": datetime.now(UTC).isoformat(),
+                "timestamp": _utc_now().isoformat(),
             }
 
         except Exception as e:
@@ -839,7 +844,7 @@ Suggest specific behavior adjustments as JSON:
 
         # Agent success rate (last 24 hours)
         try:
-            one_day_ago = datetime.now(UTC) - timedelta(days=1)
+            one_day_ago = _utc_now() - timedelta(days=1)
             total_logs = await self.db.scalar(
                 select(func.count())
                 .select_from(AgentLog)
@@ -894,7 +899,7 @@ Suggest specific behavior adjustments as JSON:
             "score": health_score,
             "checks": health_checks,
             "issues": issues,
-            "timestamp": datetime.now(UTC).isoformat(),
+            "timestamp": _utc_now().isoformat(),
         }
 
     async def _perform_rollbacks(self, issues: list[dict[str, Any]]) -> dict[str, Any]:
@@ -950,7 +955,7 @@ Suggest specific behavior adjustments as JSON:
                     {"subsystem": subsystem_name, "result": "failed", "error": str(e)}
                 )
 
-        return {"rollbacks": rollback_results, "timestamp": datetime.now(UTC).isoformat()}
+        return {"rollbacks": rollback_results, "timestamp": _utc_now().isoformat()}
 
     async def _rollback_snapshot(self, snapshot: EvolutionState) -> str:
         """
@@ -1108,7 +1113,7 @@ Suggest specific behavior adjustments as JSON:
             consolidated_count = 0
 
             # Get recent facts (last 30 days) for consolidation
-            thirty_days_ago = datetime.now(UTC) - timedelta(days=30)
+            thirty_days_ago = _utc_now() - timedelta(days=30)
             result = await self.db.execute(
                 select(MemoryFact)
                 .where(MemoryFact.created_at >= thirty_days_ago)
@@ -1228,7 +1233,7 @@ Suggest specific behavior adjustments as JSON:
             pruned_count = 0
             confidence_threshold = 0.3
             min_age_days = 7
-            cutoff_date = datetime.now(UTC) - timedelta(days=min_age_days)
+            cutoff_date = _utc_now() - timedelta(days=min_age_days)
 
             # Prune low-confidence facts
             facts_result = await self.db.execute(

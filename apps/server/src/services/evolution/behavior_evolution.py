@@ -2,7 +2,7 @@
 
 import json
 import logging
-from datetime import UTC, datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Any
 
 from sqlalchemy import select
@@ -12,6 +12,11 @@ from src.core.claude import claude_client
 from src.db.models.chat import ChatMessage
 
 logger = logging.getLogger(__name__)
+
+
+def _utc_now() -> datetime:
+    """Get current UTC time as naive datetime for database compatibility."""
+    return datetime.now(timezone.utc).replace(tzinfo=None)
 
 
 class BehaviorEvolution:
@@ -125,7 +130,7 @@ class BehaviorEvolution:
             "evolution_count": self.evolution_count,
             "current_behavior": self.behavior.copy(),
             "changes": changes,
-            "timestamp": datetime.now(UTC).isoformat(),
+            "timestamp": _utc_now().isoformat(),
         }
 
         logger.info(f"Evolution complete: {len(changes)} changes applied")
@@ -138,7 +143,7 @@ class BehaviorEvolution:
         Returns:
             Analysis dict with detected patterns
         """
-        cutoff_date = datetime.now(UTC) - timedelta(days=days)
+        cutoff_date = _utc_now() - timedelta(days=days)
 
         query = (
             select(ChatMessage)
@@ -345,7 +350,7 @@ Always respond with valid JSON."""
         """Save current behavior state to history for potential rollback."""
         snapshot = {
             "behavior": self.behavior.copy(),
-            "timestamp": datetime.now(UTC).isoformat(),
+            "timestamp": _utc_now().isoformat(),
             "evolution_count": self.evolution_count,
         }
 

@@ -3,7 +3,7 @@
 import json
 import logging
 from collections import defaultdict
-from datetime import UTC, datetime, timedelta, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Any
 from uuid import UUID
 
@@ -14,6 +14,11 @@ from src.core.claude import claude_client
 from src.db.models import Agent, AgentLog, Pattern
 
 logger = logging.getLogger(__name__)
+
+
+def _utc_now() -> datetime:
+    """Get current UTC time as naive datetime for database compatibility."""
+    return datetime.now(timezone.utc).replace(tzinfo=None)
 
 
 class AgentEvolution:
@@ -53,7 +58,7 @@ class AgentEvolution:
             "improved_agents": [],
             "created_tools": [],
             "deactivated_agents": [],
-            "timestamp": datetime.now(UTC).isoformat(),
+            "timestamp": _utc_now().isoformat(),
         }
 
         try:
@@ -101,7 +106,7 @@ class AgentEvolution:
         logger.debug("Analyzing patterns for agent creation")
 
         # Query patterns that meet criteria for agent creation
-        cutoff_date = datetime.now(UTC) - timedelta(days=self.RECENCY_DAYS)
+        cutoff_date = _utc_now() - timedelta(days=self.RECENCY_DAYS)
         query = (
             select(Pattern)
             .where(
@@ -615,7 +620,7 @@ Generate a JSON specification:
             "rolled_back_cycles": 0,
             "agents_deleted": [],
             "agents_restored": [],
-            "timestamp": datetime.now(UTC).isoformat(),
+            "timestamp": _utc_now().isoformat(),
         }
 
         try:

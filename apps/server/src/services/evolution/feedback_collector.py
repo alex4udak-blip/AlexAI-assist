@@ -9,7 +9,7 @@ This module collects feedback from multiple sources:
 
 import logging
 import re
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 from typing import Any
 from uuid import uuid4
 
@@ -19,6 +19,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from src.db.models import Agent, AgentLog, ChatMessage, Feedback
 
 logger = logging.getLogger(__name__)
+
+
+def _utc_now() -> datetime:
+    """Get current UTC time as naive datetime for database compatibility."""
+    return datetime.now(timezone.utc).replace(tzinfo=None)
 
 
 class FeedbackCollector:
@@ -110,7 +115,7 @@ class FeedbackCollector:
             "chat_feedback": chat_feedback,
             "agent_feedback": agent_feedback,
             "system_feedback": system_feedback,
-            "collected_at": datetime.now(UTC),
+            "collected_at": _utc_now(),
             "period_start": since,
             "total_items": total_feedback_items,
         }
@@ -355,7 +360,7 @@ class FeedbackCollector:
         )
 
         # Calculate time period
-        period_hours = (datetime.now(UTC) - since).total_seconds() / 3600
+        period_hours = (_utc_now() - since).total_seconds() / 3600
 
         logger.info(
             f"System metrics: {chat_volume} messages, "
@@ -402,7 +407,7 @@ class FeedbackCollector:
             - timestamp: When feedback was added
         """
         feedback_id = str(uuid4())
-        now = datetime.now(UTC)
+        now = _utc_now()
         ctx = context or {}
 
         # Create and persist feedback record to database
