@@ -36,7 +36,8 @@ class Settings(BaseSettings):
     api_key: str = ""
 
     # CORS - stored as comma-separated string, parsed via property
-    allowed_origins_str: str = "http://localhost:5173,http://localhost:3000"
+    # Includes Railway domains by default for production
+    allowed_origins_str: str = "http://localhost:5173,http://localhost:3000,https://web-production-20d71.up.railway.app,https://server-production-0b14.up.railway.app"
 
     @property
     def allowed_origins(self) -> list[str]:
