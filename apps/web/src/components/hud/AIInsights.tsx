@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion';
-import { Lightbulb, TrendingUp, TrendingDown, AlertCircle, Sparkles, ArrowRight } from 'lucide-react';
+import { TrendingUp, TrendingDown, Info, Sparkles, ChevronRight } from 'lucide-react';
 
 interface Insight {
   id: string;
@@ -15,27 +15,19 @@ interface AIInsightsProps {
 const insightConfig = {
   positive: {
     icon: TrendingUp,
-    color: 'text-status-success',
-    bg: 'bg-status-success/10',
-    border: 'border-status-success/20',
+    color: 'text-emerald-400',
   },
   negative: {
     icon: TrendingDown,
-    color: 'text-status-warning',
-    bg: 'bg-status-warning/10',
-    border: 'border-status-warning/20',
+    color: 'text-amber-400',
   },
   neutral: {
-    icon: AlertCircle,
-    color: 'text-hud-cyan',
-    bg: 'bg-hud-cyan/10',
-    border: 'border-hud-cyan/20',
+    icon: Info,
+    color: 'text-zinc-400',
   },
   suggestion: {
     icon: Sparkles,
-    color: 'text-hud-blue',
-    bg: 'bg-hud-blue/10',
-    border: 'border-hud-blue/20',
+    color: 'text-violet-400',
   },
 };
 
@@ -45,19 +37,19 @@ export function AIInsights({ insights }: AIInsightsProps) {
       <motion.div
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
-        className="p-4 rounded-xl bg-bg-secondary/60 backdrop-blur-md border border-border-subtle
-                   shadow-inner-glow overflow-hidden"
+        transition={{ duration: 0.3 }}
+        className="p-5 rounded-xl bg-zinc-900/50 border border-zinc-800"
       >
-        <h3 className="text-xs text-text-muted uppercase tracking-wider font-mono mb-3">
+        <h3 className="text-xs text-zinc-500 font-medium tracking-wide mb-4">
           AI Insights
         </h3>
-        <div className="flex flex-col items-center justify-center py-4">
-          <Lightbulb className="w-7 h-7 text-text-muted mb-2" />
-          <p className="text-sm text-text-muted text-center">
-            Недостаточно данных
+        <div className="flex flex-col items-center justify-center py-6">
+          <Sparkles className="w-6 h-6 text-zinc-600 mb-3" />
+          <p className="text-sm text-zinc-400 text-center">
+            Not enough data yet
           </p>
-          <p className="text-xs text-text-muted mt-1 text-center">
-            AI найдет паттерны
+          <p className="text-xs text-zinc-600 mt-1 text-center">
+            Insights will appear as patterns emerge
           </p>
         </div>
       </motion.div>
@@ -68,15 +60,12 @@ export function AIInsights({ insights }: AIInsightsProps) {
     <motion.div
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
-      className="p-4 rounded-xl bg-bg-secondary/60 backdrop-blur-md border border-border-subtle
-                 shadow-inner-glow overflow-hidden"
+      transition={{ duration: 0.3 }}
+      className="p-5 rounded-xl bg-zinc-900/50 border border-zinc-800"
     >
-      <div className="flex items-center gap-2 mb-3">
-        <Lightbulb className="w-4 h-4 text-hud-cyan flex-shrink-0" />
-        <h3 className="text-xs text-text-muted uppercase tracking-wider font-mono">
-          AI Insights
-        </h3>
-      </div>
+      <h3 className="text-xs text-zinc-500 font-medium tracking-wide mb-4">
+        AI Insights
+      </h3>
 
       <div className="space-y-2">
         {insights.map((insight, index) => {
@@ -86,30 +75,25 @@ export function AIInsights({ insights }: AIInsightsProps) {
           return (
             <motion.div
               key={insight.id}
-              initial={{ opacity: 0, x: -10 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: index * 0.1 }}
-              className={`p-2.5 rounded-lg border ${config.bg} ${config.border}
-                         hover:shadow-hud-sm transition-shadow cursor-pointer group overflow-hidden`}
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ delay: index * 0.05 }}
+              className="group flex items-start gap-3 p-3 rounded-lg bg-zinc-800/30
+                         hover:bg-zinc-800/50 transition-colors cursor-pointer"
             >
-              <div className="flex items-start gap-2">
-                <div className={`w-7 h-7 rounded-lg ${config.bg} flex items-center justify-center
-                                flex-shrink-0`}>
-                  <Icon className={`w-3.5 h-3.5 ${config.color}`} />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-xs text-text-primary leading-relaxed line-clamp-2">
-                    {insight.message}
+              <Icon className={`w-4 h-4 mt-0.5 flex-shrink-0 ${config.color}`} />
+              <div className="flex-1 min-w-0">
+                <p className="text-sm text-zinc-300 leading-relaxed">
+                  {insight.message}
+                </p>
+                {insight.metric && (
+                  <p className={`text-xs mt-1 ${config.color} tabular-nums`}>
+                    {insight.metric}
                   </p>
-                  {insight.metric && (
-                    <p className={`text-[10px] font-mono mt-0.5 ${config.color} truncate`}>
-                      {insight.metric}
-                    </p>
-                  )}
-                </div>
-                <ArrowRight className="w-3.5 h-3.5 text-text-muted opacity-0 group-hover:opacity-100
-                                       transition-opacity flex-shrink-0" />
+                )}
               </div>
+              <ChevronRight className="w-4 h-4 text-zinc-600 opacity-0 group-hover:opacity-100
+                                       transition-opacity flex-shrink-0 mt-0.5" />
             </motion.div>
           );
         })}
