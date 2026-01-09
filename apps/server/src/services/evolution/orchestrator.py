@@ -318,7 +318,7 @@ class EvolutionOrchestrator:
         operations = result.scalars().all()
 
         low_confidence_count = sum(
-            1 for op in operations if op.metadata.get("confidence", 1.0) < 0.5
+            1 for op in operations if (op.confidence or 1.0) < 0.5
         )
 
         if low_confidence_count > 10:

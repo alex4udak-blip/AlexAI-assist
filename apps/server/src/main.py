@@ -7,7 +7,7 @@ from fastapi import FastAPI, Request, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from src.api.middleware import RateLimiterMiddleware, RequestLoggingMiddleware
+from src.api.middleware import AuthMiddleware, RateLimiterMiddleware, RequestLoggingMiddleware, validate_websocket_auth
 from src.api.middleware.rate_limiter import RateLimiter
 from src.api.routes import (
     agents,
@@ -101,6 +101,9 @@ app.add_middleware(RateLimiterMiddleware, rate_limiter=_rate_limiter)
 # Request logging middleware
 app.add_middleware(RequestLoggingMiddleware)
 
+# API Key authentication middleware
+app.add_middleware(AuthMiddleware)
+
 # Include routers
 app.include_router(health.router, tags=["Health"])
 app.include_router(events.router, prefix="/api/v1/events", tags=["Events"])
@@ -162,6 +165,15 @@ async def test_db() -> dict[str, str]:
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket) -> None:
     """WebSocket endpoint for real-time updates."""
+    # Validate authentication before accepting
+    if not await validate_websocket_auth(websocket):
+        await websocket.close(code=4001, reason="Unauthorized")
+        logger.warning(
+            "WebSocket connection rejected: unauthorized",
+            extra={"event_type": "websocket_auth_failed"},
+        )
+        return
+
     await websocket.accept()
     active_connections.add(websocket)
     logger.info(

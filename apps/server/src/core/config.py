@@ -32,6 +32,9 @@ class Settings(BaseSettings):
     algorithm: str = "HS256"
     access_token_expire_minutes: int = 30
 
+    # API Key for simple authentication (single-user mode)
+    api_key: str = ""
+
     # CORS - stored as comma-separated string, parsed via property
     allowed_origins_str: str = "http://localhost:5173,http://localhost:3000"
 

@@ -16,6 +16,36 @@ const REQUEST_TIMEOUT_SECS: u64 = 30;
 const MAX_RETRIES: u32 = 3;
 const INITIAL_RETRY_DELAY_MS: u64 = 1000;
 
+/// Get API key from environment or config file
+///
+/// Priority:
+/// 1. OBSERVER_API_KEY environment variable
+/// 2. ~/.config/observer/api_key.txt config file
+/// 3. Empty string (no authentication - development only)
+fn get_api_key() -> Option<String> {
+    // 1. Environment variable
+    if let Ok(key) = std::env::var("OBSERVER_API_KEY") {
+        let key = key.trim();
+        if !key.is_empty() {
+            return Some(key.to_string());
+        }
+    }
+
+    // 2. Config file
+    if let Some(config_dir) = dirs::config_dir() {
+        let config_file = config_dir.join("observer").join("api_key.txt");
+        if let Ok(key) = std::fs::read_to_string(&config_file) {
+            let key = key.trim();
+            if !key.is_empty() {
+                return Some(key.to_string());
+            }
+        }
+    }
+
+    // 3. No API key (development mode)
+    None
+}
+
 /// Check if we're running in development mode
 fn is_dev_mode() -> bool {
     std::env::var("OBSERVER_DEV")
@@ -314,6 +344,7 @@ fn is_transient_error(error: &reqwest::Error) -> bool {
 async fn sync_events(events: &[Event]) -> Result<(), Box<dyn std::error::Error>> {
     let client = create_http_client()?;
     let server_url = get_server_url();
+    let api_key = get_api_key();
 
     let payload = serde_json::json!({
         "events": events
@@ -330,11 +361,16 @@ async fn sync_events(events: &[Event]) -> Result<(), Box<dyn std::error::Error>>
             tokio::time::sleep(Duration::from_millis(delay_ms)).await;
         }
 
-        match client
+        // Build request with optional API key authentication
+        let mut request = client
             .post(format!("{}/api/v1/events", server_url))
-            .json(&payload)
-            .send()
-            .await
+            .json(&payload);
+
+        if let Some(ref key) = api_key {
+            request = request.header("X-API-Key", key);
+        }
+
+        match request.send().await
         {
             Ok(response) => {
                 let status = response.status();

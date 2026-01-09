@@ -2,7 +2,7 @@
 
 import json
 import logging
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from sqlalchemy import select
@@ -125,7 +125,7 @@ class BehaviorEvolution:
             "evolution_count": self.evolution_count,
             "current_behavior": self.behavior.copy(),
             "changes": changes,
-            "timestamp": datetime.utcnow().isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
         }
 
         logger.info(f"Evolution complete: {len(changes)} changes applied")
@@ -138,7 +138,7 @@ class BehaviorEvolution:
         Returns:
             Analysis dict with detected patterns
         """
-        cutoff_date = datetime.utcnow() - timedelta(days=days)
+        cutoff_date = datetime.now(UTC) - timedelta(days=days)
 
         query = (
             select(ChatMessage)
@@ -345,7 +345,7 @@ Always respond with valid JSON."""
         """Save current behavior state to history for potential rollback."""
         snapshot = {
             "behavior": self.behavior.copy(),
-            "timestamp": datetime.utcnow().isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
             "evolution_count": self.evolution_count,
         }
 

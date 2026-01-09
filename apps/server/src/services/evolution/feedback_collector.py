@@ -9,7 +9,7 @@ This module collects feedback from multiple sources:
 
 import logging
 import re
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Any
 from uuid import uuid4
 
@@ -110,7 +110,7 @@ class FeedbackCollector:
             "chat_feedback": chat_feedback,
             "agent_feedback": agent_feedback,
             "system_feedback": system_feedback,
-            "collected_at": datetime.utcnow(),
+            "collected_at": datetime.now(UTC),
             "period_start": since,
             "total_items": total_feedback_items,
         }
@@ -355,7 +355,7 @@ class FeedbackCollector:
         )
 
         # Calculate time period
-        period_hours = (datetime.utcnow() - since).total_seconds() / 3600
+        period_hours = (datetime.now(UTC) - since).total_seconds() / 3600
 
         logger.info(
             f"System metrics: {chat_volume} messages, "
@@ -407,7 +407,7 @@ class FeedbackCollector:
             "content": content,
             "category": category,
             "context": context or {},
-            "timestamp": datetime.utcnow(),
+            "timestamp": datetime.now(UTC),
         }
 
         logger.info(
