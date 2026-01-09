@@ -1,6 +1,6 @@
 """Event endpoints."""
 
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Any
 from uuid import UUID
 
@@ -111,7 +111,7 @@ async def create_events(
             )
             db.add(device)
 
-        device.last_seen_at = datetime.utcnow()
+        device.last_seen_at = datetime.now(UTC)
 
     # Create events
     for event_data in batch.events:
@@ -212,7 +212,7 @@ async def get_timeline(
     """Get activity timeline for recent hours."""
     from datetime import timedelta
 
-    start = datetime.utcnow() - timedelta(hours=hours)
+    start = datetime.now(UTC) - timedelta(hours=hours)
     query = (
         select(Event)
         .where(Event.timestamp >= start)
