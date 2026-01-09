@@ -125,8 +125,20 @@ jobs:
             cd -
           fi
 
+      - name: Check if signing keys exist
+        id: signing
+        run: |
+          if [ -n "$TAURI_SIGNING_PRIVATE_KEY" ]; then
+            echo "has_key=true" >> $GITHUB_OUTPUT
+          else
+            echo "has_key=false" >> $GITHUB_OUTPUT
+            echo "Warning: TAURI_SIGNING_PRIVATE_KEY not set, skipping signing"
+          fi
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+
       - name: Sign update bundles with Tauri CLI
-        if: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY != '' }}
+        if: steps.signing.outputs.has_key == 'true'
         run: |
           VERSION="${{ steps.version.outputs.version }}"
 
