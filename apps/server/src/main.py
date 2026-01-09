@@ -85,7 +85,20 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# CORS middleware - handles all CORS including preflight OPTIONS
+# Middleware are processed in REVERSE order of addition
+# Last added = first to process requests
+
+# API Key authentication middleware (processes 3rd)
+app.add_middleware(AuthMiddleware)
+
+# Request logging middleware (processes 4th)
+app.add_middleware(RequestLoggingMiddleware)
+
+# Rate limiter middleware (processes 5th)
+app.add_middleware(RateLimiterMiddleware, rate_limiter=_rate_limiter)
+
+# CORS middleware - MUST be last to add so it processes FIRST
+# This ensures CORS headers are added to ALL responses including errors
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.allowed_origins,
@@ -94,15 +107,6 @@ app.add_middleware(
     allow_headers=["*"],
     expose_headers=["*"],
 )
-
-# Rate limiter middleware (uses in-memory, upgrades to Redis in lifespan)
-app.add_middleware(RateLimiterMiddleware, rate_limiter=_rate_limiter)
-
-# Request logging middleware
-app.add_middleware(RequestLoggingMiddleware)
-
-# API Key authentication middleware
-app.add_middleware(AuthMiddleware)
 
 # Include routers
 app.include_router(health.router, tags=["Health"])

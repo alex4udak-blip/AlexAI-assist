@@ -6,36 +6,57 @@ use tauri::{
     App, Manager,
 };
 
-pub fn create_tray(app: &App) -> Result<(), Box<dyn std::error::Error>> {
-    let quit = MenuItem::with_id(app, "quit", "Выйти из Observer", true, None::<&str>)?;
-    let show = MenuItem::with_id(app, "show", "Показать окно", true, None::<&str>)?;
-    let dashboard = MenuItem::with_id(app, "dashboard", "Открыть дашборд", true, None::<&str>)?;
-    let separator = MenuItem::with_id(app, "sep", "─────────────", false, None::<&str>)?;
-
-    let menu = Menu::with_items(app, &[&show, &dashboard, &separator, &quit])?;
-
-    // Create a simple 22x22 colored tray icon (standard macOS menu bar size)
-    // Using indigo color (#6366f1) as a circle
+/// Create an eye-shaped tray icon programmatically
+fn create_eye_icon() -> (Vec<u8>, u32, u32) {
     let size = 22u32;
     let mut rgba = vec![0u8; (size * size * 4) as usize];
-    let center = size as f32 / 2.0;
-    let radius = size as f32 / 2.0 - 1.0;
+    let center_x = size as f32 / 2.0;
+    let center_y = size as f32 / 2.0;
 
     for y in 0..size {
         for x in 0..size {
             let idx = ((y * size + x) * 4) as usize;
-            let dx = x as f32 - center;
-            let dy = y as f32 - center;
-            let dist = (dx * dx + dy * dy).sqrt();
+            let px = x as f32;
+            let py = y as f32;
+            let dx = px - center_x;
+            let dy = py - center_y;
 
-            if dist <= radius {
-                // Inside circle - indigo color
-                rgba[idx] = 99;      // R
-                rgba[idx + 1] = 102; // G
-                rgba[idx + 2] = 241; // B
-                rgba[idx + 3] = 255; // A
+            // Eye shape using almond/leaf curve
+            // Eye white outline: |y - center| < height * (1 - (x/width)^2)
+            let norm_x = dx / (size as f32 / 2.0 - 2.0);
+            let eye_height = 4.5 * (1.0 - norm_x * norm_x).max(0.0);
+
+            // Pupil (inner circle)
+            let pupil_dist = (dx * dx + dy * dy).sqrt();
+            let pupil_radius = 3.5;
+            let iris_radius = 5.5;
+
+            if pupil_dist <= pupil_radius {
+                // Pupil - dark blue
+                rgba[idx] = 30;       // R
+                rgba[idx + 1] = 41;   // G
+                rgba[idx + 2] = 59;   // B
+                rgba[idx + 3] = 255;  // A
+            } else if pupil_dist <= iris_radius && dy.abs() < eye_height {
+                // Iris - indigo
+                rgba[idx] = 99;       // R
+                rgba[idx + 1] = 102;  // G
+                rgba[idx + 2] = 241;  // B
+                rgba[idx + 3] = 255;  // A
+            } else if dy.abs() < eye_height && norm_x.abs() < 1.0 {
+                // Eye white
+                rgba[idx] = 255;      // R
+                rgba[idx + 1] = 255;  // G
+                rgba[idx + 2] = 255;  // B
+                rgba[idx + 3] = 255;  // A
+            } else if dy.abs() < eye_height + 1.5 && norm_x.abs() < 1.05 {
+                // Eye outline - dark indigo
+                rgba[idx] = 67;       // R
+                rgba[idx + 1] = 56;   // G
+                rgba[idx + 2] = 202;  // B
+                rgba[idx + 3] = 255;  // A
             } else {
-                // Outside circle - transparent
+                // Transparent
                 rgba[idx] = 0;
                 rgba[idx + 1] = 0;
                 rgba[idx + 2] = 0;
@@ -44,7 +65,20 @@ pub fn create_tray(app: &App) -> Result<(), Box<dyn std::error::Error>> {
         }
     }
 
-    let icon = Image::new_owned(rgba, size, size);
+    (rgba, size, size)
+}
+
+pub fn create_tray(app: &App) -> Result<(), Box<dyn std::error::Error>> {
+    let quit = MenuItem::with_id(app, "quit", "Выйти из Observer", true, None::<&str>)?;
+    let show = MenuItem::with_id(app, "show", "Показать окно", true, None::<&str>)?;
+    let dashboard = MenuItem::with_id(app, "dashboard", "Открыть дашборд", true, None::<&str>)?;
+    let separator = MenuItem::with_id(app, "sep", "─────────────", false, None::<&str>)?;
+
+    let menu = Menu::with_items(app, &[&show, &dashboard, &separator, &quit])?;
+
+    // Create eye-shaped tray icon
+    let (rgba, width, height) = create_eye_icon();
+    let icon = Image::new_owned(rgba, width, height);
 
     let tray = TrayIconBuilder::new()
         .icon(icon)
