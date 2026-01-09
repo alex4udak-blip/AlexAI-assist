@@ -446,11 +446,27 @@ Respond with JSON:
             response = await claude_client.complete(
                 prompt=prompt,
                 system="You are an AI system evolution analyzer. "
-                       "Provide actionable evolution recommendations based on feedback.",
+                       "Provide actionable evolution recommendations based on feedback. "
+                       "Respond ONLY with valid JSON, no markdown formatting.",
                 max_tokens=4000,
             )
 
-            analysis = json.loads(response)
+            # Clean response - remove markdown code blocks if present
+            clean_response = response.strip()
+            if clean_response.startswith("```"):
+                # Remove ```json and closing ```
+                lines = clean_response.split("\n")
+                if lines[0].startswith("```"):
+                    lines = lines[1:]
+                if lines and lines[-1].strip() == "```":
+                    lines = lines[:-1]
+                clean_response = "\n".join(lines)
+
+            if not clean_response:
+                logger.warning("Empty response from LLM, using fallback categorization")
+                raise ValueError("Empty LLM response")
+
+            analysis = json.loads(clean_response)
 
             # Re-categorize feedback based on LLM analysis
             categorized: dict[str, list[FeedbackSource]] = {
