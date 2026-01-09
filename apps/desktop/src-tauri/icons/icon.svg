@@ -1,0 +1,58 @@
+<svg width="1024" height="1024" viewBox="0 0 1024 1024" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <!-- Main gradient for background - deep indigo -->
+    <linearGradient id="bgGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#818cf8"/>
+      <stop offset="50%" style="stop-color:#6366f1"/>
+      <stop offset="100%" style="stop-color:#4f46e5"/>
+    </linearGradient>
+    <!-- Eye white gradient -->
+    <radialGradient id="eyeWhite" cx="50%" cy="35%" r="60%">
+      <stop offset="0%" style="stop-color:#ffffff"/>
+      <stop offset="100%" style="stop-color:#f3f4f6"/>
+    </radialGradient>
+    <!-- Iris gradient - vibrant blue -->
+    <radialGradient id="irisGradient" cx="40%" cy="40%" r="60%">
+      <stop offset="0%" style="stop-color:#60a5fa"/>
+      <stop offset="50%" style="stop-color:#3b82f6"/>
+      <stop offset="100%" style="stop-color:#1d4ed8"/>
+    </radialGradient>
+    <!-- Pupil gradient -->
+    <radialGradient id="pupilGradient" cx="35%" cy="35%" r="65%">
+      <stop offset="0%" style="stop-color:#1f2937"/>
+      <stop offset="100%" style="stop-color:#030712"/>
+    </radialGradient>
+  </defs>
+
+  <!-- macOS style rounded rectangle background (22.37% radius like Apple) -->
+  <rect x="0" y="0" width="1024" height="1024" rx="228" ry="228" fill="url(#bgGradient)"/>
+
+  <!-- Subtle top shine -->
+  <ellipse cx="512" cy="200" rx="400" ry="150" fill="white" opacity="0.1"/>
+
+  <!-- Eye white (sclera) - elegant almond shape -->
+  <ellipse cx="512" cy="512" rx="320" ry="200" fill="url(#eyeWhite)"/>
+
+  <!-- Subtle shadow on eye white -->
+  <ellipse cx="512" cy="480" rx="310" ry="140" fill="black" opacity="0.03"/>
+
+  <!-- Iris -->
+  <circle cx="512" cy="512" r="145" fill="url(#irisGradient)"/>
+
+  <!-- Iris texture rings -->
+  <circle cx="512" cy="512" r="130" fill="none" stroke="#2563eb" stroke-width="1" opacity="0.3"/>
+  <circle cx="512" cy="512" r="110" fill="none" stroke="#1d4ed8" stroke-width="1" opacity="0.2"/>
+  <circle cx="512" cy="512" r="90" fill="none" stroke="#1e40af" stroke-width="1" opacity="0.15"/>
+
+  <!-- Pupil -->
+  <circle cx="512" cy="512" r="60" fill="url(#pupilGradient)"/>
+
+  <!-- Main highlight reflection -->
+  <ellipse cx="465" cy="465" rx="28" ry="24" fill="white" opacity="0.95"/>
+
+  <!-- Secondary small highlight -->
+  <circle cx="555" cy="550" r="10" fill="white" opacity="0.6"/>
+
+  <!-- Subtle bottom reflection on iris -->
+  <ellipse cx="512" cy="590" rx="60" ry="20" fill="white" opacity="0.08"/>
+</svg>
