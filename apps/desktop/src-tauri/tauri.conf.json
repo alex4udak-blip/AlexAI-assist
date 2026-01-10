@@ -22,13 +22,11 @@
         "minHeight": 500,
         "visible": true,
         "resizable": true,
-        "decorations": true,
-        "transparent": false,
-        "skipTaskbar": false,
+        "decorations": false,
+        "transparent": true,
+        "skipTaskbar": true,
         "alwaysOnTop": false,
-        "center": true,
-        "titleBarStyle": "Transparent",
-        "hiddenTitle": true
+        "center": true
       }
     ],
     "trayIcon": {

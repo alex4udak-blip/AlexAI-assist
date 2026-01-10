@@ -1,16 +1,46 @@
-import { Download, Apple, Monitor, CheckCircle, Clock, Cpu } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Download, Apple, Monitor, CheckCircle, Clock, Cpu, Loader2 } from 'lucide-react';
 import { Card, CardContent } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { Badge } from '../components/ui/Badge';
 
-// GitHub Release download URLs - version auto-synced from package.json via Vite
+// GitHub Release URLs
 const REPO = 'alex4udak-blip/AlexAI-assist';
-const VERSION = __APP_VERSION__;
-const DOWNLOAD_URL_ARM = `https://github.com/${REPO}/releases/download/v${VERSION}/Observer_${VERSION}_aarch64.dmg`;
-const DOWNLOAD_URL_INTEL = `https://github.com/${REPO}/releases/download/v${VERSION}/Observer_${VERSION}_x64.dmg`;
 const RELEASES_URL = `https://github.com/${REPO}/releases/latest`;
+const API_RELEASES_URL = `https://api.github.com/repos/${REPO}/releases/latest`;
+
+// Fallback version if API call fails
+const FALLBACK_VERSION = __APP_VERSION__;
 
 export default function DownloadPage() {
+  const [version, setVersion] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    // Fetch latest version from GitHub API
+    fetch(API_RELEASES_URL)
+      .then(res => res.json())
+      .then(data => {
+        if (data.tag_name) {
+          // Remove 'v' prefix if present
+          const ver = data.tag_name.replace(/^v/, '');
+          setVersion(ver);
+        } else {
+          setVersion(FALLBACK_VERSION);
+        }
+      })
+      .catch(() => {
+        setVersion(FALLBACK_VERSION);
+      })
+      .finally(() => {
+        setLoading(false);
+      });
+  }, []);
+
+  const currentVersion = version || FALLBACK_VERSION;
+  const downloadUrlArm = `https://github.com/${REPO}/releases/download/v${currentVersion}/Observer_${currentVersion}_aarch64.dmg`;
+  const downloadUrlIntel = `https://github.com/${REPO}/releases/download/v${currentVersion}/Observer_${currentVersion}_x64.dmg`;
+
   const features = [
     'Работает в строке меню',
     'Собирает активность через Accessibility API',
@@ -19,14 +49,14 @@ export default function DownloadPage() {
     'Автоматические обновления',
   ];
 
-  const isAvailable = true;
+  const isAvailable = !loading && version !== null;
 
   const handleDownloadArm = () => {
-    window.open(DOWNLOAD_URL_ARM, '_blank');
+    window.open(downloadUrlArm, '_blank');
   };
 
   const handleDownloadIntel = () => {
-    window.open(DOWNLOAD_URL_INTEL, '_blank');
+    window.open(downloadUrlIntel, '_blank');
   };
 
   return (
@@ -58,7 +88,14 @@ export default function DownloadPage() {
               </div>
             </div>
             <Badge variant={isAvailable ? 'success' : 'warning'}>
-              {isAvailable ? `v${VERSION}` : 'В разработке'}
+              {loading ? (
+                <span className="flex items-center gap-1">
+                  <Loader2 className="w-3 h-3 animate-spin" />
+                  Загрузка
+                </span>
+              ) : (
+                `v${currentVersion}`
+              )}
             </Badge>
           </div>
 
