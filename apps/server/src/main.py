@@ -63,14 +63,19 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 
         from alembic import command  # type: ignore[attr-defined]
 
+        logger.info("Starting database migrations...")
+
         def run_migrations() -> None:
             base_dir = pathlib.Path(__file__).parent.parent
             alembic_cfg = Config(str(base_dir / "alembic.ini"))
             alembic_cfg.set_main_option("script_location", str(base_dir / "alembic"))
             command.upgrade(alembic_cfg, "head")
 
-        await asyncio.to_thread(run_migrations)
+        # Add 60 second timeout for migrations
+        await asyncio.wait_for(asyncio.to_thread(run_migrations), timeout=60.0)
         logger.info("Database migrations completed successfully")
+    except asyncio.TimeoutError:
+        logger.error("Database migrations timed out after 60 seconds - continuing without migrations")
     except Exception as e:
         logger.warning(f"Could not run migrations (may already be up to date): {e}")
 
