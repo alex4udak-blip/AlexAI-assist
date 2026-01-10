@@ -77,33 +77,50 @@ export default function Main({ onOpenSettings }: Props) {
 
   return (
     <div className="min-h-screen bg-bg-primary flex flex-col">
-      {/* macOS Style Titlebar - draggable area */}
+      {/* Custom Titlebar - draggable area (no native decorations) */}
       <div
         data-tauri-drag-region
         className="h-12 bg-bg-secondary/80 backdrop-blur-xl border-b border-border-subtle flex items-center px-4 shrink-0"
       >
-        {/* Traffic lights space (macOS native buttons) */}
-        <div className="w-20" />
-
-        {/* Center - App title with status */}
-        <div className="flex-1 flex items-center justify-center gap-2">
-          <span className="text-sm font-medium text-text-secondary">Observer</span>
-          <span
-            className={`w-1.5 h-1.5 rounded-full ${
-              stats.status === 'collecting'
-                ? 'bg-status-success'
-                : stats.status === 'syncing'
-                ? 'bg-status-info animate-pulse'
-                : 'bg-status-warning'
-            }`}
-          />
+        {/* Left side - App info */}
+        <div className="flex items-center gap-2" data-tauri-drag-region>
+          <div className="w-8 h-8 rounded-lg bg-accent-gradient flex items-center justify-center">
+            <Eye className="w-4 h-4 text-white" />
+          </div>
+          <div data-tauri-drag-region>
+            <span className="text-sm font-medium text-text-secondary">Observer</span>
+            <div className="flex items-center gap-1">
+              <span
+                className={`w-1.5 h-1.5 rounded-full ${
+                  stats.status === 'collecting'
+                    ? 'bg-status-success'
+                    : stats.status === 'syncing'
+                    ? 'bg-status-info animate-pulse'
+                    : 'bg-status-warning'
+                }`}
+              />
+              <span className="text-xs text-text-tertiary">
+                {stats.status === 'collecting' ? 'Сбор' : stats.status === 'paused' ? 'Пауза' : 'Синхр.'}
+              </span>
+            </div>
+          </div>
         </div>
 
+        <div className="flex-1" data-tauri-drag-region />
+
         {/* Right side actions */}
-        <div className="w-20 flex items-center justify-end gap-1">
+        <div className="flex items-center gap-1">
+          <button
+            onClick={openDashboard}
+            className="px-3 py-1.5 bg-accent-gradient text-white text-xs font-medium rounded-md hover:opacity-90 transition-opacity flex items-center gap-1.5"
+          >
+            <ExternalLink className="w-3.5 h-3.5" />
+            Веб-дашборд
+          </button>
           <button
             onClick={toggleCollection}
             className="p-1.5 text-text-tertiary hover:text-text-primary hover:bg-bg-hover rounded-md transition-colors"
+            title={stats.status === 'collecting' ? 'Приостановить' : 'Возобновить'}
           >
             {stats.status === 'collecting' ? (
               <Pause className="w-4 h-4" />
@@ -120,41 +137,6 @@ export default function Main({ onOpenSettings }: Props) {
           </button>
         </div>
       </div>
-
-      {/* Main Header */}
-      <header className="bg-bg-secondary border-b border-border-subtle p-4 shrink-0">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-violet-400 to-violet-600 flex items-center justify-center shadow-lg shadow-violet-500/20">
-              <Eye className="w-5 h-5 text-white" />
-            </div>
-            <div>
-              <h1 className="text-lg font-bold text-text-primary">Observer</h1>
-              <div className="flex items-center gap-2">
-                <span
-                  className={`w-2 h-2 rounded-full ${
-                    stats.status === 'collecting'
-                      ? 'bg-status-success'
-                      : stats.status === 'syncing'
-                      ? 'bg-status-info animate-pulse'
-                      : 'bg-status-warning'
-                  }`}
-                />
-                <span className="text-xs text-text-tertiary capitalize">
-                  {stats.status === 'collecting' ? 'Сбор данных' : stats.status === 'paused' ? 'Пауза' : 'Синхронизация'}
-                </span>
-              </div>
-            </div>
-          </div>
-          <button
-            onClick={openDashboard}
-            className="px-4 py-2 bg-gradient-to-r from-violet-500 to-violet-600 text-white text-sm font-medium rounded-lg hover:opacity-90 transition-opacity flex items-center gap-2 shadow-lg shadow-violet-500/20"
-          >
-            <ExternalLink className="w-4 h-4" />
-            Веб-дашборд
-          </button>
-        </div>
-      </header>
 
       {/* Content - scrollable area */}
       <main className="flex-1 overflow-y-auto p-6">

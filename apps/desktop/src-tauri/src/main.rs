@@ -87,6 +87,7 @@ fn main() {
             None,
         ))
         .plugin(tauri_plugin_updater::Builder::new().build())
+        .plugin(tauri_plugin_process::init())
         .manage(state.clone())
         .manage(automation_queue.clone())
         .setup(move |app| {

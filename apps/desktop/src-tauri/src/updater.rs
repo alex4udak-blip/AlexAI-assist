@@ -3,6 +3,21 @@
 use tauri::AppHandle;
 use tauri_plugin_updater::UpdaterExt;
 
+/// Restart the application after update
+fn restart_app() {
+    // Get the current executable path and restart
+    if let Ok(exe) = std::env::current_exe() {
+        println!("Restarting app from: {:?}", exe);
+
+        // Spawn a new instance of the app
+        let _ = std::process::Command::new(&exe)
+            .spawn();
+
+        // Exit the current instance
+        std::process::exit(0);
+    }
+}
+
 /// Check for updates and prompt user if available
 pub async fn check_for_updates(app: AppHandle) {
     // Wait a bit before checking to let app fully initialize
@@ -22,7 +37,11 @@ pub async fn check_for_updates(app: AppHandle) {
 
                     // Auto-download and install
                     match download_and_install(update).await {
-                        Ok(_) => println!("Update downloaded successfully"),
+                        Ok(_) => {
+                            println!("Update installed, restarting app...");
+                            // Restart the app to apply the update
+                            restart_app();
+                        }
                         Err(e) => eprintln!("Failed to download update: {}", e),
                     }
                 }
