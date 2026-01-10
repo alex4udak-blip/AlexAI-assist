@@ -1,5 +1,9 @@
 """Observer API Server - Main Entry Point"""
 
+import sys
+print("=== MAIN.PY IMPORT START ===", flush=True)
+sys.stdout.flush()
+
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 
@@ -7,8 +11,14 @@ from fastapi import FastAPI, HTTPException, Request, WebSocket, WebSocketDisconn
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
+print("=== FASTAPI IMPORTS DONE ===", flush=True)
+
+print("=== IMPORTING MIDDLEWARE ===", flush=True)
 from src.api.middleware import AuthMiddleware, RateLimiterMiddleware, RequestLoggingMiddleware, validate_websocket_auth
 from src.api.middleware.rate_limiter import RateLimiter
+print("=== MIDDLEWARE DONE ===", flush=True)
+
+print("=== IMPORTING ROUTES ===", flush=True)
 from src.api.routes import (
     agents,
     analytics,
@@ -24,10 +34,14 @@ from src.api.routes import (
 from src.api.routes import (
     settings as settings_router,
 )
+print("=== ROUTES DONE ===", flush=True)
+
+print("=== IMPORTING CORE ===", flush=True)
 from src.core.config import settings
 from src.core.logging import get_logger, log_error, setup_logging
 from src.core.websocket import active_connections
 from src.db.session import engine
+print("=== CORE DONE ===", flush=True)
 
 # Configure structured logging
 setup_logging(
