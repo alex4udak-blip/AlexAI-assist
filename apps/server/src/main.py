@@ -54,25 +54,9 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     )
     logger.info(f"CORS origins: {settings.allowed_origins}")
 
-    # Run database migrations automatically (in thread to avoid asyncio.run conflict)
-    try:
-        import asyncio
-        import pathlib
-
-        from alembic.config import Config
-
-        from alembic import command  # type: ignore[attr-defined]
-
-        def run_migrations() -> None:
-            base_dir = pathlib.Path(__file__).parent.parent
-            alembic_cfg = Config(str(base_dir / "alembic.ini"))
-            alembic_cfg.set_main_option("script_location", str(base_dir / "alembic"))
-            command.upgrade(alembic_cfg, "head")
-
-        await asyncio.to_thread(run_migrations)
-        logger.info("Database migrations completed successfully")
-    except Exception as e:
-        logger.warning(f"Could not run migrations (may already be up to date): {e}")
+    # NOTE: Migrations are run via Dockerfile CMD before server starts:
+    # CMD ["sh", "-c", "alembic upgrade head && uvicorn ..."]
+    # Do NOT run them here - causes asyncio.run() conflict with existing event loop
 
     # Try to upgrade rate limiter to Redis (optional, with timeout)
     try:
