@@ -184,7 +184,8 @@ async def create_events(
         result = await db.execute(
             select(Event).where(Event.id.in_(event_ids))
         )
-        fetched_events_map: dict[UUID, Event] = {e.id: e for e in result.scalars().all()}
+        fetched_events: list[Event] = list(result.scalars().all())
+        fetched_events_map: dict[UUID, Event] = {e.id: e for e in fetched_events}
 
         # Process events in timestamp order
         sorted_created = sorted(

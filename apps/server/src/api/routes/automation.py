@@ -839,13 +839,13 @@ async def get_screenshot_history(
         )
 
     # Get screenshots from database
-    result = await db.execute(
+    screenshot_result = await db.execute(
         select(DBScreenshot)
         .where(DBScreenshot.device_id == device_id)
         .order_by(desc(DBScreenshot.captured_at))
         .limit(limit)
     )
-    screenshots = result.scalars().all()
+    screenshots: list[DBScreenshot] = list(screenshot_result.scalars().all())
 
     return [
         {
