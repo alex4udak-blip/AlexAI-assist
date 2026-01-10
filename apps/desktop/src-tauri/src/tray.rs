@@ -10,12 +10,14 @@ use tauri::{
 /// Global flag to track window visibility (more reliable than is_visible() on macOS)
 static WINDOW_VISIBLE: AtomicBool = AtomicBool::new(true);
 
-/// Create an eye-shaped tray icon programmatically
+/// Create a proper eye-shaped tray icon for macOS menu bar
+/// Uses higher resolution (44x44) for Retina displays
 fn create_eye_icon() -> (Vec<u8>, u32, u32) {
-    let size = 22u32;
+    let size = 44u32; // @2x for Retina
     let mut rgba = vec![0u8; (size * size * 4) as usize];
     let center_x = size as f32 / 2.0;
     let center_y = size as f32 / 2.0;
+    let scale = size as f32 / 22.0; // Scale factor for Retina
 
     for y in 0..size {
         for x in 0..size {
@@ -25,40 +27,41 @@ fn create_eye_icon() -> (Vec<u8>, u32, u32) {
             let dx = px - center_x;
             let dy = py - center_y;
 
-            // Eye shape using almond/leaf curve
-            // Eye white outline: |y - center| < height * (1 - (x/width)^2)
-            let norm_x = dx / (size as f32 / 2.0 - 2.0);
-            let eye_height = 4.5 * (1.0 - norm_x * norm_x).max(0.0);
+            // Eye shape using almond/leaf curve (scaled for @2x)
+            let norm_x = dx / (size as f32 / 2.0 - 4.0 * scale);
+            let eye_height = 7.0 * scale * (1.0 - norm_x * norm_x).max(0.0);
 
-            // Pupil (inner circle)
+            // Pupil and iris (scaled)
             let pupil_dist = (dx * dx + dy * dy).sqrt();
-            let pupil_radius = 3.5;
-            let iris_radius = 5.5;
+            let pupil_radius = 5.0 * scale;
+            let iris_radius = 8.0 * scale;
 
+            // For macOS template icons: use black with varying alpha
+            // This allows macOS to properly invert colors for dark/light mode
             if pupil_dist <= pupil_radius {
-                // Pupil - dark blue
-                rgba[idx] = 30;       // R
-                rgba[idx + 1] = 41;   // G
-                rgba[idx + 2] = 59;   // B
-                rgba[idx + 3] = 255;  // A
+                // Pupil - solid black
+                rgba[idx] = 0;        // R
+                rgba[idx + 1] = 0;    // G
+                rgba[idx + 2] = 0;    // B
+                rgba[idx + 3] = 255;  // A (fully opaque)
             } else if pupil_dist <= iris_radius && dy.abs() < eye_height {
-                // Iris - indigo
-                rgba[idx] = 99;       // R
-                rgba[idx + 1] = 102;  // G
-                rgba[idx + 2] = 241;  // B
-                rgba[idx + 3] = 255;  // A
+                // Iris - semi-transparent black
+                rgba[idx] = 0;
+                rgba[idx + 1] = 0;
+                rgba[idx + 2] = 0;
+                rgba[idx + 3] = 180;  // Semi-opaque
             } else if dy.abs() < eye_height && norm_x.abs() < 1.0 {
-                // Eye white
-                rgba[idx] = 255;      // R
-                rgba[idx + 1] = 255;  // G
-                rgba[idx + 2] = 255;  // B
-                rgba[idx + 3] = 255;  // A
-            } else if dy.abs() < eye_height + 1.5 && norm_x.abs() < 1.05 {
-                // Eye outline - dark indigo
-                rgba[idx] = 67;       // R
-                rgba[idx + 1] = 56;   // G
-                rgba[idx + 2] = 202;  // B
-                rgba[idx + 3] = 255;  // A
+                // Eye white area - light gray (will show as white in menu bar)
+                rgba[idx] = 0;
+                rgba[idx + 1] = 0;
+                rgba[idx + 2] = 0;
+                rgba[idx + 3] = 60;   // Very transparent
+            } else if dy.abs() < eye_height + 2.0 * scale && norm_x.abs() < 1.05 {
+                // Eye outline - solid black
+                rgba[idx] = 0;
+                rgba[idx + 1] = 0;
+                rgba[idx + 2] = 0;
+                rgba[idx + 3] = 255;  // Fully opaque
             } else {
                 // Transparent
                 rgba[idx] = 0;
@@ -86,7 +89,7 @@ pub fn create_tray(app: &App) -> Result<(), Box<dyn std::error::Error>> {
 
     let tray = TrayIconBuilder::new()
         .icon(icon)
-        .icon_as_template(false)
+        .icon_as_template(true) // Enable template mode for proper macOS light/dark mode support
         .menu(&menu)
         .show_menu_on_left_click(false)
         .tooltip("Observer - Activity Tracker")
