@@ -545,6 +545,13 @@ pub fn request_app_automation(app_name: String) -> bool {
     permissions::request_automation_permission(&app_name)
 }
 
+/// Trigger automation permission dialog for a specific app
+/// This uses osascript directly which properly triggers macOS permission dialogs
+#[tauri::command]
+pub fn trigger_automation_permission(app_name: String) -> bool {
+    crate::native_applescript::trigger_permission_for_app(&app_name)
+}
+
 /// Request automation permissions for all apps
 #[tauri::command]
 pub fn request_all_automations() -> Vec<permissions::AppPermissionStatus> {
