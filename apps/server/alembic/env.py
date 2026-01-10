@@ -1,10 +1,8 @@
 """Alembic environment configuration."""
 
 import asyncio
-import gc
 import logging
 import sys
-import time
 from logging.config import fileConfig
 
 from sqlalchemy import pool
@@ -71,22 +69,15 @@ async def run_async_migrations() -> None:
             logger.info("Migrations completed successfully")
     finally:
         await connectable.dispose()
-        # Give asyncpg time to clean up connections
-        await asyncio.sleep(0.1)
 
 
 def run_migrations_online() -> None:
     """Run migrations in 'online' mode."""
     try:
         asyncio.run(run_async_migrations())
-        # Force garbage collection to clean up any lingering connections
-        gc.collect()
-        # Small delay to ensure all cleanup completes
-        time.sleep(0.2)
-        logger.info("Migration cleanup complete, exiting normally")
     except Exception as e:
         logger.error(f"Migration failed: {e}")
-        sys.exit(1)
+        raise
 
 
 if context.is_offline_mode():
