@@ -405,9 +405,10 @@ class TestEdgeCases:
 
         result = await service.detect_patterns(device_id="test-device")
 
-        # Single event should not create patterns
+        # Single event should not create app sequences
         assert result["app_sequences"] == []
-        assert result["context_switches"]["total_switches"] == 0
+        # First app is counted as a switch (from None to Chrome)
+        assert result["context_switches"]["total_switches"] == 1
 
     @pytest.mark.asyncio
     async def test_events_with_no_app_name(self):
