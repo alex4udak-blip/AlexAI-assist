@@ -89,10 +89,13 @@ jobs:
       - name: Install dependencies
         run: npm install
 
+      - name: Type check frontend
+        run: npx tsc --noEmit
+
+      - name: Build frontend
+        run: npm run build
+
       - name: Check Rust
         run: |
           cd src-tauri
           cargo check
-
-      - name: Type check frontend
-        run: npx tsc --noEmit
