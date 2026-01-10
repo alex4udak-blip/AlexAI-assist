@@ -63,16 +63,47 @@ async def get_patterns(
     return patterns
 
 
+class AppSequencePattern(BaseModel):
+    """Detected app sequence pattern."""
+
+    type: str = Field(..., description="Pattern type")
+    sequence: list[str] = Field(..., description="App sequence")
+    occurrences: int = Field(..., description="Number of occurrences")
+    automatable: bool = Field(..., description="Whether pattern can be automated")
+
+
+class TimePattern(BaseModel):
+    """Detected time-based pattern."""
+
+    type: str = Field(..., description="Pattern type")
+    hour: int = Field(..., description="Hour of day (0-23)")
+    app: str = Field(..., description="Application name")
+    occurrences: int = Field(..., description="Number of occurrences")
+    automatable: bool = Field(..., description="Whether pattern can be automated")
+
+
+class ContextSwitches(BaseModel):
+    """Context switching analysis."""
+
+    total_switches: int = Field(..., description="Total number of context switches")
+    switch_rate: float = Field(..., description="Switch rate per event")
+    assessment: str = Field(..., description="Assessment (low, medium, high)")
+
+
 class PatternDetectionResult(BaseModel):
     """Pattern detection result."""
 
-    patterns_found: int = Field(
-        ...,
-        description="Number of patterns detected",
-    )
-    patterns: list[PatternResponse] = Field(
+    app_sequences: list[AppSequencePattern] = Field(
         default_factory=list,
-        description="List of detected patterns",
+        description="Detected app sequence patterns",
+    )
+    time_patterns: list[TimePattern] = Field(
+        default_factory=list,
+        description="Detected time-based patterns",
+    )
+    context_switches: ContextSwitches = Field(
+        ...,
+        description="Context switching analysis",
     )
 
 

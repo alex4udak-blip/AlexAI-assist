@@ -216,9 +216,31 @@ export interface Pattern {
   status: string;
 }
 
+export interface AppSequencePattern {
+  type: string;
+  sequence: string[];
+  occurrences: number;
+  automatable: boolean;
+}
+
+export interface TimePattern {
+  type: string;
+  hour: number;
+  app: string;
+  occurrences: number;
+  automatable: boolean;
+}
+
+export interface ContextSwitches {
+  total_switches: number;
+  switch_rate: number;
+  assessment: 'low' | 'medium' | 'high';
+}
+
 export interface DetectedPatterns {
-  patterns_found: number;
-  patterns: Pattern[];
+  app_sequences: AppSequencePattern[];
+  time_patterns: TimePattern[];
+  context_switches: ContextSwitches;
 }
 
 export interface Suggestion {
