@@ -2,6 +2,7 @@ use crate::collector::{
     get_current_focus, has_accessibility_permission, request_accessibility_permission, FocusInfo,
 };
 use crate::sync::{get_dashboard_url, manual_sync, validate_url};
+use crate::tray;
 use crate::AppState;
 use crate::automation;
 use crate::permissions;
@@ -143,6 +144,12 @@ pub fn request_permissions() -> bool {
 #[tauri::command]
 pub fn get_focus() -> Option<FocusInfo> {
     get_current_focus()
+}
+
+/// Notify that window visibility changed (for tray icon sync)
+#[tauri::command]
+pub fn set_window_visible(visible: bool) {
+    tray::set_window_visible(visible);
 }
 
 /// Open settings - for macOS this opens Accessibility preferences

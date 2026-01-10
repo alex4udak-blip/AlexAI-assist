@@ -162,6 +162,7 @@ fn main() {
             commands::check_permissions,
             commands::request_permissions,
             commands::get_focus,
+            commands::set_window_visible,
             // Automation commands
             commands::check_all_permissions,
             commands::request_permission,
