@@ -5,7 +5,7 @@ from typing import Any
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Query
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_serializer
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -112,8 +112,20 @@ class EventResponse(BaseModel):
     category: str | None
     created_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = {"from_attributes": True}
+
+    @field_serializer("timestamp", "created_at")
+    @staticmethod
+    def serialize_datetime(dt: datetime | None) -> str | None:
+        """Serialize datetime to ISO format with UTC indicator.
+
+        Server stores all timestamps in UTC as naive datetimes.
+        Append 'Z' to indicate UTC timezone for frontend parsing.
+        Without 'Z', JavaScript's new Date() parses as local time.
+        """
+        if dt is None:
+            return None
+        return dt.isoformat() + "Z"
 
 
 @router.post("")
@@ -208,11 +220,18 @@ async def create_events(
 
     # Broadcast new events to WebSocket clients
     # Convert events to dict format for JSON serialization
+    # IMPORTANT: Normalize timestamps to UTC and append 'Z' suffix for frontend parsing
+    def format_ws_timestamp(dt: datetime | None) -> str | None:
+        if dt is None:
+            return None
+        normalized = normalize_datetime(dt)
+        return (normalized.isoformat() + "Z") if normalized else None
+
     events_data = [
         {
             "device_id": e.device_id,
             "event_type": e.event_type,
-            "timestamp": e.timestamp.isoformat() if e.timestamp else None,
+            "timestamp": format_ws_timestamp(e.timestamp),
             "app_name": e.app_name,
             "window_title": e.window_title,
             "url": e.url,
@@ -347,18 +366,20 @@ async def get_timeline(
     events = list(result.scalars().all())
 
     # Convert to serializable format for caching
+    # IMPORTANT: Append 'Z' suffix to indicate UTC timezone
+    # Without 'Z', JavaScript's new Date() parses as local time, causing display issues
     events_data = [
         {
             "id": str(e.id),
             "device_id": e.device_id,
             "event_type": e.event_type,
-            "timestamp": e.timestamp.isoformat() if e.timestamp else None,
+            "timestamp": (e.timestamp.isoformat() + "Z") if e.timestamp else None,
             "app_name": e.app_name,
             "window_title": e.window_title,
             "url": e.url,
             "data": e.data,
             "category": e.category,
-            "created_at": e.created_at.isoformat() if e.created_at else None,
+            "created_at": (e.created_at.isoformat() + "Z") if e.created_at else None,
         }
         for e in events
     ]
