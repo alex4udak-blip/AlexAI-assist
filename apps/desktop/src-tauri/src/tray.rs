@@ -172,14 +172,22 @@ pub fn create_tray(app: &App) -> Result<(), Box<dyn std::error::Error>> {
         {
             // Get tray icon position and place window below it
             if let Ok(Some(rect)) = tray.rect() {
-                let size = window.outer_size().unwrap_or(tauri::PhysicalSize {
+                let win_size = window.outer_size().unwrap_or(tauri::PhysicalSize {
                     width: 320,
                     height: 400,
                 });
+                // Extract physical position and size from Rect
+                let (pos_x, pos_y) = match rect.position {
+                    tauri::Position::Physical(p) => (p.x, p.y),
+                    tauri::Position::Logical(l) => (l.x as i32, l.y as i32),
+                };
+                let (rect_width, rect_height) = match rect.size {
+                    tauri::Size::Physical(s) => (s.width as i32, s.height as i32),
+                    tauri::Size::Logical(l) => (l.width as i32, l.height as i32),
+                };
                 // Center window horizontally under tray icon
-                let x =
-                    rect.position.x as i32 + (rect.size.width as i32 / 2) - (size.width as i32 / 2);
-                let y = rect.position.y as i32 + rect.size.height as i32 + 5; // Below tray with small gap
+                let x = pos_x + (rect_width / 2) - (win_size.width as i32 / 2);
+                let y = pos_y + rect_height + 5; // Below tray with small gap
                 let _ = window.set_position(tauri::PhysicalPosition::new(x, y));
             }
         }

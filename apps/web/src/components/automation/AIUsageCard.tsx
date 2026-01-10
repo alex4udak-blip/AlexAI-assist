@@ -71,7 +71,7 @@ export function AIUsageCard({ usage, loading }: AIUsageCardProps) {
       <CardHeader>
         <div className="flex items-center gap-2">
           <Sparkles className="w-4 h-4 text-accent-primary" />
-          <CardTitle>AI Usage Today</CardTitle>
+          <CardTitle>Использование AI сегодня</CardTitle>
         </div>
       </CardHeader>
 

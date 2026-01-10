@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import { CategoryBreakdown } from '../components/analytics/CategoryBreakdown';
 import { ProductivityScore } from '../components/analytics/ProductivityScore';
@@ -10,6 +10,8 @@ import {
   useAppUsage,
   useTrends,
 } from '../hooks/useAnalytics';
+import { useEventsCreated } from '../hooks/useWebSocketSync';
+import { useWebSocket } from '../hooks/useWebSocket';
 
 type Period = '7' | '14' | '30';
 
@@ -29,18 +31,32 @@ const item = {
 export default function Analytics() {
   const [period, setPeriod] = useState<Period>('7');
 
-  const { data: categories, loading: categoriesLoading } = useCategories({
+  // Connect to WebSocket for real-time updates
+  useWebSocket();
+
+  const { data: categories, loading: categoriesLoading, refetch: refetchCategories } = useCategories({
     days: parseInt(period),
   });
-  const { data: productivity, loading: productivityLoading } = useProductivity({
+  const { data: productivity, loading: productivityLoading, refetch: refetchProductivity } = useProductivity({
     days: parseInt(period),
   });
-  const { data: appUsage, loading: appUsageLoading } = useAppUsage({
+  const { data: appUsage, loading: appUsageLoading, refetch: refetchAppUsage } = useAppUsage({
     days: parseInt(period),
   });
-  const { data: trends, loading: trendsLoading } = useTrends({
+  const { data: trends, loading: trendsLoading, refetch: refetchTrends } = useTrends({
     days: parseInt(period),
   });
+
+  // Handle real-time event updates
+  const handleEventsCreated = useCallback(() => {
+    refetchCategories();
+    refetchProductivity();
+    refetchAppUsage();
+    refetchTrends();
+  }, [refetchCategories, refetchProductivity, refetchAppUsage, refetchTrends]);
+
+  // Subscribe to real-time events
+  useEventsCreated(handleEventsCreated);
 
   return (
     <motion.div

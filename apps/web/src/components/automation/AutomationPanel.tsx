@@ -609,7 +609,7 @@ export function AutomationPanel() {
                           </div>
                           <img
                             src={`data:image/png;base64,${lastResult.data.screenshot}`}
-                            alt="Screenshot"
+                            alt="Снимок экрана"
                             className="rounded-lg border border-border-default max-w-full h-auto"
                           />
                         </div>
@@ -676,10 +676,10 @@ export function AutomationPanel() {
                   );
                   const timeLabel =
                     timeAgo < 60
-                      ? `${timeAgo}s ago`
+                      ? `${timeAgo}с назад`
                       : timeAgo < 3600
-                        ? `${Math.floor(timeAgo / 60)}m ago`
-                        : `${Math.floor(timeAgo / 3600)}h ago`;
+                        ? `${Math.floor(timeAgo / 60)}м назад`
+                        : `${Math.floor(timeAgo / 3600)}ч назад`;
 
                   return (
                     <div
@@ -689,7 +689,7 @@ export function AutomationPanel() {
                     >
                       <img
                         src={`data:image/png;base64,${screenshot.screenshot}`}
-                        alt={`Screenshot ${index + 1}`}
+                        alt={`Снимок экрана ${index + 1}`}
                         className="w-full h-32 object-cover"
                       />
                       <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity">
@@ -728,7 +728,7 @@ export function AutomationPanel() {
             </button>
             <img
               src={`data:image/png;base64,${selectedScreenshot}`}
-              alt="Screenshot"
+              alt="Снимок экрана"
               className="rounded-lg border border-border-default max-w-full h-auto"
             />
           </motion.div>
