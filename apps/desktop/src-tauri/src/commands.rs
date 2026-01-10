@@ -497,8 +497,7 @@ pub fn get_debug_info() -> Result<DebugInfo, String> {
     Ok(DebugInfo {
         version: env!("CARGO_PKG_VERSION").to_string(),
         accessibility_permission: has_accessibility_permission(),
-        screen_recording_permission: permissions::check_permission(permissions::PermissionType::ScreenRecording)
-            .unwrap_or(false),
+        screen_recording_permission: permissions::check_permission(permissions::PermissionType::ScreenRecording).granted,
         config_path,
         log_path,
         platform: std::env::consts::OS.to_string(),
