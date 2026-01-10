@@ -328,10 +328,18 @@ class TestBehaviorEvolution:
 
         issues = [{"type": "verbosity_complaint", "severity": "medium"}]
 
-        old_verbosity = evolution.behavior["verbosity"]
-        await evolution.evolve(issues)
+        # Mock LLM insights to return a verbosity decrease suggestion
+        with patch.object(
+            evolution,
+            "_get_behavior_insights",
+            return_value=[
+                {"parameter": "verbosity", "adjustment": -0.15, "reasoning": "User requested brevity"}
+            ],
+        ):
+            old_verbosity = evolution.behavior["verbosity"]
+            await evolution.evolve(issues)
 
-        assert evolution.behavior["verbosity"] < old_verbosity
+            assert evolution.behavior["verbosity"] < old_verbosity
 
     @pytest.mark.asyncio
     async def test_analyze_recent_chats(self, db_session):
@@ -484,13 +492,11 @@ class TestAgentEvolution:
             id=uuid4(),
             name="Daily Status Check",
             pattern_type="time_based",
-            status="active",
             automatable=True,
             occurrences=10,
             last_seen_at=datetime.now(UTC),
-            frequency=10,
             trigger_conditions={"schedule": "0 9 * * *"},
-            sequence=["check_status", "send_notification"],
+            sequence=[{"action": "check_status"}, {"action": "send_notification"}],
         )
 
         mock_pattern_result = MagicMock()
@@ -534,7 +540,6 @@ class TestAgentEvolution:
             trigger_config={},
             actions=[],
             settings={},
-            version=1,
         )
 
         mock_agent_result = MagicMock()
@@ -546,10 +551,8 @@ class TestAgentEvolution:
             id=uuid4(),
             agent_id=agent.id,
             level="error",
-            status="error",
-            message="Connection timeout",
-            error="Timeout after 30s",
-            executed_at=datetime.now(UTC),
+            message="Connection timeout: Timeout after 30s",
+            data={"error": "Timeout after 30s"},
         )
 
         mock_log_result = MagicMock()
@@ -589,7 +592,6 @@ class TestAgentEvolution:
             trigger_config={},
             actions=[],
             settings={},
-            version=1,
         )
 
         mock_result = MagicMock()
@@ -705,10 +707,8 @@ class TestEvolutionOrchestrator:
             id=uuid4(),
             agent_id=uuid4(),
             level="error",
-            status="error",
-            message="Agent failed",
-            error="Connection refused",
-            executed_at=datetime.now(UTC),
+            message="Agent failed: Connection refused",
+            data={"error": "Connection refused"},
         )
 
         mock_result = MagicMock()
@@ -728,17 +728,17 @@ class TestEvolutionOrchestrator:
 
         # Mock memory operations with low confidence
         operations = [
-            MagicMock(metadata={"confidence": 0.3}),
-            MagicMock(metadata={"confidence": 0.4}),
-            MagicMock(metadata={"confidence": 0.45}),
-            MagicMock(metadata={"confidence": 0.35}),
-            MagicMock(metadata={"confidence": 0.4}),
-            MagicMock(metadata={"confidence": 0.3}),
-            MagicMock(metadata={"confidence": 0.45}),
-            MagicMock(metadata={"confidence": 0.4}),
-            MagicMock(metadata={"confidence": 0.3}),
-            MagicMock(metadata={"confidence": 0.35}),
-            MagicMock(metadata={"confidence": 0.4}),
+            MagicMock(confidence=0.3),
+            MagicMock(confidence=0.4),
+            MagicMock(confidence=0.45),
+            MagicMock(confidence=0.35),
+            MagicMock(confidence=0.4),
+            MagicMock(confidence=0.3),
+            MagicMock(confidence=0.45),
+            MagicMock(confidence=0.4),
+            MagicMock(confidence=0.3),
+            MagicMock(confidence=0.35),
+            MagicMock(confidence=0.4),
         ]
 
         mock_result = MagicMock()
@@ -842,16 +842,14 @@ class TestIntegration:
             id=uuid4(),
             agent_id=uuid4(),
             level="error",
-            status="error",
-            message="Test error",
-            error="Test error details",
-            executed_at=datetime.now(UTC),
+            message="Test error: Test error details",
+            data={"error": "Test error details"},
         )
 
         # Memory operations
         mock_memory_ops = [
-            MagicMock(metadata={"confidence": 0.9}),
-            MagicMock(metadata={"confidence": 0.8}),
+            MagicMock(confidence=0.9),
+            MagicMock(confidence=0.8),
         ]
 
         # Patterns
@@ -859,8 +857,11 @@ class TestIntegration:
             id=uuid4(),
             name="Test Pattern",
             pattern_type="time_based",
-            status="active",
-            frequency=5,
+            automatable=True,
+            occurrences=5,
+            last_seen_at=datetime.now(UTC),
+            trigger_conditions={"schedule": "0 * * * *"},
+            sequence=[{"action": "test"}],
         )
 
         # Setup mock returns for different queries
