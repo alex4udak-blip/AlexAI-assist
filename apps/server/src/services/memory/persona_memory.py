@@ -71,7 +71,7 @@ class PersonaMemory:
         events = events_result.scalars().all()
 
         # Build profile
-        profile = {
+        profile: dict[str, Any] = {
             "attributes": [
                 {
                     "content": a.content,

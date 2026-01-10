@@ -359,7 +359,7 @@ class AIRouter:
     def get_usage_stats(self, days: int = 7) -> dict[str, Any]:
         """Get usage statistics for dashboard."""
         today = utc_now()
-        stats = {
+        stats: dict[str, Any] = {
             "daily_usage": [],
             "total_cost": 0.0,
             "total_requests": 0,

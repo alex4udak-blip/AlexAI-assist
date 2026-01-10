@@ -596,14 +596,13 @@ Respond with JSON:
                             "access_count": f.access_count,
                             "heat_score": f.heat_score,
                             "created_at": f.created_at.isoformat() if f.created_at else None,
-                            "embedding": f.embedding,
                         }
                         for f in (list(low_confidence_facts) + list(recent_facts))
                     ],
                     "beliefs": [
                         {
                             "id": str(b.id),
-                            "content": b.content,
+                            "belief": b.belief,
                             "confidence": b.confidence,
                             "status": b.status,
                             "created_at": b.created_at.isoformat() if b.created_at else None,
@@ -615,7 +614,7 @@ Respond with JSON:
                             "id": str(r.id),
                             "source_id": str(r.source_id) if r.source_id else None,
                             "target_id": str(r.target_id) if r.target_id else None,
-                            "relationship_type": r.relationship_type,
+                            "relation_type": r.relation_type,
                             "confidence": r.confidence,
                             "created_at": r.created_at.isoformat() if r.created_at else None,
                         }
@@ -893,7 +892,7 @@ Suggest specific behavior adjustments as JSON:
                     {
                         "check": "agent_success_rate",
                         "status": "healthy" if success_rate >= 0.7 else "degraded",
-                        "rate": success_rate,
+                        "rate": str(success_rate),
                     }
                 )
 
@@ -902,7 +901,7 @@ Suggest specific behavior adjustments as JSON:
                         {
                             "subsystem": "agents",
                             "issue": "low_success_rate",
-                            "rate": success_rate,
+                            "rate": str(success_rate),
                         }
                     )
             else:
@@ -1051,7 +1050,7 @@ Suggest specific behavior adjustments as JSON:
                         # Belief was deleted, restore it
                         restored_belief = MemoryBelief(
                             id=belief_id,
-                            content=belief_data["content"],
+                            belief=belief_data.get("belief", belief_data.get("content", "")),
                             confidence=belief_data["confidence"],
                             status=belief_data["status"],
                         )
@@ -1076,7 +1075,7 @@ Suggest specific behavior adjustments as JSON:
                             id=rel_id,
                             source_id=UUID(rel_data["source_id"]) if rel_data["source_id"] else None,
                             target_id=UUID(rel_data["target_id"]) if rel_data["target_id"] else None,
-                            relationship_type=rel_data["relationship_type"],
+                            relation_type=rel_data.get("relation_type", rel_data.get("relationship_type", "")),
                             confidence=rel_data["confidence"],
                         )
                         if rel_data["created_at"]:

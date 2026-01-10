@@ -92,7 +92,8 @@ class EmbeddingService:
             )
             response.raise_for_status()
             data = response.json()
-            return data["data"][0]["embedding"]
+            result: list[float] = data["data"][0]["embedding"]
+            return result
         except Exception as e:
             logger.error(f"Embedding error: {e}")
             return None
@@ -114,7 +115,8 @@ class EmbeddingService:
             )
             response.raise_for_status()
             data = response.json()
-            return data["data"][0]["embedding"]
+            result: list[float] = data["data"][0]["embedding"]
+            return result
         except Exception as e:
             logger.error(f"Embedding error: {e}")
             return None

@@ -55,6 +55,12 @@ known-first-party = ["src"]
 [tool.mypy]
 python_version = "3.12"
 strict = true
+# Relax some strict checks for third-party library compatibility
+disallow_subclassing_any = false
+warn_return_any = false
+disallow_untyped_decorators = false
+# Disable unused type ignore warnings (library stubs inconsistent)
+warn_unused_ignores = false
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"

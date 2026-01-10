@@ -65,10 +65,11 @@ def retry_with_backoff(
         wait=wait_exponential(multiplier=1, min=min_wait, max=max_wait),
         reraise=True,
         before_sleep=lambda retry_state: logger.warning(
-            f"Retrying {retry_state.fn.__name__} after {retry_state.outcome.exception()}"
+            f"Retrying {retry_state.fn.__name__ if retry_state.fn else 'unknown'} "
+            f"after {retry_state.outcome.exception() if retry_state.outcome else 'error'}"
             f" (attempt {retry_state.attempt_number}/{max_attempts})"
         ),
-    )
+    )  # type: ignore[no-any-return]
 
 
 class CircuitBreaker:
@@ -228,9 +229,9 @@ def with_circuit_breaker(
                 raise CircuitBreakerOpenError(error_msg)
 
             try:
-                result = await func(*args, **kwargs)
+                result: T = await func(*args, **kwargs)  # type: ignore[misc]
                 cb.record_success(service_name)
-                return result
+                return result  # type: ignore[return-value]
             except Exception as e:
                 # Only record failure for transient errors
                 if is_retryable_http_error(e):
@@ -258,8 +259,8 @@ def with_circuit_breaker(
         import inspect
 
         if inspect.iscoroutinefunction(func):
-            return async_wrapper  # type: ignore
+            return async_wrapper  # type: ignore[return-value]
         else:
-            return sync_wrapper  # type: ignore
+            return sync_wrapper  # type: ignore[return-value]
 
     return decorator

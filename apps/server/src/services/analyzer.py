@@ -251,8 +251,9 @@ class AnalyzerService:
                 activity["url"] = event.url
 
             # Add typed text if present (browser search/input)
-            if event.typed_text:
-                activity["typed"] = event.typed_text[:200]  # Truncate for context
+            typed_text = event.data.get("typed_text") if event.data else None
+            if typed_text:
+                activity["typed"] = str(typed_text)[:200]  # Truncate for context
 
             # Add category
             if event.category:

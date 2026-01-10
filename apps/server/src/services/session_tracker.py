@@ -27,7 +27,7 @@ class SessionTracker:
     DEFAULT_SHORT_BREAK_MINUTES = 5
     DEFAULT_MIN_SESSION_MINUTES = 5
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize session tracker with configurable thresholds."""
         # Load configurable thresholds from environment variables
         self.SESSION_BREAK_MINUTES = int(

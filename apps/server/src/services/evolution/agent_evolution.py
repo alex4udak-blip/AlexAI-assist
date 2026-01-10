@@ -53,7 +53,7 @@ class AgentEvolution:
             Summary of evolution actions taken
         """
         logger.info("Starting evolution cycle")
-        results = {
+        results: dict[str, Any] = {
             "created_agents": [],
             "improved_agents": [],
             "created_tools": [],
@@ -328,7 +328,7 @@ Ensure actions are safe, reversible, and match the pattern's context."""
         error_logs = list(log_result.scalars().all())
 
         # Analyze error patterns
-        error_summary = defaultdict(int)
+        error_summary: dict[str | None, int] = defaultdict(int)
         for log in error_logs:
             error_summary[log.message] += 1
 
@@ -616,7 +616,7 @@ Generate a JSON specification:
         if not self._evolution_history:
             return {"error": "No evolution history to rollback"}
 
-        rollback_results = {
+        rollback_results: dict[str, Any] = {
             "rolled_back_cycles": 0,
             "agents_deleted": [],
             "agents_restored": [],

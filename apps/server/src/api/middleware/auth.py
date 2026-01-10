@@ -4,7 +4,9 @@ Simple API key based authentication for single-user mode.
 All API requests must include a valid API key in the X-API-Key header.
 """
 
-from fastapi import HTTPException, Request
+from typing import Any
+
+from fastapi import HTTPException, Request, Response
 from fastapi.responses import JSONResponse
 from starlette.middleware.base import BaseHTTPMiddleware
 
@@ -56,7 +58,7 @@ def validate_api_key(api_key: str | None) -> bool:
 class AuthMiddleware(BaseHTTPMiddleware):
     """Middleware to validate API key on all requests."""
 
-    async def dispatch(self, request: Request, call_next):
+    async def dispatch(self, request: Request, call_next: Any) -> Response:
         # Skip auth for OPTIONS requests (CORS preflight)
         if request.method == "OPTIONS":
             return await call_next(request)
@@ -117,7 +119,7 @@ def require_api_key(api_key: str | None = None) -> None:
         )
 
 
-async def validate_websocket_auth(websocket) -> bool:
+async def validate_websocket_auth(websocket: Any) -> bool:
     """Validate WebSocket connection authentication.
 
     Checks for API key in:

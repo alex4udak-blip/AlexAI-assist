@@ -58,9 +58,8 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     try:
         import os
 
+        from alembic import command  # type: ignore[attr-defined]
         from alembic.config import Config
-
-        from alembic import command
 
         alembic_cfg = Config(os.path.join(os.path.dirname(__file__), "..", "alembic.ini"))
         alembic_cfg.set_main_option("script_location", os.path.join(os.path.dirname(__file__), "..", "alembic"))
@@ -75,7 +74,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 
         import redis.asyncio as redis
         logger.info("Attempting Redis connection...")
-        redis_client = redis.from_url(
+        redis_client = redis.from_url(  # type: ignore[no-untyped-call]
             settings.redis_url,
             encoding="utf-8",
             decode_responses=False,

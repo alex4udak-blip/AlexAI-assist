@@ -41,7 +41,7 @@ class MemoryParams:
 class MemoryEvolution:
     """Evolves memory system parameters based on performance analysis."""
 
-    DEFAULT_PARAMS: dict[str, float | int] = {
+    DEFAULT_PARAMS: dict[str, float | int | str] = {
         "decay_rate_facts": 0.95,  # Lower decay = longer retention
         "decay_rate_beliefs": 0.90,  # Beliefs decay slower than facts
         "decay_rate_experiences": 0.85,  # Experiences decay fastest
