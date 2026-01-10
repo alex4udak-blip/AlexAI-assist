@@ -30,4 +30,14 @@ ENV PYTHONUNBUFFERED=1
 EXPOSE 8000
 
 # Run migrations and start server
-CMD ["sh", "-c", "echo '=== RUNNING MIGRATIONS ===' && alembic upgrade head && echo '=== MIGRATIONS OK, STARTING UVICORN ===' && exec uvicorn src.main:app --host 0.0.0.0 --port ${PORT:-8000}"]
+# Added explicit error capture to see what's failing
+CMD ["sh", "-c", "\
+    echo '=== CHECKING PYTHON ===' && \
+    python --version && \
+    echo '=== CHECKING IMPORTS ===' && \
+    python -c 'from src.core.config import settings; print(f\"ENV={settings.environment}\")' 2>&1 || { echo 'IMPORT FAILED'; exit 1; } && \
+    echo '=== RUNNING MIGRATIONS ===' && \
+    alembic upgrade head 2>&1 || { echo 'ALEMBIC FAILED'; exit 1; } && \
+    echo '=== MIGRATIONS OK, STARTING UVICORN ===' && \
+    exec uvicorn src.main:app --host 0.0.0.0 --port ${PORT:-8000} \
+"]
