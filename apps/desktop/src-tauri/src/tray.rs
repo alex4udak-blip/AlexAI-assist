@@ -1,10 +1,14 @@
 use crate::sync::get_dashboard_url;
+use std::sync::atomic::{AtomicBool, Ordering};
 use tauri::{
     image::Image,
     menu::{Menu, MenuItem},
     tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
     App, Manager,
 };
+
+/// Global flag to track window visibility (more reliable than is_visible() on macOS)
+static WINDOW_VISIBLE: AtomicBool = AtomicBool::new(true);
 
 /// Create an eye-shaped tray icon programmatically
 fn create_eye_icon() -> (Vec<u8>, u32, u32) {
@@ -112,12 +116,14 @@ pub fn create_tray(app: &App) -> Result<(), Box<dyn std::error::Error>> {
                     println!("Tray icon clicked at position: {:?}", position);
                     let app = tray.app_handle();
                     if let Some(window) = app.get_webview_window("main") {
-                        let is_visible = window.is_visible().unwrap_or(false);
-                        println!("Window visible: {}", is_visible);
+                        // Use our atomic flag instead of is_visible() for reliable state tracking
+                        let is_visible = WINDOW_VISIBLE.load(Ordering::SeqCst);
+                        println!("Window visible (tracked): {}", is_visible);
 
                         if is_visible {
                             println!("Hiding window");
                             let _ = window.hide();
+                            WINDOW_VISIBLE.store(false, Ordering::SeqCst);
                         } else {
                             println!("Showing window");
 
@@ -135,6 +141,7 @@ pub fn create_tray(app: &App) -> Result<(), Box<dyn std::error::Error>> {
 
                             let _ = window.show();
                             let _ = window.set_focus();
+                            WINDOW_VISIBLE.store(true, Ordering::SeqCst);
                             println!("Window show and focus called");
                         }
                     } else {
@@ -164,4 +171,10 @@ pub fn create_tray(app: &App) -> Result<(), Box<dyn std::error::Error>> {
 /// State to keep tray icon alive
 pub struct TrayState {
     _tray: tauri::tray::TrayIcon,
+}
+
+/// Set window visibility flag (call this when window is shown/hidden from frontend)
+pub fn set_window_visible(visible: bool) {
+    WINDOW_VISIBLE.store(visible, Ordering::SeqCst);
+    println!("Window visibility flag set to: {}", visible);
 }

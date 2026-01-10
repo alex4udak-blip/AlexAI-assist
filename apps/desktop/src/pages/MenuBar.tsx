@@ -73,6 +73,8 @@ export default function MenuBar({ onOpenSettings }: Props) {
   };
 
   const hideWindow = async () => {
+    // Notify backend that window is hidden (for tray icon sync)
+    await invoke('set_window_visible', { visible: false });
     const window = getCurrentWindow();
     await window.hide();
   };
@@ -176,7 +178,7 @@ export default function MenuBar({ onOpenSettings }: Props) {
       {/* Footer */}
       <div className="px-4 py-3 bg-bg-tertiary border-t border-border-subtle">
         <div className="flex items-center justify-between text-xs text-text-muted">
-          <span>v0.2.0</span>
+          <span>v{__APP_VERSION__}</span>
           <button
             onClick={onOpenSettings}
             className="hover:text-text-secondary transition-colors"
