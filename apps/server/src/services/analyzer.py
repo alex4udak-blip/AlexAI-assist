@@ -3,10 +3,30 @@
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
-from sqlalchemy import case, func, select
+from sqlalchemy import Integer, case, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.db.models import Event
+
+
+def _get_dialect_name(session: AsyncSession) -> str:
+    """Get the database dialect name from the session."""
+    bind = session.get_bind()
+    return bind.dialect.name
+
+
+def _extract_hour(timestamp_col: Any, dialect_name: str) -> Any:
+    """Extract hour from timestamp, compatible with PostgreSQL and SQLite."""
+    if dialect_name == "sqlite":
+        return func.cast(func.strftime("%H", timestamp_col), Integer)
+    return func.extract("hour", timestamp_col)
+
+
+def _date_trunc_day(timestamp_col: Any, dialect_name: str) -> Any:
+    """Truncate timestamp to day, compatible with PostgreSQL and SQLite."""
+    if dialect_name == "sqlite":
+        return func.date(timestamp_col)
+    return func.date_trunc("day", timestamp_col)
 
 
 class AnalyzerService:
@@ -67,7 +87,8 @@ class AnalyzerService:
         categories = {row.category: row.count for row in categories_result.all()}
 
         # Query 4: Get hourly activity (GROUP BY hour)
-        hour_expr = func.extract("hour", Event.timestamp)
+        dialect_name = _get_dialect_name(self.db)
+        hour_expr = _extract_hour(Event.timestamp, dialect_name)
         hourly_query = (
             select(
                 hour_expr.label("hour"),
@@ -156,18 +177,17 @@ class AnalyzerService:
     async def get_productivity_score(
         self,
         device_id: str | None = None,
+        days: int = 7,
     ) -> dict[str, Any]:
         """Calculate productivity score using SQL aggregations."""
-        today = datetime.now(UTC).replace(
-            hour=0, minute=0, second=0, microsecond=0, tzinfo=None
-        )
+        start_date = datetime.now(UTC).replace(tzinfo=None) - timedelta(days=days)
 
         # Define productivity categories
         productive_categories = ("coding", "writing", "design", "research")
         semi_productive_categories = ("browsing", "reading")
 
         # Base conditions
-        base_conditions = [Event.timestamp >= today]
+        base_conditions = [Event.timestamp >= start_date]
         if device_id:
             base_conditions.append(Event.device_id == device_id)
 
@@ -271,7 +291,8 @@ class AnalyzerService:
         """Get activity trends over time."""
         start_date = datetime.now(UTC).replace(tzinfo=None) - timedelta(days=days)
 
-        date_trunc_expr = func.date_trunc("day", Event.timestamp)
+        dialect_name = _get_dialect_name(self.db)
+        date_trunc_expr = _date_trunc_day(Event.timestamp, dialect_name)
         query = (
             select(
                 date_trunc_expr.label("date"),

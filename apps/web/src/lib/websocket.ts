@@ -12,7 +12,7 @@ class WebSocketClient {
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
 
   constructor() {
-    this.url = `${config.wsUrl}/ws`;
+    this.url = `${config.wsUrl}/ws?api_key=${config.apiKey}`;
   }
 
   connect(): void {

@@ -32,7 +32,9 @@ export default function Analytics() {
   const { data: categories, loading: categoriesLoading } = useCategories({
     days: parseInt(period),
   });
-  const { data: productivity, loading: productivityLoading } = useProductivity();
+  const { data: productivity, loading: productivityLoading } = useProductivity({
+    days: parseInt(period),
+  });
   const { data: appUsage, loading: appUsageLoading } = useAppUsage({
     days: parseInt(period),
   });

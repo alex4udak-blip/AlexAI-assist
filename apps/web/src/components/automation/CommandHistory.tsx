@@ -52,7 +52,7 @@ function CommandItem({ command }: { command: CommandRecord }) {
               {command.command_type}
             </span>
             <Badge variant={command.success ? 'success' : 'error'}>
-              {command.success ? 'Success' : 'Failed'}
+              {command.success ? 'Успешно' : 'Ошибка'}
             </Badge>
           </div>
           <div className="flex items-center gap-3 mt-1 text-xs text-text-tertiary">
@@ -78,7 +78,7 @@ function CommandItem({ command }: { command: CommandRecord }) {
               {command.error_message && (
                 <div>
                   <span className="text-xs text-text-tertiary block mb-1">
-                    Error
+                    Ошибка
                   </span>
                   <p className="text-sm text-status-error font-mono">
                     {command.error_message}
@@ -89,7 +89,7 @@ function CommandItem({ command }: { command: CommandRecord }) {
               {command.result && (
                 <div>
                   <span className="text-xs text-text-tertiary block mb-1">
-                    Result
+                    Результат
                   </span>
                   <pre className="text-xs text-text-secondary bg-bg-tertiary rounded p-2 overflow-x-auto">
                     {JSON.stringify(command.result, null, 2)}
@@ -99,7 +99,7 @@ function CommandItem({ command }: { command: CommandRecord }) {
 
               <div>
                 <span className="text-xs text-text-tertiary block mb-1">
-                  Command ID
+                  ID команды
                 </span>
                 <p className="text-xs text-text-secondary font-mono">
                   {command.command_id}
@@ -117,13 +117,13 @@ export function CommandHistory({ commands }: CommandHistoryProps) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Recent Commands</CardTitle>
+        <CardTitle>Последние команды</CardTitle>
       </CardHeader>
 
       <CardContent>
         {commands.length === 0 ? (
           <div className="text-center py-8 text-text-tertiary">
-            <p className="text-sm">No commands executed yet</p>
+            <p className="text-sm">Команды ещё не выполнялись</p>
           </div>
         ) : (
           <div className="space-y-2">
