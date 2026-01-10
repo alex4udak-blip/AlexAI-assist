@@ -106,7 +106,24 @@ pub fn get_current_focus() -> Option<FocusInfo> {
     if has_accessibility_permission() {
         if let Some((app_name, window_title)) = get_focused_element_info() {
             let selected_text = get_selected_text();
-            let url = get_browser_url();
+
+            // Get URL using AppleScript for browsers (more reliable)
+            let url = {
+                let app_lower = app_name.to_lowercase();
+                let is_browser = app_lower.contains("chrome")
+                    || app_lower.contains("safari")
+                    || app_lower.contains("firefox")
+                    || app_lower.contains("edge")
+                    || app_lower.contains("arc")
+                    || app_lower.contains("brave");
+
+                if is_browser {
+                    let browser_monitor = browser::BrowserMonitor::new();
+                    browser_monitor.get_active_tab(&app_name).map(|tab| tab.url)
+                } else {
+                    None
+                }
+            };
 
             return Some(FocusInfo {
                 app_name,
