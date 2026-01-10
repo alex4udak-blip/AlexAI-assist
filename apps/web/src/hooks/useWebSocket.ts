@@ -1,21 +1,44 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { wsClient } from '../lib/websocket';
 
+// Reference counter to track how many components are using the WebSocket
+let activeConnections = 0;
+
 export function useWebSocket() {
-  const [isConnected, setIsConnected] = useState(false);
+  const [isConnected, setIsConnected] = useState(wsClient.isConnected);
+  const cleanupRef = useRef<(() => void) | null>(null);
 
   useEffect(() => {
-    wsClient.connect();
+    // Increment reference counter and connect if this is the first component
+    activeConnections++;
+    if (activeConnections === 1) {
+      wsClient.connect();
+    }
 
+    // Set up handlers for this component
     const unsubConnect = wsClient.on('connected', () => setIsConnected(true));
     const unsubDisconnect = wsClient.on('disconnected', () =>
       setIsConnected(false)
     );
 
-    return () => {
+    // Store cleanup function
+    cleanupRef.current = () => {
       unsubConnect();
       unsubDisconnect();
-      wsClient.disconnect();
+    };
+
+    return () => {
+      // Clean up this component's handlers
+      if (cleanupRef.current) {
+        cleanupRef.current();
+        cleanupRef.current = null;
+      }
+
+      // Decrement reference counter and disconnect only if this is the last component
+      activeConnections--;
+      if (activeConnections === 0) {
+        wsClient.disconnect();
+      }
     };
   }, []);
 

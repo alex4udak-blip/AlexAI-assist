@@ -281,7 +281,7 @@ export function AutomationPanel() {
     params: Record<string, unknown> = {}
   ) => {
     if (!selectedDevice) {
-      alert('Please select a device first');
+      alert('Сначала выберите устройство');
       return;
     }
 
@@ -351,12 +351,12 @@ export function AutomationPanel() {
       {/* Device Selection */}
       <motion.div variants={item}>
         <h2 className="text-lg font-semibold text-text-primary mb-3">
-          Connected Devices
+          Подключенные устройства
         </h2>
         {devices.length === 0 ? (
           <Card>
             <CardContent className="py-8 text-center text-text-tertiary">
-              <p>No devices connected</p>
+              <p>Нет подключенных устройств</p>
             </CardContent>
           </Card>
         ) : (
@@ -378,7 +378,7 @@ export function AutomationPanel() {
         <motion.div variants={item}>
           <Card>
             <CardHeader>
-              <CardTitle>Quick Actions</CardTitle>
+              <CardTitle>Быстрые действия</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               {/* Simple actions grid */}
@@ -390,7 +390,7 @@ export function AutomationPanel() {
                   className="w-full"
                 >
                   <Camera className="w-4 h-4" />
-                  Screenshot
+                  Снимок экрана
                 </Button>
 
                 <Button
@@ -400,7 +400,7 @@ export function AutomationPanel() {
                   className="w-full"
                 >
                   <ScanText className="w-4 h-4" />
-                  OCR
+                  Распознавание текста
                 </Button>
 
                 <Button
@@ -410,14 +410,14 @@ export function AutomationPanel() {
                   className="w-full"
                 >
                   <Globe className="w-4 h-4" />
-                  Get URL
+                  Получить URL
                 </Button>
               </div>
 
               {/* Navigate to URL */}
               <div className="flex gap-2">
                 <Input
-                  placeholder="Enter URL..."
+                  placeholder="Введите URL..."
                   value={urlInput}
                   onChange={(e) => setUrlInput(e.target.value)}
                   className="flex-1"
@@ -433,14 +433,14 @@ export function AutomationPanel() {
                   disabled={loading || !urlInput.trim()}
                 >
                   <Navigation className="w-4 h-4" />
-                  Navigate
+                  Перейти
                 </Button>
               </div>
 
               {/* Type text */}
               <div className="flex gap-2">
                 <Input
-                  placeholder="Text to type..."
+                  placeholder="Текст для ввода..."
                   value={textInput}
                   onChange={(e) => setTextInput(e.target.value)}
                   className="flex-1"
@@ -456,7 +456,7 @@ export function AutomationPanel() {
                   disabled={loading || !textInput.trim()}
                 >
                   <Type className="w-4 h-4" />
-                  Type
+                  Ввести
                 </Button>
               </div>
 
@@ -491,7 +491,7 @@ export function AutomationPanel() {
                   disabled={loading || !coordX || !coordY}
                 >
                   <MousePointer className="w-4 h-4" />
-                  Click
+                  Клик
                 </Button>
               </div>
             </CardContent>
@@ -508,17 +508,17 @@ export function AutomationPanel() {
                 {loading ? (
                   <>
                     <Loader2 className="w-4 h-4 text-accent-primary animate-spin" />
-                    <CardTitle>Executing Command...</CardTitle>
+                    <CardTitle>Выполнение команды...</CardTitle>
                   </>
                 ) : lastResult?.success ? (
                   <>
                     <CheckCircle2 className="w-4 h-4 text-status-success" />
-                    <CardTitle>Command Successful</CardTitle>
+                    <CardTitle>Команда выполнена</CardTitle>
                   </>
                 ) : (
                   <>
                     <XCircle className="w-4 h-4 text-status-error" />
-                    <CardTitle>Command Failed</CardTitle>
+                    <CardTitle>Ошибка команды</CardTitle>
                   </>
                 )}
               </div>
@@ -529,7 +529,7 @@ export function AutomationPanel() {
                 <>
                   {lastResult.duration !== undefined && (
                     <div>
-                      <span className="text-xs text-text-tertiary">Duration</span>
+                      <span className="text-xs text-text-tertiary">Длительность</span>
                       <p className="text-sm text-text-secondary">
                         {(lastResult.duration / 1000).toFixed(2)}s
                       </p>
@@ -538,7 +538,7 @@ export function AutomationPanel() {
 
                   {lastResult.error && (
                     <div>
-                      <span className="text-xs text-text-tertiary">Error</span>
+                      <span className="text-xs text-text-tertiary">Ошибка</span>
                       <p className="text-sm text-status-error font-mono">
                         {lastResult.error}
                       </p>
@@ -554,7 +554,7 @@ export function AutomationPanel() {
                             <div className="flex items-center gap-2">
                               <ScanText className="w-4 h-4 text-accent-primary" />
                               <span className="text-sm font-medium text-text-primary">
-                                OCR Text
+                                Распознанный текст
                               </span>
                             </div>
                             <Button
@@ -570,12 +570,12 @@ export function AutomationPanel() {
                               {copied ? (
                                 <>
                                   <Check className="w-3 h-3" />
-                                  Copied
+                                  Скопировано
                                 </>
                               ) : (
                                 <>
                                   <Copy className="w-3 h-3" />
-                                  Copy
+                                  Копировать
                                 </>
                               )}
                             </Button>
@@ -587,7 +587,7 @@ export function AutomationPanel() {
                             {lastResult.data.confidence != null && (
                               <div className="mt-2 pt-2 border-t border-border-default">
                                 <span className="text-xs text-text-tertiary">
-                                  Confidence:{' '}
+                                  Уверенность:{' '}
                                   {typeof lastResult.data.confidence === 'number'
                                     ? `${(lastResult.data.confidence * 100).toFixed(1)}%`
                                     : String(lastResult.data.confidence)}
@@ -604,7 +604,7 @@ export function AutomationPanel() {
                           <div className="flex items-center gap-2 mb-2">
                             <ImageIcon className="w-4 h-4 text-accent-primary" />
                             <span className="text-sm font-medium text-text-primary">
-                              Screenshot
+                              Снимок экрана
                             </span>
                           </div>
                           <img
@@ -624,7 +624,7 @@ export function AutomationPanel() {
                       ) ? (
                         <div>
                           <span className="text-xs text-text-tertiary block mb-1">
-                            Additional Data
+                            Дополнительные данные
                           </span>
                           <pre className="text-xs text-text-secondary bg-bg-tertiary rounded p-3 overflow-x-auto">
                             {JSON.stringify(
@@ -664,7 +664,7 @@ export function AutomationPanel() {
             <CardHeader>
               <div className="flex items-center gap-2">
                 <ImageIcon className="w-4 h-4 text-accent-primary" />
-                <CardTitle>Screenshot History</CardTitle>
+                <CardTitle>История снимков</CardTitle>
               </div>
             </CardHeader>
             <CardContent>

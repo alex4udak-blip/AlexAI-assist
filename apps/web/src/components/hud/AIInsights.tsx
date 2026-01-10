@@ -1,5 +1,6 @@
 import { motion } from 'framer-motion';
 import { TrendingUp, TrendingDown, Info, Sparkles, ChevronRight } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 
 interface Insight {
   id: string;
@@ -32,6 +33,23 @@ const insightConfig = {
 };
 
 export function AIInsights({ insights }: AIInsightsProps) {
+  const navigate = useNavigate();
+
+  const handleInsightClick = (insight: Insight) => {
+    switch (insight.type) {
+      case 'suggestion':
+        navigate('/automation');
+        break;
+      case 'positive':
+      case 'negative':
+        navigate('/analytics');
+        break;
+      case 'neutral':
+        navigate('/dashboard');
+        break;
+    }
+  };
+
   if (insights.length === 0) {
     return (
       <motion.div
@@ -78,6 +96,7 @@ export function AIInsights({ insights }: AIInsightsProps) {
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               transition={{ delay: index * 0.05 }}
+              onClick={() => handleInsightClick(insight)}
               className="group flex items-start gap-3 p-3 rounded-lg bg-zinc-800/30
                          hover:bg-zinc-800/50 transition-colors cursor-pointer"
             >

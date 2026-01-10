@@ -1,4 +1,4 @@
-import { Routes, Route } from 'react-router-dom';
+import { Routes, Route, Navigate } from 'react-router-dom';
 import ErrorBoundary from './components/ErrorBoundary';
 import Layout from './components/layout/Layout';
 import Dashboard from './pages/Dashboard';
@@ -21,6 +21,7 @@ function App() {
           <Route path="/history" element={<History />} />
           <Route path="/chat" element={<Chat />} />
           <Route path="/automation" element={<Automation />} />
+          <Route path="/patterns" element={<Navigate to="/automation" replace />} />
           <Route path="/settings" element={<Settings />} />
           <Route path="/download" element={<Download />} />
         </Routes>

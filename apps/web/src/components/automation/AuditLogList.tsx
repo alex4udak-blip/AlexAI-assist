@@ -62,13 +62,13 @@ export function AuditLogList() {
   const getResultBadge = (result: string) => {
     switch (result) {
       case 'success':
-        return <Badge variant="success">Success</Badge>;
+        return <Badge variant="success">Успешно</Badge>;
       case 'failure':
-        return <Badge variant="error">Failure</Badge>;
+        return <Badge variant="error">Ошибка</Badge>;
       case 'pending':
-        return <Badge variant="warning">Pending</Badge>;
+        return <Badge variant="warning">Ожидание</Badge>;
       case 'timeout':
-        return <Badge variant="warning">Timeout</Badge>;
+        return <Badge variant="warning">Таймаут</Badge>;
       default:
         return <Badge variant="default">{result}</Badge>;
     }
@@ -103,14 +103,14 @@ export function AuditLogList() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Audit Trail</CardTitle>
+        <CardTitle>Журнал аудита</CardTitle>
       </CardHeader>
       <CardContent>
         <div className="space-y-4">
           {/* Filters */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <Input
-              placeholder="Filter by device ID"
+              placeholder="Фильтр по ID устройства"
               value={filterDevice}
               onChange={(e) => setFilterDevice(e.target.value)}
             />
@@ -118,20 +118,20 @@ export function AuditLogList() {
               value={filterActionType}
               onChange={(e) => setFilterActionType(e.target.value)}
             >
-              <option value="">All Actions</option>
-              <option value="command_executed">Command Executed</option>
-              <option value="agent_run">Agent Run</option>
-              <option value="setting_changed">Setting Changed</option>
+              <option value="">Все действия</option>
+              <option value="command_executed">Команда выполнена</option>
+              <option value="agent_run">Запуск агента</option>
+              <option value="setting_changed">Настройка изменена</option>
             </Select>
             <Select
               value={filterResult}
               onChange={(e) => setFilterResult(e.target.value)}
             >
-              <option value="">All Results</option>
-              <option value="success">Success</option>
-              <option value="failure">Failure</option>
-              <option value="pending">Pending</option>
-              <option value="timeout">Timeout</option>
+              <option value="">Все результаты</option>
+              <option value="success">Успешно</option>
+              <option value="failure">Ошибка</option>
+              <option value="pending">Ожидание</option>
+              <option value="timeout">Таймаут</option>
             </Select>
           </div>
 
@@ -142,7 +142,7 @@ export function AuditLogList() {
             </div>
           ) : logs.length === 0 ? (
             <div className="text-center py-8 text-text-tertiary">
-              No audit logs found
+              Записи аудита не найдены
             </div>
           ) : (
             <motion.div
@@ -208,12 +208,12 @@ export function AuditLogList() {
                               {expandedLog === log.id ? (
                                 <>
                                   <ChevronUp className="w-4 h-4" />
-                                  Hide details
+                                  Скрыть детали
                                 </>
                               ) : (
                                 <>
                                   <ChevronDown className="w-4 h-4" />
-                                  Show details
+                                  Показать детали
                                 </>
                               )}
                             </button>
@@ -223,7 +223,7 @@ export function AuditLogList() {
                                 {log.command_params && (
                                   <div>
                                     <span className="text-text-tertiary block mb-1">
-                                      Parameters:
+                                      Параметры:
                                     </span>
                                     <pre className="text-xs text-text-secondary bg-bg-tertiary rounded p-2 overflow-x-auto">
                                       {JSON.stringify(log.command_params, null, 2)}
@@ -233,7 +233,7 @@ export function AuditLogList() {
                                 {log.ip_address && (
                                   <div>
                                     <span className="text-text-tertiary">
-                                      IP Address:
+                                      IP адрес:
                                     </span>{' '}
                                     <span className="text-text-secondary font-mono">
                                       {log.ip_address}

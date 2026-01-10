@@ -16,7 +16,7 @@ from src.db.models import Device, Event
 from src.services.session_tracker import SessionTracker
 
 # Cache TTL for timeline endpoint (in seconds)
-TIMELINE_CACHE_TTL = 45
+TIMELINE_CACHE_TTL = 10
 
 
 def normalize_datetime(dt: datetime | None) -> datetime | None:
@@ -299,23 +299,31 @@ async def get_timeline(
         le=168,
         description="Number of hours to look back",
     ),
+    nocache: bool = Query(
+        default=False,
+        description="Bypass cache for fresh data (use on page navigation)",
+    ),
     db: AsyncSession = Depends(get_db_session),
 ) -> list[dict[str, Any]]:
     """Get activity timeline for recent hours.
 
     Results are cached for TIMELINE_CACHE_TTL seconds.
     Cache is invalidated when new events are created.
+    Use nocache=true query parameter to bypass cache on page navigation.
     """
     from datetime import timedelta
 
-    # Build cache key based on query parameters
-    cache_key = f"timeline:{hours}:{device_id or 'all'}"
     cache = get_cache()
 
-    # Try to get from cache
-    cached_data = await cache.get(cache_key)
-    if cached_data is not None:
-        return cached_data
+    # Skip cache if nocache parameter is set
+    if not nocache:
+        # Build cache key based on query parameters
+        cache_key = f"timeline:{hours}:{device_id or 'all'}"
+
+        # Try to get from cache
+        cached_data = await cache.get(cache_key)
+        if cached_data is not None:
+            return cached_data
 
     # Cache miss - fetch from database
     start = datetime.now(UTC).replace(tzinfo=None) - timedelta(hours=hours)
@@ -349,7 +357,9 @@ async def get_timeline(
         for e in events
     ]
 
-    # Store in cache
-    await cache.set(cache_key, events_data, TIMELINE_CACHE_TTL)
+    # Store in cache (only if not bypassing cache)
+    if not nocache:
+        cache_key = f"timeline:{hours}:{device_id or 'all'}"
+        await cache.set(cache_key, events_data, TIMELINE_CACHE_TTL)
 
     return events_data

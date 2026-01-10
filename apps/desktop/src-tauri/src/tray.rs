@@ -171,7 +171,7 @@ pub fn create_tray(app: &App) -> Result<(), Box<dyn std::error::Error>> {
         #[cfg(target_os = "macos")]
         {
             // Get tray icon position and place window below it
-            if let Ok(rect) = tray.rect() {
+            if let Ok(Some(rect)) = tray.rect() {
                 let size = window.outer_size().unwrap_or(tauri::PhysicalSize {
                     width: 320,
                     height: 400,

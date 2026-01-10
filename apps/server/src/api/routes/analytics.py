@@ -191,11 +191,17 @@ async def get_productivity(
         max_length=255,
         description="Filter by device ID",
     ),
+    days: int = Query(
+        default=7,
+        ge=1,
+        le=90,
+        description="Number of days to analyze",
+    ),
     db: AsyncSession = Depends(get_db_session),
 ) -> dict[str, Any]:
     """Get productivity score."""
     service = AnalyzerService(db)
-    return await service.get_productivity_score(device_id=device_id)
+    return await service.get_productivity_score(device_id=device_id, days=days)
 
 
 @router.get("/trends", response_model=list[TrendData])

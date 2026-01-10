@@ -25,10 +25,10 @@ export default function Automation() {
     >
       <motion.div variants={item}>
         <h1 className="text-2xl font-bold text-text-primary">
-          Automation Control
+          Управление автоматизацией
         </h1>
         <p className="text-text-secondary mt-1">
-          Control connected devices and execute automation commands
+          Управление подключенными устройствами и выполнение команд автоматизации
         </p>
       </motion.div>
 

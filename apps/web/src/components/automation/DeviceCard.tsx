@@ -28,15 +28,15 @@ interface DeviceCardProps {
 
 export function DeviceCard({ device, selected, onClick }: DeviceCardProps) {
   const getTimeSinceSync = (lastSync: string | null): string => {
-    if (!lastSync) return 'Never';
+    if (!lastSync) return 'Никогда';
     const secondsAgo = Math.floor(
       (Date.now() - new Date(lastSync).getTime()) / 1000
     );
-    if (secondsAgo < 60) return `${secondsAgo}s ago`;
+    if (secondsAgo < 60) return `${secondsAgo} сек. назад`;
     const minutesAgo = Math.floor(secondsAgo / 60);
-    if (minutesAgo < 60) return `${minutesAgo}m ago`;
+    if (minutesAgo < 60) return `${minutesAgo} мин. назад`;
     const hoursAgo = Math.floor(minutesAgo / 60);
-    return `${hoursAgo}h ago`;
+    return `${hoursAgo} ч. назад`;
   };
 
   const getSyncStatusColor = (lastSync: string | null): string => {
@@ -73,7 +73,7 @@ export function DeviceCard({ device, selected, onClick }: DeviceCardProps) {
                 }`}
               />
               <span className="text-xs text-text-tertiary">
-                {device.connected ? 'Connected' : 'Disconnected'}
+                {device.connected ? 'Подключено' : 'Отключено'}
               </span>
             </div>
           </div>
@@ -83,24 +83,24 @@ export function DeviceCard({ device, selected, onClick }: DeviceCardProps) {
       <CardContent className="space-y-3">
         {/* Active App */}
         <div>
-          <span className="text-xs text-text-tertiary">Active App</span>
+          <span className="text-xs text-text-tertiary">Активное приложение</span>
           <p className="text-sm text-text-secondary mt-0.5">
-            {device.active_app || 'None'}
+            {device.active_app || 'Нет'}
           </p>
         </div>
 
         {/* Queue Size */}
         <div>
-          <span className="text-xs text-text-tertiary">Queue Size</span>
+          <span className="text-xs text-text-tertiary">Размер очереди</span>
           <p className="text-sm text-text-secondary mt-0.5">
-            {device.queue_size} commands
+            {device.queue_size} команд
           </p>
         </div>
 
         {/* Sync Status */}
         {device.sync_status && (
           <div>
-            <span className="text-xs text-text-tertiary">Last Sync</span>
+            <span className="text-xs text-text-tertiary">Последняя синхронизация</span>
             <div className="flex items-center gap-2 mt-0.5">
               <Clock
                 className={`w-3 h-3 ${getSyncStatusColor(
@@ -112,7 +112,7 @@ export function DeviceCard({ device, selected, onClick }: DeviceCardProps) {
               </p>
               {device.sync_status.events_since_sync > 0 && (
                 <Badge variant="warning" className="text-xs">
-                  {device.sync_status.events_since_sync} pending
+                  {device.sync_status.events_since_sync} ожидает
                 </Badge>
               )}
             </div>
@@ -122,18 +122,18 @@ export function DeviceCard({ device, selected, onClick }: DeviceCardProps) {
         {/* Permissions */}
         <div>
           <span className="text-xs text-text-tertiary mb-1.5 block">
-            Permissions
+            Разрешения
           </span>
           <div className="flex flex-wrap gap-1.5">
             <Badge
               variant={device.permissions.accessibility ? 'success' : 'error'}
             >
-              Accessibility
+              Доступность
             </Badge>
             <Badge
               variant={device.permissions.screen_recording ? 'success' : 'error'}
             >
-              Screen Recording
+              Запись экрана
             </Badge>
           </div>
         </div>

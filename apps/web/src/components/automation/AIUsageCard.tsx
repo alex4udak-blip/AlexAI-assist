@@ -33,7 +33,7 @@ export function AIUsageCard({ usage, loading }: AIUsageCardProps) {
         <CardHeader>
           <div className="flex items-center gap-2">
             <Sparkles className="w-4 h-4 text-accent-primary" />
-            <CardTitle>AI Usage Today</CardTitle>
+            <CardTitle>Использование AI сегодня</CardTitle>
           </div>
         </CardHeader>
         <CardContent>
@@ -53,11 +53,11 @@ export function AIUsageCard({ usage, loading }: AIUsageCardProps) {
         <CardHeader>
           <div className="flex items-center gap-2">
             <Sparkles className="w-4 h-4 text-accent-primary" />
-            <CardTitle>AI Usage Today</CardTitle>
+            <CardTitle>Использование AI сегодня</CardTitle>
           </div>
         </CardHeader>
         <CardContent>
-          <p className="text-sm text-text-tertiary">No usage data available</p>
+          <p className="text-sm text-text-tertiary">Нет данных об использовании</p>
         </CardContent>
       </Card>
     );
@@ -79,9 +79,9 @@ export function AIUsageCard({ usage, loading }: AIUsageCardProps) {
         {/* Budget Overview */}
         <div>
           <div className="flex items-center justify-between mb-2">
-            <span className="text-sm text-text-secondary">Daily Budget</span>
+            <span className="text-sm text-text-secondary">Дневной бюджет</span>
             <span className="text-sm font-medium text-text-primary">
-              ${budgetRemaining.toFixed(2)} remaining
+              ${budgetRemaining.toFixed(2)} осталось
             </span>
           </div>
           <Progress
@@ -97,10 +97,10 @@ export function AIUsageCard({ usage, loading }: AIUsageCardProps) {
           />
           <div className="flex items-center justify-between mt-1">
             <span className="text-xs text-text-tertiary">
-              ${usage.total_spent_today.toFixed(2)} spent
+              ${usage.total_spent_today.toFixed(2)} потрачено
             </span>
             <span className="text-xs text-text-tertiary">
-              ${usage.daily_budget.toFixed(2)} total
+              ${usage.daily_budget.toFixed(2)} всего
             </span>
           </div>
         </div>
@@ -108,7 +108,7 @@ export function AIUsageCard({ usage, loading }: AIUsageCardProps) {
         {/* Model Usage */}
         <div className="space-y-3">
           <h4 className="text-xs font-medium text-text-tertiary uppercase tracking-wider">
-            Usage by Model
+            Использование по моделям
           </h4>
 
           {/* Haiku */}
@@ -117,7 +117,7 @@ export function AIUsageCard({ usage, loading }: AIUsageCardProps) {
               <div className="flex items-center justify-between mb-1">
                 <span className="text-sm text-text-secondary">Haiku</span>
                 <span className="text-xs text-text-tertiary">
-                  {usage.daily_usage.haiku.requests} requests
+                  {usage.daily_usage.haiku.requests} запросов
                 </span>
               </div>
               <Progress
@@ -138,7 +138,7 @@ export function AIUsageCard({ usage, loading }: AIUsageCardProps) {
               <div className="flex items-center justify-between mb-1">
                 <span className="text-sm text-text-secondary">Sonnet</span>
                 <span className="text-xs text-text-tertiary">
-                  {usage.daily_usage.sonnet.requests} requests
+                  {usage.daily_usage.sonnet.requests} запросов
                 </span>
               </div>
               <Progress
@@ -159,7 +159,7 @@ export function AIUsageCard({ usage, loading }: AIUsageCardProps) {
               <div className="flex items-center justify-between mb-1">
                 <span className="text-sm text-text-secondary">Opus</span>
                 <span className="text-xs text-text-tertiary">
-                  {usage.daily_usage.opus.requests} requests
+                  {usage.daily_usage.opus.requests} запросов
                 </span>
               </div>
               <Progress
