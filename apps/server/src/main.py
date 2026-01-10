@@ -65,17 +65,24 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     except Exception as e:
         logger.warning(f"Could not run migrations (may already be up to date): {e}")
 
-    # Try to upgrade rate limiter to Redis (optional)
+    # Try to upgrade rate limiter to Redis (optional, with timeout)
     try:
+        import asyncio
         import redis.asyncio as redis
+        logger.info("Attempting Redis connection...")
         redis_client = redis.from_url(
             settings.redis_url,
             encoding="utf-8",
             decode_responses=False,
+            socket_connect_timeout=5,
+            socket_timeout=5,
         )
-        await redis_client.ping()
+        # Timeout ping to avoid hanging forever
+        await asyncio.wait_for(redis_client.ping(), timeout=5.0)
         _rate_limiter.redis_client = redis_client
         logger.info("Rate limiter upgraded to Redis backend")
+    except asyncio.TimeoutError:
+        logger.warning("Redis connection timed out, using in-memory rate limiting")
     except Exception as e:
         logger.warning(f"Redis not available, using in-memory rate limiting: {e}")
 
@@ -83,6 +90,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     from src.core.scheduler import start_scheduler, stop_scheduler
     start_scheduler()
 
+    logger.info("=== SERVER STARTUP COMPLETE - READY TO ACCEPT REQUESTS ===")
     yield
 
     # Shutdown
