@@ -3,7 +3,7 @@
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, Request, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, HTTPException, Request, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
@@ -138,6 +138,23 @@ app.include_router(automation.router, prefix="/api/v1/automation", tags=["Automa
 app.include_router(settings_router.router, prefix="/api/v1/settings", tags=["Settings"])
 
 
+@app.exception_handler(HTTPException)
+async def http_exception_handler(request: Request, exc: HTTPException) -> JSONResponse:
+    """HTTP exception handler with CORS headers."""
+    origin = request.headers.get("origin", "")
+    cors_headers = {}
+    if origin:
+        cors_headers = {
+            "Access-Control-Allow-Origin": origin,
+            "Access-Control-Allow-Credentials": "true",
+        }
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={"detail": exc.detail},
+        headers=cors_headers,
+    )
+
+
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception) -> JSONResponse:
     """Global exception handler with full error logging."""
@@ -151,9 +168,18 @@ async def global_exception_handler(request: Request, exc: Exception) -> JSONResp
             "client_ip": request.client.host if request.client else "unknown",
         },
     )
+    # Include CORS headers in error response
+    origin = request.headers.get("origin", "")
+    cors_headers = {}
+    if origin:
+        cors_headers = {
+            "Access-Control-Allow-Origin": origin,
+            "Access-Control-Allow-Credentials": "true",
+        }
     return JSONResponse(
         status_code=500,
         content={"detail": "Internal server error"},
+        headers=cors_headers,
     )
 
 
