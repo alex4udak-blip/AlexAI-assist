@@ -217,30 +217,8 @@ export interface Pattern {
 }
 
 export interface DetectedPatterns {
-  app_sequences: PatternSequence[];
-  time_patterns: TimePattern[];
-  context_switches: ContextSwitches;
-}
-
-export interface PatternSequence {
-  type: string;
-  sequence: string[];
-  occurrences: number;
-  automatable: boolean;
-}
-
-export interface TimePattern {
-  type: string;
-  hour: number;
-  app: string;
-  occurrences: number;
-  automatable: boolean;
-}
-
-export interface ContextSwitches {
-  total_switches: number;
-  switch_rate: number;
-  assessment: string;
+  patterns_found: number;
+  patterns: Pattern[];
 }
 
 export interface Suggestion {
@@ -305,10 +283,8 @@ export interface AgentLog {
 
 export interface AnalyticsSummary {
   total_events: number;
-  period: { start: string; end: string };
   top_apps: [string, number][];
   categories: Record<string, number>;
-  hourly_activity: Record<number, number>;
 }
 
 export interface CategoryBreakdown {

@@ -207,28 +207,6 @@ async def root() -> dict[str, str]:
     return {"status": "ok", "service": "observer-api"}
 
 
-@app.get("/test-db")
-async def test_db() -> dict[str, str]:
-    """Test database connection (internal use only)."""
-    from sqlalchemy import text
-
-    from src.db.session import engine
-    try:
-        async with engine.connect() as conn:
-            await conn.execute(text("SELECT 1"))
-            logger.info("Database connection test successful")
-            return {"status": "ok", "db": "connected"}
-    except Exception as e:
-        # Log full error but don't expose details to client
-        log_error(
-            logger,
-            "Database connection test failed",
-            error=e,
-            extra={"event_type": "db_error"},
-        )
-        return {"status": "error", "detail": "Database connection failed"}
-
-
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket) -> None:
     """WebSocket endpoint for real-time updates."""

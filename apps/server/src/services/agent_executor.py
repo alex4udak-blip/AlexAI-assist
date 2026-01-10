@@ -13,6 +13,7 @@ import httpx
 from src.core.claude import claude_client
 from src.core.logging import get_logger, log_error, log_security_event
 from src.core.retry import retry_with_backoff, with_circuit_breaker
+from src.core.websocket import broadcast_event
 from src.db.models import Agent
 
 logger = get_logger(__name__)
@@ -162,14 +163,47 @@ class AgentExecutorService:
         action: dict[str, Any],
         context: dict[str, Any],
     ) -> dict[str, Any]:
-        """Send a notification."""
+        """Send a notification via logging and WebSocket broadcast."""
         template = action.get("template", "")
         message = self._render_template(template, context)
+        title = action.get("title", "Agent Notification")
+        priority = action.get("priority", "normal")
 
-        # In production, this would send to notification service
+        # Log the notification
+        logger.info(
+            f"Agent notification: {message}",
+            extra={
+                "event_type": "agent_notification",
+                "notification_title": title,
+                "notification_message": message,
+                "priority": priority,
+                "context_keys": list(context.keys()),
+            },
+        )
+
+        # Broadcast to connected desktop clients via WebSocket
+        try:
+            await broadcast_event("notification", {
+                "title": title,
+                "message": message,
+                "priority": priority,
+                "timestamp": datetime.now(UTC).isoformat(),
+            })
+        except Exception as e:
+            # Don't fail the action if broadcast fails - just log it
+            logger.warning(
+                "Failed to broadcast notification via WebSocket",
+                extra={
+                    "event_type": "notification_broadcast_failed",
+                    "error": str(e),
+                },
+            )
+
         return {
             "success": True,
             "message": message,
+            "title": title,
+            "priority": priority,
             "type": "notification",
         }
 
@@ -462,7 +496,11 @@ class AgentExecutorService:
         try:
             return json.loads(value)
         except json.JSONDecodeError:
-            pass
+            # Value is not valid JSON, will try other parsing methods below
+            logger.debug(
+                "Value is not valid JSON, treating as string",
+                extra={"value": value[:50] if len(value) > 50 else value},
+            )
 
         # Try as quoted string
         if (value.startswith("'") and value.endswith("'")) or \

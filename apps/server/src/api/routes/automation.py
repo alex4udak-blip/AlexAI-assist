@@ -548,8 +548,11 @@ async def automation_websocket(
         try:
             await update_device_status(db, device_id, connected=False)
             await broadcast_device_update(device_id, {"connected": False})
-        except Exception:
-            pass  # Best effort
+        except Exception as cleanup_err:
+            logger.warning(
+                "Failed to update device status during error cleanup",
+                extra={"device_id": device_id, "error": str(cleanup_err)},
+            )
 
 
 @router.post("/command/{device_id}", response_model=CommandResponse)

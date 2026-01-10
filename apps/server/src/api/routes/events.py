@@ -122,13 +122,15 @@ async def create_events(
     db: AsyncSession = Depends(get_db_session),
 ) -> dict[str, Any]:
     """Receive events from collector."""
-    # Ensure device exists
+    # Ensure device exists - batch query to avoid N+1
     device_ids = {e.device_id for e in batch.events}
+    result = await db.execute(
+        select(Device).where(Device.id.in_(device_ids))
+    )
+    existing_devices = {d.id: d for d in result.scalars().all()}
+
     for device_id in device_ids:
-        result = await db.execute(
-            select(Device).where(Device.id == device_id)
-        )
-        device = result.scalar_one_or_none()
+        device = existing_devices.get(device_id)
         if not device:
             device = Device(
                 id=device_id,
@@ -136,27 +138,30 @@ async def create_events(
                 os="unknown",
             )
             db.add(device)
-
         device.last_seen_at = datetime.now(UTC).replace(tzinfo=None)
 
-    # Create events with deduplication
+    # Create events with deduplication - batch query to avoid N+1
     session_events = []
-    acked_event_ids = []
+    acked_event_ids: list[str] = []
     skipped_count = 0
     created_events: list[Event] = []  # Track created events for batch processing
 
+    # Batch lookup all event_ids at once for deduplication
+    event_ids_to_check = [e.event_id for e in batch.events if e.event_id]
+    existing_event_ids: set[str] = set()
+    if event_ids_to_check:
+        result = await db.execute(
+            select(Event.event_id).where(Event.event_id.in_(event_ids_to_check))
+        )
+        existing_event_ids = {row[0] for row in result.all()}
+
     for event_data in batch.events:
         # Check for duplicates if event_id is provided
-        if event_data.event_id:
-            result = await db.execute(
-                select(Event).where(Event.event_id == event_data.event_id)
-            )
-            existing = result.scalar_one_or_none()
-            if existing:
-                # Event already exists, skip but acknowledge
-                acked_event_ids.append(event_data.event_id)
-                skipped_count += 1
-                continue
+        if event_data.event_id and event_data.event_id in existing_event_ids:
+            # Event already exists, skip but acknowledge
+            acked_event_ids.append(event_data.event_id)
+            skipped_count += 1
+            continue
 
         event = Event(
             event_id=event_data.event_id,
