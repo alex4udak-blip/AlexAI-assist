@@ -211,6 +211,97 @@ impl Default for PermissionManager {
     }
 }
 
+// ============================================================================
+// App-specific Automation Permissions
+// ============================================================================
+
+/// App-specific automation permission status
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AppPermissionStatus {
+    pub app_name: String,
+    pub bundle_id: String,
+    pub granted: bool,
+}
+
+/// List of apps that Observer needs Automation access to
+pub fn get_required_apps() -> Vec<(&'static str, &'static str)> {
+    vec![
+        ("Google Chrome", "com.google.Chrome"),
+        ("Safari", "com.apple.Safari"),
+        ("Arc", "company.thebrowser.Browser"),
+        ("Firefox", "org.mozilla.firefox"),
+        ("Brave Browser", "com.brave.Browser"),
+        ("Microsoft Edge", "com.microsoft.Edge"),
+        ("Telegram", "ru.keepcoder.Telegram"),
+        ("Discord", "com.hnc.Discord"),
+        ("Slack", "com.tinyspeck.slackmacgap"),
+        ("Finder", "com.apple.Finder"),
+        ("Notes", "com.apple.Notes"),
+        ("Mail", "com.apple.mail"),
+    ]
+}
+
+/// Check automation permission for all required apps
+pub fn check_automation_permissions() -> Vec<AppPermissionStatus> {
+    get_required_apps()
+        .iter()
+        .map(|(name, bundle_id)| {
+            let granted = crate::native_applescript::check_app_permission(name);
+            AppPermissionStatus {
+                app_name: name.to_string(),
+                bundle_id: bundle_id.to_string(),
+                granted,
+            }
+        })
+        .collect()
+}
+
+/// Request automation permission for a specific app
+/// Returns true if permission was granted
+pub fn request_automation_permission(app_name: &str) -> bool {
+    crate::native_applescript::request_app_permission(app_name)
+}
+
+/// Request automation permissions for all apps sequentially
+/// Returns updated status for all apps
+pub fn request_all_automation_permissions() -> Vec<AppPermissionStatus> {
+    let apps = get_required_apps();
+    let mut results = Vec::new();
+
+    for (name, bundle_id) in apps {
+        // Try to trigger permission request
+        let granted = crate::native_applescript::request_app_permission(name);
+
+        results.push(AppPermissionStatus {
+            app_name: name.to_string(),
+            bundle_id: bundle_id.to_string(),
+            granted,
+        });
+
+        // Small delay between requests so user can respond to dialogs
+        std::thread::sleep(std::time::Duration::from_millis(500));
+    }
+
+    results
+}
+
+/// Open System Preferences to Automation settings
+pub fn open_automation_settings() -> Result<(), String> {
+    #[cfg(target_os = "macos")]
+    {
+        std::process::Command::new("open")
+            .arg("x-apple.systempreferences:com.apple.preference.security?Privacy_Automation")
+            .spawn()
+            .map_err(|e| format!("Failed to open settings: {}", e))?;
+        Ok(())
+    }
+
+    #[cfg(not(target_os = "macos"))]
+    {
+        Err("Only supported on macOS".to_string())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

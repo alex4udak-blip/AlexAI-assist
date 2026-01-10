@@ -8,8 +8,10 @@ import {
   X,
   ExternalLink,
   RefreshCw,
+  Zap,
 } from 'lucide-react';
 import { invoke } from '@tauri-apps/api/core';
+import { PermissionsPanel } from './PermissionsPanel';
 
 interface SettingsData {
   apiUrl: string;
@@ -195,6 +197,15 @@ export default function Settings({ onBack }: Props) {
             />
             <span className="text-[12px] text-white/70">Запускать при входе</span>
           </label>
+        </div>
+
+        {/* App Automation Permissions */}
+        <div className="px-4 py-3 border-b border-white/5">
+          <div className="flex items-center gap-2 mb-3">
+            <Zap className="w-3.5 h-3.5 text-white/40" />
+            <span className="text-[10px] text-white/40 uppercase tracking-wider">Automation</span>
+          </div>
+          <PermissionsPanel />
         </div>
       </div>
 
