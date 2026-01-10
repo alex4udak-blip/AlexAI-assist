@@ -54,16 +54,22 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     )
     logger.info(f"CORS origins: {settings.allowed_origins}")
 
-    # Run database migrations automatically
+    # Run database migrations automatically (in thread to avoid asyncio.run conflict)
     try:
-        import os
+        import asyncio
+        import pathlib
 
-        from alembic import command  # type: ignore[attr-defined]
         from alembic.config import Config
 
-        alembic_cfg = Config(os.path.join(os.path.dirname(__file__), "..", "alembic.ini"))
-        alembic_cfg.set_main_option("script_location", os.path.join(os.path.dirname(__file__), "..", "alembic"))
-        command.upgrade(alembic_cfg, "head")
+        from alembic import command  # type: ignore[attr-defined]
+
+        def run_migrations() -> None:
+            base_dir = pathlib.Path(__file__).parent.parent
+            alembic_cfg = Config(str(base_dir / "alembic.ini"))
+            alembic_cfg.set_main_option("script_location", str(base_dir / "alembic"))
+            command.upgrade(alembic_cfg, "head")
+
+        await asyncio.to_thread(run_migrations)
         logger.info("Database migrations completed successfully")
     except Exception as e:
         logger.warning(f"Could not run migrations (may already be up to date): {e}")
