@@ -23,12 +23,17 @@ pub async fn check_for_updates(app: AppHandle) {
     // Wait a bit before checking to let app fully initialize
     tokio::time::sleep(tokio::time::Duration::from_secs(5)).await;
 
+    println!("=== Checking for updates ===");
+    println!("Current version: {}", env!("CARGO_PKG_VERSION"));
+
     match app.updater() {
         Ok(updater) => {
+            println!("Updater initialized, fetching latest.json from GitHub...");
             match updater.check().await {
                 Ok(Some(update)) => {
                     let version = update.version.clone();
-                    println!("Update available: v{}", version);
+                    println!("UPDATE AVAILABLE: v{}", version);
+                    println!("Current: v{} -> New: v{}", env!("CARGO_PKG_VERSION"), version);
 
                     // Show notification about update
                     if let Err(e) = show_update_notification(&app, &version).await {
@@ -36,27 +41,42 @@ pub async fn check_for_updates(app: AppHandle) {
                     }
 
                     // Auto-download and install
+                    println!("Starting download...");
                     match download_and_install(update).await {
                         Ok(_) => {
-                            println!("Update installed, restarting app...");
-                            // Restart the app to apply the update
+                            println!("Update installed successfully!");
+                            println!("Restarting app to apply update...");
                             restart_app();
                         }
-                        Err(e) => eprintln!("Failed to download update: {}", e),
+                        Err(e) => {
+                            eprintln!("FAILED to download/install update: {}", e);
+                            eprintln!("Please download manually from GitHub Releases");
+                        }
                     }
                 }
                 Ok(None) => {
-                    println!("App is up to date");
+                    println!("App is up to date (v{})", env!("CARGO_PKG_VERSION"));
                 }
                 Err(e) => {
                     eprintln!("Failed to check for updates: {}", e);
+                    // Common errors:
+                    // - Network error: can't reach github.com
+                    // - Parse error: latest.json doesn't exist or is malformed
+                    // - Signature mismatch: update signed with different key
+                    if e.to_string().contains("404") || e.to_string().contains("Not Found") {
+                        eprintln!("Hint: No release found on GitHub. Check if releases are published.");
+                    } else if e.to_string().contains("signature") {
+                        eprintln!("Hint: Signature mismatch. The update may be signed with a different key.");
+                    }
                 }
             }
         }
         Err(e) => {
             eprintln!("Updater not available: {}", e);
+            eprintln!("Hint: Make sure 'updater' plugin is configured in tauri.conf.json");
         }
     }
+    println!("=== Update check complete ===");
 }
 
 /// Show notification about available update

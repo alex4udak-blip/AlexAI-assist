@@ -28,7 +28,9 @@ extern "C" {
 
 /// Check if the app has accessibility permissions without prompting
 pub fn check_accessibility() -> bool {
-    unsafe { AXIsProcessTrusted() }
+    let result = unsafe { AXIsProcessTrusted() };
+    println!("[Permissions] AXIsProcessTrusted() = {}", result);
+    result
 }
 
 /// Request accessibility permissions (shows system dialog if not trusted)
@@ -48,7 +50,9 @@ pub fn request_accessibility() -> bool {
 
 /// Check if the app has screen recording permissions without prompting
 pub fn check_screen_recording() -> bool {
-    unsafe { CGPreflightScreenCaptureAccess() }
+    let result = unsafe { CGPreflightScreenCaptureAccess() };
+    println!("[Permissions] CGPreflightScreenCaptureAccess() = {}", result);
+    result
 }
 
 /// Request screen recording permissions (shows system dialog)

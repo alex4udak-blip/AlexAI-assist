@@ -144,9 +144,18 @@ export default function Settings({ onBack }: Props) {
 
         {/* Permissions section */}
         <div className="px-4 py-3 border-b border-white/5">
-          <div className="flex items-center gap-2 mb-3">
-            <Shield className="w-3.5 h-3.5 text-white/40" />
-            <span className="text-[10px] text-white/40 uppercase tracking-wider">Доступы</span>
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-2">
+              <Shield className="w-3.5 h-3.5 text-white/40" />
+              <span className="text-[10px] text-white/40 uppercase tracking-wider">Доступы</span>
+            </div>
+            <button
+              onClick={checkPermissions}
+              className="p-1 rounded hover:bg-white/5 text-white/40 hover:text-white/60 transition-colors"
+              title="Обновить статус"
+            >
+              <RefreshCw className="w-3 h-3" />
+            </button>
           </div>
           <div className="space-y-2">
             <PermissionRow

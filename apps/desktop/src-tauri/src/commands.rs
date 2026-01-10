@@ -473,6 +473,62 @@ pub fn open_system_preferences(pane: String) -> Result<(), String> {
     Ok(())
 }
 
+/// Get debug info for troubleshooting
+#[derive(Serialize)]
+pub struct DebugInfo {
+    pub version: String,
+    pub accessibility_permission: bool,
+    pub screen_recording_permission: bool,
+    pub config_path: String,
+    pub log_path: String,
+    pub platform: String,
+}
+
+#[tauri::command]
+pub fn get_debug_info() -> Result<DebugInfo, String> {
+    let config_path = dirs::config_dir()
+        .map(|p| p.join("observer").to_string_lossy().to_string())
+        .unwrap_or_else(|| "unknown".to_string());
+
+    let log_path = dirs::data_local_dir()
+        .map(|p| p.join("observer").join("logs").to_string_lossy().to_string())
+        .unwrap_or_else(|| "unknown".to_string());
+
+    Ok(DebugInfo {
+        version: env!("CARGO_PKG_VERSION").to_string(),
+        accessibility_permission: has_accessibility_permission(),
+        screen_recording_permission: permissions::check_permission(permissions::PermissionType::ScreenRecording).granted,
+        config_path,
+        log_path,
+        platform: std::env::consts::OS.to_string(),
+    })
+}
+
+/// Force check for updates (manual trigger)
+#[tauri::command]
+pub async fn check_updates(app: tauri::AppHandle) -> Result<String, String> {
+    use tauri_plugin_updater::UpdaterExt;
+
+    match app.updater() {
+        Ok(updater) => {
+            match updater.check().await {
+                Ok(Some(update)) => {
+                    Ok(format!("Update available: v{}", update.version))
+                }
+                Ok(None) => {
+                    Ok(format!("App is up to date (v{})", env!("CARGO_PKG_VERSION")))
+                }
+                Err(e) => {
+                    Err(format!("Update check failed: {}", e))
+                }
+            }
+        }
+        Err(e) => {
+            Err(format!("Updater not available: {}", e))
+        }
+    }
+}
+
 // ============================================================================
 // HELPER FUNCTIONS
 // ============================================================================

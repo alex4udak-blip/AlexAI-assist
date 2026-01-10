@@ -1,5 +1,6 @@
-import { motion } from 'framer-motion';
-import { Monitor, FileText, Globe, Code, MessageSquare } from 'lucide-react';
+import { useState } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Monitor, FileText, Globe, Code, MessageSquare, ChevronDown, ExternalLink } from 'lucide-react';
 import { formatRelativeTime, truncate } from '../../lib/utils';
 import type { Event } from '../../lib/api';
 
@@ -36,7 +37,19 @@ const categoryConfig: Record<string, { icon: typeof Monitor; color: string; bgCo
   },
 };
 
+function extractDomain(url: string | null): string | null {
+  if (!url) return null;
+  try {
+    const parsed = new URL(url);
+    return parsed.hostname.replace('www.', '');
+  } catch {
+    return null;
+  }
+}
+
 export function Timeline({ events, loading }: TimelineProps) {
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+
   if (loading) {
     return (
       <div className="p-6 rounded-2xl border border-border-subtle bg-gradient-to-br from-white/[0.02] to-transparent h-full">
@@ -67,6 +80,9 @@ export function Timeline({ events, loading }: TimelineProps) {
           events.slice(0, 15).map((event, i) => {
             const config = categoryConfig[event.category || 'default'] || categoryConfig.default;
             const Icon = config.icon;
+            const isExpanded = expandedId === event.id;
+            const hasDetails = event.window_title || event.url;
+            const domain = extractDomain(event.url);
 
             return (
               <motion.div
@@ -74,25 +90,78 @@ export function Timeline({ events, loading }: TimelineProps) {
                 initial={{ opacity: 0, x: -10 }}
                 animate={{ opacity: 1, x: 0 }}
                 transition={{ delay: i * 0.03, duration: 0.2 }}
-                className="flex items-start gap-3 p-3 rounded-lg hover:bg-white/[0.03] transition-colors cursor-default"
+                className="rounded-lg hover:bg-white/[0.03] transition-colors"
               >
-                <div className={`w-8 h-8 rounded-lg ${config.bgColor} flex items-center justify-center shrink-0`}>
-                  <Icon className={`w-4 h-4 ${config.color}`} />
-                </div>
+                <div
+                  className={`flex items-start gap-3 p-3 ${hasDetails ? 'cursor-pointer' : 'cursor-default'}`}
+                  onClick={() => hasDetails && setExpandedId(isExpanded ? null : event.id)}
+                >
+                  <div className={`w-8 h-8 rounded-lg ${config.bgColor} flex items-center justify-center shrink-0`}>
+                    <Icon className={`w-4 h-4 ${config.color}`} />
+                  </div>
 
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm text-text-primary truncate">
-                      {event.app_name || 'Приложение'}
-                    </span>
-                    <span className="text-xs text-text-muted hidden sm:inline">
-                      {truncate(event.window_title || '', 30)}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm text-text-primary truncate">
+                        {event.app_name || 'Приложение'}
+                      </span>
+                      {domain && (
+                        <span className="text-xs text-purple-400/80 bg-purple-500/10 px-1.5 py-0.5 rounded">
+                          {domain}
+                        </span>
+                      )}
+                      {hasDetails && (
+                        <ChevronDown
+                          className={`w-3 h-3 text-text-muted transition-transform ${isExpanded ? 'rotate-180' : ''}`}
+                        />
+                      )}
+                    </div>
+                    {event.window_title && !isExpanded && (
+                      <p className="text-xs text-text-muted truncate mt-0.5">
+                        {truncate(event.window_title, 50)}
+                      </p>
+                    )}
+                    <span className="text-xs text-text-tertiary">
+                      {formatRelativeTime(event.timestamp)}
                     </span>
                   </div>
-                  <span className="text-xs text-text-tertiary">
-                    {formatRelativeTime(event.timestamp)}
-                  </span>
                 </div>
+
+                <AnimatePresence>
+                  {isExpanded && (
+                    <motion.div
+                      initial={{ height: 0, opacity: 0 }}
+                      animate={{ height: 'auto', opacity: 1 }}
+                      exit={{ height: 0, opacity: 0 }}
+                      transition={{ duration: 0.15 }}
+                      className="overflow-hidden"
+                    >
+                      <div className="px-3 pb-3 pl-14 space-y-2">
+                        {event.window_title && (
+                          <div>
+                            <span className="text-xs text-text-tertiary">Заголовок:</span>
+                            <p className="text-sm text-text-secondary">{event.window_title}</p>
+                          </div>
+                        )}
+                        {event.url && (
+                          <div>
+                            <span className="text-xs text-text-tertiary">URL:</span>
+                            <a
+                              href={event.url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="flex items-center gap-1 text-sm text-purple-400 hover:text-purple-300 transition-colors break-all"
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              {truncate(event.url, 60)}
+                              <ExternalLink className="w-3 h-3 shrink-0" />
+                            </a>
+                          </div>
+                        )}
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
               </motion.div>
             );
           })

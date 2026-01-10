@@ -187,9 +187,30 @@ fn main() {
             commands::get_settings,
             commands::save_settings,
             commands::open_system_preferences,
+            // Debug commands
+            commands::get_debug_info,
+            commands::check_updates,
         ])
-        .run(tauri::generate_context!())
-        .expect("error while running tauri application");
+        .build(tauri::generate_context!())
+        .expect("error while building tauri application")
+        .run(|app_handle, event| {
+            match event {
+                // Handle dock icon click on macOS (applicationShouldHandleReopen)
+                tauri::RunEvent::Reopen { .. } => {
+                    println!("Dock icon clicked - showing main window");
+                    if let Some(window) = app_handle.get_webview_window("main") {
+                        let _ = window.show();
+                        let _ = window.set_focus();
+                        tray::set_window_visible(true);
+                    }
+                }
+                tauri::RunEvent::ExitRequested { api, .. } => {
+                    // Prevent exit, just hide window (tray app behavior)
+                    api.prevent_exit();
+                }
+                _ => {}
+            }
+        });
 }
 
 /// Set up signal handlers for graceful shutdown (SIGTERM, SIGINT)
