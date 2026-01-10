@@ -16,7 +16,8 @@ from src.db.models import Device, Event
 from src.services.session_tracker import SessionTracker
 
 # Cache TTL for timeline endpoint (in seconds)
-TIMELINE_CACHE_TTL = 10
+# Set to 0 to disable caching - WebSocket provides real-time updates
+TIMELINE_CACHE_TTL = 0
 
 
 def normalize_datetime(dt: datetime | None) -> datetime | None:
