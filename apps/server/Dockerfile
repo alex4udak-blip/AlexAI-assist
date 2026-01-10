@@ -30,4 +30,4 @@ ENV PYTHONUNBUFFERED=1
 EXPOSE 8000
 
 # Run migrations and start server
-CMD ["sh", "-c", "alembic upgrade head && uvicorn src.main:app --host 0.0.0.0 --port 8000"]
+CMD ["sh", "-c", "echo '=== RUNNING MIGRATIONS ===' && alembic upgrade head && echo '=== MIGRATIONS OK, STARTING UVICORN ===' && exec uvicorn src.main:app --host 0.0.0.0 --port ${PORT:-8000}"]
