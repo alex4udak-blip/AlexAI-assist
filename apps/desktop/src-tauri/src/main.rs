@@ -193,22 +193,10 @@ fn main() {
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application")
-        .run(|app_handle, event| {
-            match event {
-                // Handle dock icon click on macOS (applicationShouldHandleReopen)
-                tauri::RunEvent::Reopen { .. } => {
-                    println!("Dock icon clicked - showing main window");
-                    if let Some(window) = app_handle.get_webview_window("main") {
-                        let _ = window.show();
-                        let _ = window.set_focus();
-                        tray::set_window_visible(true);
-                    }
-                }
-                tauri::RunEvent::ExitRequested { api, .. } => {
-                    // Prevent exit, just hide window (tray app behavior)
-                    api.prevent_exit();
-                }
-                _ => {}
+        .run(|_app_handle, event| {
+            if let tauri::RunEvent::ExitRequested { api, .. } = event {
+                // Prevent exit - this is a menubar app (LSUIElement)
+                api.prevent_exit();
             }
         });
 }
