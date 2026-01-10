@@ -38,7 +38,8 @@ export function AIInsights({ insights }: AIInsightsProps) {
   const handleInsightClick = (insight: Insight) => {
     switch (insight.type) {
       case 'suggestion':
-        navigate('/automation');
+        // Navigate to automation page with patterns tab active
+        navigate('/automation#patterns');
         break;
       case 'positive':
       case 'negative':

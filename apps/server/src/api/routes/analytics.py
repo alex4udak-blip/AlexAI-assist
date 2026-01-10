@@ -38,13 +38,9 @@ class CategoryBreakdown(BaseModel):
         ...,
         description="Category name",
     )
-    time_minutes: float = Field(
+    count: int = Field(
         ...,
-        description="Time spent in minutes",
-    )
-    percentage: float = Field(
-        ...,
-        description="Percentage of total time",
+        description="Number of events in category",
     )
 
 
@@ -54,10 +50,6 @@ class AppUsage(BaseModel):
     app_name: str = Field(
         ...,
         description="Application name",
-    )
-    time_minutes: float = Field(
-        ...,
-        description="Time spent in minutes",
     )
     event_count: int = Field(
         ...,
@@ -95,13 +87,9 @@ class TrendData(BaseModel):
         ...,
         description="Date in ISO format",
     )
-    value: float = Field(
+    count: int = Field(
         ...,
-        description="Value for the date",
-    )
-    category: str | None = Field(
-        default=None,
-        description="Category if applicable",
+        description="Event count for the date",
     )
 
 

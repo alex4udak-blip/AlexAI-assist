@@ -87,7 +87,7 @@ export function Achievements({ achievements, streak = 0 }: AchievementsProps) {
                     <div className="mt-2.5">
                       <div className="flex justify-between items-center mb-1.5">
                         <span className="text-xs text-zinc-500 tabular-nums">
-                          {achievement.progress}%
+                          {Number(achievement.progress.toFixed(1))}%
                         </span>
                         {achievement.value && (
                           <span className="text-xs text-zinc-400 tabular-nums">

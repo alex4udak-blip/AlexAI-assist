@@ -84,7 +84,7 @@ export function MobileAchievements({ achievements, streak = 0 }: MobileAchieveme
                   <div className="mt-1">
                     <div className="flex justify-between items-center mb-1">
                       <span className="text-[10px] text-text-muted font-mono">
-                        {achievement.progress}%
+                        {Number(achievement.progress.toFixed(1))}%
                       </span>
                       {achievement.value && (
                         <span className="text-[10px] text-hud-cyan font-mono">
