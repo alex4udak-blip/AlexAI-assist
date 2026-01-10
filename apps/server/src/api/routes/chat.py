@@ -100,6 +100,8 @@ async def chat(
     db: AsyncSession = Depends(get_db_session),
 ) -> ChatResponse:
     """Chat with Observer AI with Memory integration."""
+    logger.info(f"=== CHAT ENDPOINT CALLED === message length: {len(data.message)}")
+
     message_id = str(uuid4())
     session_id = data.context.get("session_id", "default")
 
