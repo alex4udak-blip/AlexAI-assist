@@ -143,39 +143,102 @@ impl BrowserMonitor {
         self.run_applescript_tab(script, "Brave")
     }
 
-    /// Helper function to run AppleScript and parse tab information
+    /// Helper function to run AppleScript NATIVELY and parse tab information
+    /// Uses NSAppleScript directly so macOS prompts for Automation permissions for Observer itself
     fn run_applescript_tab(&self, script: &str, browser_name: &str) -> Option<BrowserTab> {
-        let output = Command::new("osascript")
-            .arg("-e")
-            .arg(script)
-            .output();
+        #[cfg(target_os = "macos")]
+        {
+            use objc::runtime::{Class, Object};
+            use objc::{msg_send, sel, sel_impl};
+            use std::ffi::{CStr, CString};
 
-        match output {
-            Ok(result) => {
-                if result.status.success() {
-                    let output_str = String::from_utf8_lossy(&result.stdout).trim().to_string();
+            unsafe {
+                // Get NSAppleScript class
+                let ns_applescript_class = Class::get("NSAppleScript")?;
+                let ns_string_class = Class::get("NSString")?;
 
-                    if output_str.is_empty() {
-                        return None;
+                // Create NSString from script
+                let script_cstr = CString::new(script).ok()?;
+                let source: *mut Object =
+                    msg_send![ns_string_class, stringWithUTF8String: script_cstr.as_ptr()];
+                if source.is_null() {
+                    println!("[Browser] {} failed to create NSString", browser_name);
+                    return None;
+                }
+
+                // Create NSAppleScript
+                let script_obj: *mut Object = msg_send![ns_applescript_class, alloc];
+                let script_obj: *mut Object = msg_send![script_obj, initWithSource: source];
+                if script_obj.is_null() {
+                    println!("[Browser] {} failed to create NSAppleScript", browser_name);
+                    return None;
+                }
+
+                // Execute script
+                let mut error: *mut Object = std::ptr::null_mut();
+                let result: *mut Object = msg_send![script_obj, executeAndReturnError: &mut error];
+
+                // Release script object
+                let _: () = msg_send![script_obj, release];
+
+                if result.is_null() {
+                    if !error.is_null() {
+                        let error_key: *mut Object = msg_send![ns_string_class, stringWithUTF8String: CString::new("NSAppleScriptErrorMessage").unwrap().as_ptr()];
+                        let error_desc: *mut Object = msg_send![error, objectForKey: error_key];
+                        if !error_desc.is_null() {
+                            let c_str: *const i8 = msg_send![error_desc, UTF8String];
+                            if !c_str.is_null() {
+                                let error_msg = CStr::from_ptr(c_str).to_string_lossy();
+                                println!(
+                                    "[Browser] {} AppleScript error: {}",
+                                    browser_name, error_msg
+                                );
+                            }
+                        }
                     }
+                    return None;
+                }
 
-                    // Parse the output format: "URL|||Title"
-                    let parts: Vec<&str> = output_str.split("|||").collect();
-                    if parts.len() == 2 {
-                        Some(BrowserTab {
-                            browser: browser_name.to_string(),
-                            url: parts[0].to_string(),
-                            title: parts[1].to_string(),
-                            visible_text: None,
-                        })
-                    } else {
-                        None
-                    }
+                // Get string value from result
+                let string_value: *mut Object = msg_send![result, stringValue];
+                if string_value.is_null() {
+                    println!("[Browser] {} result has no stringValue", browser_name);
+                    return None;
+                }
+
+                let c_str: *const i8 = msg_send![string_value, UTF8String];
+                if c_str.is_null() {
+                    println!("[Browser] {} UTF8String is null", browser_name);
+                    return None;
+                }
+
+                let output_str = CStr::from_ptr(c_str).to_string_lossy().trim().to_string();
+                println!("[Browser] {} returned: {}", browser_name, output_str);
+
+                if output_str.is_empty() {
+                    return None;
+                }
+
+                // Parse the output format: "URL|||Title"
+                let parts: Vec<&str> = output_str.split("|||").collect();
+                if parts.len() == 2 {
+                    Some(BrowserTab {
+                        browser: browser_name.to_string(),
+                        url: parts[0].to_string(),
+                        title: parts[1].to_string(),
+                        visible_text: None,
+                    })
                 } else {
+                    println!("[Browser] {} unexpected format: {}", browser_name, output_str);
                     None
                 }
             }
-            Err(_) => None,
+        }
+
+        #[cfg(not(target_os = "macos"))]
+        {
+            let _ = (script, browser_name);
+            None
         }
     }
 

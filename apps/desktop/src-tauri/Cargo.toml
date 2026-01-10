@@ -1,6 +1,6 @@
 [package]
 name = "observer-desktop"
-version = "0.3.2"
+version = "0.3.4"
 description = "Observer Desktop App"
 authors = ["Observer"]
 license = "MIT"
@@ -42,6 +42,7 @@ rusqlite = { version = "0.31", features = ["bundled"] }
 core-foundation = "0.10"
 core-graphics = "0.24"
 objc = "0.2"
+objc-foundation = "0.1"
 cocoa = "0.26"
 block = "0.1"
 dispatch = "0.2"
