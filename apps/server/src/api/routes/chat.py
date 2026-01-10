@@ -33,12 +33,12 @@ async def get_redis() -> redis.Redis | None:
     global redis_client
     if redis_client is None:
         try:
-            redis_client = redis.from_url(
+            redis_client = redis.from_url(  # type: ignore[no-untyped-call]
                 settings.redis_url,
                 encoding="utf-8",
                 decode_responses=True,
             )
-            await redis_client.ping()
+            await redis_client.ping()  # type: ignore[misc]
             logger.info("Redis connection established")
         except Exception as e:
             log_error(
@@ -380,12 +380,13 @@ async def chat(
 
     # Process interaction for memory (async, non-blocking)
     try:
-        await memory_manager.process_interaction(
-            user_message=data.message,
-            assistant_response=response,
-            message_id=user_msg.id,
-            context=memory_context,
-        )
+        if response:
+            await memory_manager.process_interaction(
+                user_message=data.message,
+                assistant_response=response,
+                message_id=user_msg.id,
+                context=memory_context,
+            )
         logger.debug(
             "Memory processed",
             extra={"event_type": "memory_processed", "session_id": session_id},

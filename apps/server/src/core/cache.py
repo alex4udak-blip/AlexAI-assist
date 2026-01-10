@@ -38,12 +38,12 @@ class Cache:
             return
 
         try:
-            self._redis_client = redis.from_url(
+            self._redis_client = redis.from_url(  # type: ignore[no-untyped-call]
                 settings.redis_url,
                 encoding="utf-8",
                 decode_responses=True,
             )
-            await self._redis_client.ping()
+            await self._redis_client.ping()  # type: ignore[misc]
             logger.info("Cache using Redis backend")
         except Exception as e:
             logger.warning(f"Redis not available for caching, using in-memory fallback: {e}")

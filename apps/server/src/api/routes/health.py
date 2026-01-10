@@ -59,7 +59,7 @@ async def check_redis() -> dict[str, Any]:
     start = time.time()
     redis_client = None
     try:
-        redis_client = redis.from_url(
+        redis_client = redis.from_url(  # type: ignore[no-untyped-call]
             settings.redis_url,
             encoding="utf-8",
             decode_responses=True,

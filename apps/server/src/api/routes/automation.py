@@ -236,7 +236,7 @@ class CommandResponse(BaseModel):
     created_at: datetime = Field(..., description="Command creation timestamp")
 
 
-class CommandResult(BaseModel):
+class CommandResult(BaseModel):  # type: ignore[no-redef]
     """Command result schema."""
 
     success: bool = Field(..., description="Whether command succeeded")
@@ -246,7 +246,7 @@ class CommandResult(BaseModel):
     duration_ms: int | None = Field(default=None, description="Execution duration in milliseconds")
 
 
-class DeviceStatus(BaseModel):
+class DeviceStatus(BaseModel):  # type: ignore[no-redef]
     """Device status schema."""
 
     device_id: str = Field(..., description="Device ID")
@@ -811,7 +811,7 @@ async def get_sync_status(
     }
 
 
-class Screenshot(BaseModel):
+class Screenshot(BaseModel):  # type: ignore[no-redef]
     """Screenshot schema."""
 
     screenshot: str = Field(..., description="Base64 encoded screenshot")
@@ -875,8 +875,8 @@ class DeviceStatusInput(BaseModel):
 
 @router.post("/results")
 async def save_command_result_endpoint(
+    result: CommandResultInput,
     command_id: str = Query(..., description="Command ID"),
-    result: CommandResultInput = ...,
     db: AsyncSession = Depends(get_db_session),
 ) -> dict[str, str]:
     """Save command result from device (alternative to WebSocket)."""
@@ -921,8 +921,8 @@ async def save_command_result_endpoint(
 
 @router.post("/status")
 async def save_device_status_endpoint(
+    status: DeviceStatusInput,
     device_id: str = Query(..., description="Device ID"),
-    status: DeviceStatusInput = ...,
     db: AsyncSession = Depends(get_db_session),
 ) -> dict[str, str]:
     """Save device status (alternative to WebSocket)."""

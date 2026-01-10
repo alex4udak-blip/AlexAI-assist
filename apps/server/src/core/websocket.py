@@ -9,7 +9,7 @@ if TYPE_CHECKING:
 active_connections: set["WebSocket"] = set()
 
 
-async def broadcast_event(event_type: str, data: dict) -> None:
+async def broadcast_event(event_type: str, data: dict[str, Any]) -> None:
     """Broadcast event to all connected WebSocket clients."""
     if not active_connections:
         return

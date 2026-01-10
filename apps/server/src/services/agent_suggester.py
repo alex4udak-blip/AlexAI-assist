@@ -165,7 +165,7 @@ class AgentSuggester:
                 patterns.append(pattern)
 
         # Sort by confidence
-        patterns.sort(key=lambda p: p.get("confidence", 0), reverse=True)
+        patterns.sort(key=lambda p: float(p.get("confidence", 0) or 0), reverse=True)  # type: ignore[arg-type]
 
         logger.debug(
             "Patterns found",
@@ -179,7 +179,7 @@ class AgentSuggester:
         events: list[dict[str, Any]],
     ) -> Counter[tuple[str, ...]]:
         """Find common app sequences (e.g., Browser -> IDE -> Terminal)."""
-        sequences = Counter()
+        sequences: Counter[tuple[str, ...]] = Counter()
 
         # Group events by day
         days = defaultdict(list)
@@ -210,7 +210,7 @@ class AgentSuggester:
         patterns = []
 
         # Group by hour and app
-        hourly_apps = defaultdict(lambda: defaultdict(int))
+        hourly_apps: dict[int, dict[str, int]] = defaultdict(lambda: defaultdict(int))
         for event in events:
             if event["app_name"]:
                 hour = event["timestamp"].hour
@@ -251,7 +251,7 @@ class AgentSuggester:
         patterns = []
 
         # Count app switches
-        switches = defaultdict(lambda: defaultdict(int))
+        switches: dict[str, dict[str, int]] = defaultdict(lambda: defaultdict(int))
         prev_app = None
 
         for event in events:

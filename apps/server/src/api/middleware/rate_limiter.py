@@ -2,7 +2,8 @@
 
 import logging
 import time
-from collections.abc import Callable
+from collections.abc import Awaitable, Callable
+from typing import Any
 
 import redis.asyncio as redis
 from fastapi import Request, Response, status
@@ -155,7 +156,7 @@ class RateLimiter:
 class RateLimiterMiddleware(BaseHTTPMiddleware):
     """FastAPI middleware for rate limiting."""
 
-    def __init__(self, app, rate_limiter: RateLimiter) -> None:
+    def __init__(self, app: Any, rate_limiter: RateLimiter) -> None:
         """Initialize middleware.
 
         Args:
@@ -235,7 +236,7 @@ class RateLimiterMiddleware(BaseHTTPMiddleware):
     async def dispatch(
         self,
         request: Request,
-        call_next: Callable,
+        call_next: Callable[[Request], Awaitable[Response]],
     ) -> Response:
         """Process request with rate limiting.
 
@@ -316,12 +317,12 @@ async def get_rate_limiter() -> RateLimiter:
 
         try:
             # Try to connect to Redis
-            redis_client = redis.from_url(
+            redis_client = redis.from_url(  # type: ignore[no-untyped-call]
                 settings.redis_url,
                 encoding="utf-8",
                 decode_responses=False,  # Keep binary for sorted sets
             )
-            await redis_client.ping()
+            await redis_client.ping()  # type: ignore[misc]
             logger.info("Rate limiter using Redis backend")
         except Exception as e:
             logger.warning(f"Redis not available for rate limiting, using in-memory fallback: {e}")

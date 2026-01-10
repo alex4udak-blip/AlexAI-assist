@@ -21,7 +21,7 @@ class CleanupService:
     """Service for cleaning up old data based on retention policy."""
 
     # Tables to clean and their timestamp columns
-    CLEANUP_TARGETS: list[tuple[type, str]] = [
+    CLEANUP_TARGETS: list[tuple[Any, str]] = [
         (Event, "timestamp"),
         (Session, "start_time"),
         (ChatMessage, "timestamp"),
