@@ -1,7 +1,7 @@
 """Chat endpoints with PostgreSQL storage, Redis caching, and Memory integration."""
 
 import json
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from typing import Any
 from uuid import uuid4
 
@@ -109,7 +109,7 @@ async def chat(
     session_id = validate_session_id(session_id)
 
     # Use naive datetime for PostgreSQL TIMESTAMP WITHOUT TIME ZONE column
-    timestamp = datetime.now(timezone.utc).replace(tzinfo=None)
+    timestamp = datetime.now(UTC).replace(tzinfo=None)
 
     # Get context from recent activity
     analyzer = AnalyzerService(db)

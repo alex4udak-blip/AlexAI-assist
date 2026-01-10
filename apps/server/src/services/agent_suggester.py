@@ -3,9 +3,8 @@
 import json
 import os
 from collections import Counter, defaultdict
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from typing import Any
-from uuid import UUID
 
 from sqlalchemy import and_, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -19,7 +18,7 @@ logger = get_logger(__name__)
 
 def utc_now() -> datetime:
     """Get current UTC time as naive datetime."""
-    return datetime.now(timezone.utc).replace(tzinfo=None)
+    return datetime.now(UTC).replace(tzinfo=None)
 
 
 class AgentSuggester:
@@ -222,14 +221,12 @@ class AgentSuggester:
             for app, count in apps.items():
                 if count >= self.MIN_TIME_PATTERN_OCCURRENCES:
                     # Calculate confidence based on consistency
-                    days_active = len(
-                        set(
-                            e["timestamp"].strftime("%Y-%m-%d")
-                            for e in events
-                            if e["app_name"] == app
-                            and e["timestamp"].hour == hour
-                        )
-                    )
+                    days_active = len({
+                        e["timestamp"].strftime("%Y-%m-%d")
+                        for e in events
+                        if e["app_name"] == app
+                        and e["timestamp"].hour == hour
+                    })
                     confidence = min(days_active / 3, 1.0)  # More aggressive: 3 days = 100% confidence
 
                     patterns.append(

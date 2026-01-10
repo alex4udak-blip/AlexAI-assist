@@ -5,7 +5,7 @@ from typing import Any
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Query
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.api.deps import get_db_session

@@ -26,7 +26,10 @@ def upgrade() -> None:
         "audit_logs",
         sa.Column("id", postgresql.UUID(as_uuid=True), primary_key=True),
         sa.Column("timestamp", sa.DateTime(), nullable=False),
-        sa.Column("action_type", sa.String(50), nullable=False, comment="Type of action: command_executed, agent_run, setting_changed"),
+        sa.Column(
+            "action_type", sa.String(50), nullable=False,
+            comment="Type of action: command_executed, agent_run, setting_changed"
+        ),
         sa.Column("actor", sa.String(50), nullable=False, comment="Who initiated: user, agent, system"),
         sa.Column("device_id", sa.String(64), sa.ForeignKey("devices.id"), nullable=True),
         sa.Column("command_type", sa.String(100), nullable=True),

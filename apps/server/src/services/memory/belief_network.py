@@ -4,7 +4,7 @@ Implements Hindsight's Belief Network with confidence evolution.
 """
 
 import logging
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 from uuid import UUID, uuid4
 
@@ -106,12 +106,12 @@ class BeliefNetwork:
             belief_type=belief_type,
             confidence=initial_confidence,
             confidence_history=[{
-                "timestamp": datetime.now(timezone.utc).replace(tzinfo=None).isoformat(),
+                "timestamp": datetime.now(UTC).replace(tzinfo=None).isoformat(),
                 "value": initial_confidence,
                 "reason": "initial formation",
             }],
             supporting_facts=supporting_facts or [],
-            formed_at=datetime.now(timezone.utc).replace(tzinfo=None),
+            formed_at=datetime.now(UTC).replace(tzinfo=None),
             status="active",
         )
 
@@ -218,12 +218,12 @@ class BeliefNetwork:
 
         belief.confidence = new_confidence
         belief.times_reinforced += 1
-        belief.last_reinforced = datetime.now(timezone.utc).replace(tzinfo=None)
+        belief.last_reinforced = datetime.now(UTC).replace(tzinfo=None)
 
         # Add to history
         history = belief.confidence_history or []
         history.append({
-            "timestamp": datetime.now(timezone.utc).replace(tzinfo=None).isoformat(),
+            "timestamp": datetime.now(UTC).replace(tzinfo=None).isoformat(),
             "value": new_confidence,
             "reason": reason,
         })
@@ -234,7 +234,7 @@ class BeliefNetwork:
             current_evidence = belief.supporting_facts or []
             belief.supporting_facts = list(set(current_evidence + new_evidence))
 
-        belief.updated_at = datetime.now(timezone.utc).replace(tzinfo=None)
+        belief.updated_at = datetime.now(UTC).replace(tzinfo=None)
 
         logger.info(
             f"Reinforced belief: {belief.belief[:50]}... "
@@ -262,12 +262,12 @@ class BeliefNetwork:
 
         belief.confidence = new_confidence
         belief.times_challenged += 1
-        belief.last_challenged = datetime.now(timezone.utc).replace(tzinfo=None)
+        belief.last_challenged = datetime.now(UTC).replace(tzinfo=None)
 
         # Add to history
         history = belief.confidence_history or []
         history.append({
-            "timestamp": datetime.now(timezone.utc).replace(tzinfo=None).isoformat(),
+            "timestamp": datetime.now(UTC).replace(tzinfo=None).isoformat(),
             "value": new_confidence,
             "reason": reason,
         })
@@ -283,7 +283,7 @@ class BeliefNetwork:
             belief.status = "rejected"
             logger.info(f"Rejected belief due to low confidence: {belief.belief[:50]}...")
 
-        belief.updated_at = datetime.now(timezone.utc).replace(tzinfo=None)
+        belief.updated_at = datetime.now(UTC).replace(tzinfo=None)
 
         logger.info(
             f"Challenged belief: {belief.belief[:50]}... "
@@ -319,7 +319,7 @@ class BeliefNetwork:
         # Add to history
         history = old.confidence_history or []
         history.append({
-            "timestamp": datetime.now(timezone.utc).replace(tzinfo=None).isoformat(),
+            "timestamp": datetime.now(UTC).replace(tzinfo=None).isoformat(),
             "value": old.confidence,
             "reason": f"superseded: {reason}",
         })
@@ -335,12 +335,12 @@ class BeliefNetwork:
             return False
 
         belief.status = "rejected"
-        belief.updated_at = datetime.now(timezone.utc).replace(tzinfo=None)
+        belief.updated_at = datetime.now(UTC).replace(tzinfo=None)
 
         # Add to history
         history = belief.confidence_history or []
         history.append({
-            "timestamp": datetime.now(timezone.utc).replace(tzinfo=None).isoformat(),
+            "timestamp": datetime.now(UTC).replace(tzinfo=None).isoformat(),
             "value": belief.confidence,
             "reason": f"rejected: {reason}",
         })
@@ -377,7 +377,7 @@ class BeliefNetwork:
                             MemoryFact.id.in_(belief.supporting_facts),
                             or_(
                                 MemoryFact.valid_to.is_(None),
-                                MemoryFact.valid_to > datetime.now(timezone.utc).replace(tzinfo=None),
+                                MemoryFact.valid_to > datetime.now(UTC).replace(tzinfo=None),
                             ),
                         )
                     )
@@ -398,7 +398,7 @@ class BeliefNetwork:
                             MemoryFact.id.in_(belief.contradicting_facts),
                             or_(
                                 MemoryFact.valid_to.is_(None),
-                                MemoryFact.valid_to > datetime.now(timezone.utc).replace(tzinfo=None),
+                                MemoryFact.valid_to > datetime.now(UTC).replace(tzinfo=None),
                             ),
                         )
                     )

@@ -11,15 +11,10 @@ This orchestrator:
 
 import json
 import logging
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from enum import Enum
 from typing import Any
 from uuid import UUID, uuid4
-
-
-def _utc_now() -> datetime:
-    """Get current UTC time as naive datetime for database compatibility."""
-    return datetime.now(timezone.utc).replace(tzinfo=None)
 
 from sqlalchemy import func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -28,11 +23,15 @@ from src.core.claude import claude_client
 from src.db.models import Agent, AgentLog, Pattern, Suggestion
 from src.db.models.memory import (
     MemoryBelief,
-    MemoryExperience,
     MemoryFact,
     MemoryOperation,
     MemoryRelationship,
 )
+
+
+def _utc_now() -> datetime:
+    """Get current UTC time as naive datetime for database compatibility."""
+    return datetime.now(UTC).replace(tzinfo=None)
 
 logger = logging.getLogger(__name__)
 
@@ -1165,7 +1164,7 @@ Suggest specific behavior adjustments as JSON:
             # Find and consolidate duplicates within each type
             facts_to_delete = []
 
-            for fact_type, type_facts in facts_by_type.items():
+            for _fact_type, type_facts in facts_by_type.items():
                 # Compare facts pairwise for similarity
                 seen_indices = set()
 

@@ -1,7 +1,7 @@
 """Session model for tracking user work sessions."""
 
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 from sqlalchemy import DateTime, Float, ForeignKey, Index, Integer, String
@@ -41,12 +41,12 @@ class Session(Base):
     session_metadata: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(),
-        default=lambda: datetime.now(timezone.utc).replace(tzinfo=None),
+        default=lambda: datetime.now(UTC).replace(tzinfo=None),
     )
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(),
-        default=lambda: datetime.now(timezone.utc).replace(tzinfo=None),
-        onupdate=lambda: datetime.now(timezone.utc).replace(tzinfo=None),
+        default=lambda: datetime.now(UTC).replace(tzinfo=None),
+        onupdate=lambda: datetime.now(UTC).replace(tzinfo=None),
     )
 
     __table_args__ = (

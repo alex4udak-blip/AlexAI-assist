@@ -9,26 +9,22 @@ Comprehensive tests for all evolution subsystems:
 """
 
 import json
-from datetime import UTC, datetime, timedelta, timezone
-from pathlib import Path
-from typing import Any
-from unittest.mock import AsyncMock, MagicMock, call, patch
+from datetime import UTC, datetime, timedelta
+from unittest.mock import AsyncMock, MagicMock, patch
 from uuid import uuid4
 
 import pytest
 
 from src.db.models import Agent, AgentLog, Pattern
-from src.db.models.memory import MemoryFact, MemoryOperation
 from src.services.evolution.agent_evolution import AgentEvolution
 from src.services.evolution.behavior_evolution import BehaviorEvolution
-from src.services.evolution.memory_evolution import MemoryEvolution, MemoryParams
+from src.services.evolution.memory_evolution import MemoryEvolution
 from src.services.evolution.orchestrator import (
     EvolutionOrchestrator,
     EvolutionPriority,
     EvolutionSubsystem,
     FeedbackSource,
 )
-
 
 # ===========================================
 # FIXTURES
@@ -319,12 +315,12 @@ class TestBehaviorEvolution:
         mock_msg1 = MagicMock()
         mock_msg1.role = "user"
         mock_msg1.content = "Please make your responses shorter"
-        mock_msg1.timestamp = datetime.now(timezone.utc).replace(tzinfo=None)
+        mock_msg1.timestamp = datetime.now(UTC).replace(tzinfo=None)
 
         mock_msg2 = MagicMock()
         mock_msg2.role = "user"
         mock_msg2.content = "Too verbose, can you be more brief?"
-        mock_msg2.timestamp = datetime.now(timezone.utc).replace(tzinfo=None)
+        mock_msg2.timestamp = datetime.now(UTC).replace(tzinfo=None)
 
         mock_result = MagicMock()
         mock_result.scalars.return_value.all.return_value = [mock_msg1, mock_msg2]
@@ -333,7 +329,7 @@ class TestBehaviorEvolution:
         issues = [{"type": "verbosity_complaint", "severity": "medium"}]
 
         old_verbosity = evolution.behavior["verbosity"]
-        result = await evolution.evolve(issues)
+        await evolution.evolve(issues)
 
         assert evolution.behavior["verbosity"] < old_verbosity
 
@@ -346,17 +342,17 @@ class TestBehaviorEvolution:
         mock_msg1 = MagicMock()
         mock_msg1.role = "user"
         mock_msg1.content = "Great job, спасибо!"
-        mock_msg1.timestamp = datetime.now(timezone.utc).replace(tzinfo=None)
+        mock_msg1.timestamp = datetime.now(UTC).replace(tzinfo=None)
 
         mock_msg2 = MagicMock()
         mock_msg2.role = "user"
         mock_msg2.content = "Please make it shorter"
-        mock_msg2.timestamp = datetime.now(timezone.utc).replace(tzinfo=None)
+        mock_msg2.timestamp = datetime.now(UTC).replace(tzinfo=None)
 
         mock_msg3 = MagicMock()
         mock_msg3.role = "assistant"
         mock_msg3.content = "Here is the detailed response..."
-        mock_msg3.timestamp = datetime.now(timezone.utc).replace(tzinfo=None)
+        mock_msg3.timestamp = datetime.now(UTC).replace(tzinfo=None)
 
         mock_result = MagicMock()
         mock_result.scalars.return_value.all.return_value = [mock_msg1, mock_msg2, mock_msg3]
@@ -974,7 +970,7 @@ class TestIntegration:
             mock_msg = MagicMock()
             mock_msg.role = "user"
             mock_msg.content = "Too verbose"
-            mock_msg.timestamp = datetime.now(timezone.utc).replace(tzinfo=None)
+            mock_msg.timestamp = datetime.now(UTC).replace(tzinfo=None)
 
             mock_result = MagicMock()
             mock_result.scalars.return_value.all.return_value = [mock_msg]
@@ -1019,8 +1015,6 @@ class TestIntegration:
         memory_evolution._save_param_history()
 
         # Simulate concurrent modifications
-        original_decay = memory_evolution.current_params.decay_rate_facts
-
         issues1 = [{"type": "low_recall", "severity": "high"}]
         issues2 = [{"type": "memory_overload", "severity": "high"}]
 

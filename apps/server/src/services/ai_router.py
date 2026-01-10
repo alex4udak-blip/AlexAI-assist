@@ -2,7 +2,7 @@
 
 import json
 from collections import defaultdict
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from enum import Enum
 from typing import Any
 
@@ -34,7 +34,7 @@ class TaskComplexity(Enum):
 
 def utc_now() -> datetime:
     """Get current UTC time as naive datetime."""
-    return datetime.now(timezone.utc).replace(tzinfo=None)
+    return datetime.now(UTC).replace(tzinfo=None)
 
 
 class AIRouter:
@@ -451,7 +451,9 @@ class ObserverTasks:
     ) -> dict[str, Any]:
         """Classify activity (Haiku, cached 7 days - same app+title = same result)."""
         # Compressed prompt - fewer tokens, same quality
-        prompt = f"Classify as productive/neutral/distracting: {activity.get('app_name', '?')} - {activity.get('window_title', '?')}"
+        app = activity.get('app_name', '?')
+        title = activity.get('window_title', '?')
+        prompt = f"Classify as productive/neutral/distracting: {app} - {title}"
 
         return await self.router.query(
             prompt=prompt,
@@ -473,8 +475,10 @@ class ObserverTasks:
         for activity in activities:
             cache_key = f"{activity.get('app_name', '?')}|{activity.get('window_title', '?')}"
             # Check router's internal cache
+            app = activity.get('app_name', '?')
+            title = activity.get('window_title', '?')
             full_key = self.router._get_cache_key(
-                f"Classify as productive/neutral/distracting: {activity.get('app_name', '?')} - {activity.get('window_title', '?')}",
+                f"Classify as productive/neutral/distracting: {app} - {title}",
                 ModelTier.HAIKU.value
             )
             if full_key in self.router.cache:
@@ -494,7 +498,10 @@ class ObserverTasks:
             for i, a in enumerate(uncached[:20])
         ])
 
-        prompt = f"Classify each as P(productive)/N(neutral)/D(distracting). Reply with numbers and letters only, like: 1P 2N 3D\n\n{items_text}"
+        prompt = (
+            "Classify each as P(productive)/N(neutral)/D(distracting). "
+            f"Reply with numbers and letters only, like: 1P 2N 3D\n\n{items_text}"
+        )
 
         result = await self.router.query(
             prompt=prompt,
@@ -515,12 +522,14 @@ class ObserverTasks:
             elif f"{i+1}N" in response_text or f"{i+1}n" in response_text:
                 classification = "neutral"
 
-            cache_key = f"{activity.get('app_name', '?')}|{activity.get('window_title', '?')}"
+            app_name = activity.get('app_name', '?')
+            win_title = activity.get('window_title', '?')
+            cache_key = f"{app_name}|{win_title}"
             cached_results[cache_key] = classification
 
             # Store in router cache for future single lookups
             full_key = self.router._get_cache_key(
-                f"Classify as productive/neutral/distracting: {activity.get('app_name', '?')} - {activity.get('window_title', '?')}",
+                f"Classify as productive/neutral/distracting: {app_name} - {win_title}",
                 ModelTier.HAIKU.value
             )
             self.router.cache[full_key] = {

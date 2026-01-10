@@ -1,7 +1,7 @@
 """Audit log model for tracking command executions."""
 
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 from sqlalchemy import DateTime, ForeignKey, Index, Integer, String, Text
@@ -24,7 +24,7 @@ class AuditLog(Base):
     timestamp: Mapped[datetime] = mapped_column(
         DateTime(),
         nullable=False,
-        default=lambda: datetime.now(timezone.utc).replace(tzinfo=None),
+        default=lambda: datetime.now(UTC).replace(tzinfo=None),
     )
     action_type: Mapped[str] = mapped_column(
         String(50),
@@ -52,7 +52,7 @@ class AuditLog(Base):
     ip_address: Mapped[str | None] = mapped_column(String(45))
     created_at: Mapped[datetime] = mapped_column(
         DateTime(),
-        default=lambda: datetime.now(timezone.utc).replace(tzinfo=None),
+        default=lambda: datetime.now(UTC).replace(tzinfo=None),
     )
 
     __table_args__ = (

@@ -3,7 +3,7 @@ Central Memory Manager - MemGPT/Hindsight/O-Mem unified orchestrator.
 """
 
 import logging
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 from uuid import UUID, uuid4
 
@@ -499,7 +499,7 @@ class MemoryManager:
                 meta.facts_count = facts_count
                 meta.beliefs_count = beliefs_count
                 meta.confidence_score = confidence
-                meta.last_updated = datetime.now(timezone.utc).replace(tzinfo=None)
+                meta.last_updated = datetime.now(UTC).replace(tzinfo=None)
             else:
                 meta = MemoryMeta(
                     id=uuid4(),

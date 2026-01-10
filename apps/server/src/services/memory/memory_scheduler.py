@@ -4,7 +4,7 @@ Implements MemOS's MemScheduler for memory prioritization.
 """
 
 import logging
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 from uuid import UUID, uuid4
 
@@ -98,9 +98,9 @@ class MemScheduler:
 
         # Recency component
         if last_accessed:
-            hours_since_access = (datetime.now(timezone.utc).replace(tzinfo=None) - last_accessed).total_seconds() / 3600
+            hours_since_access = (datetime.now(UTC).replace(tzinfo=None) - last_accessed).total_seconds() / 3600
         else:
-            hours_since_access = (datetime.now(timezone.utc).replace(tzinfo=None) - created_at).total_seconds() / 3600
+            hours_since_access = (datetime.now(UTC).replace(tzinfo=None) - created_at).total_seconds() / 3600
 
         # Exponential decay
         recency = math.exp(-hours_since_access / 168)  # Week half-life
@@ -229,7 +229,7 @@ class MemScheduler:
 
         if cube:
             cube.schedule_count += 1
-            cube.last_scheduled = datetime.now(timezone.utc).replace(tzinfo=None)
+            cube.last_scheduled = datetime.now(UTC).replace(tzinfo=None)
         else:
             cube = MemoryCube(
                 id=uuid4(),
@@ -237,7 +237,7 @@ class MemScheduler:
                 memory_type=memory_type,
                 memory_id=memory_id,
                 schedule_count=1,
-                last_scheduled=datetime.now(timezone.utc).replace(tzinfo=None),
+                last_scheduled=datetime.now(UTC).replace(tzinfo=None),
             )
             self.db.add(cube)
 
@@ -326,7 +326,7 @@ class MemScheduler:
             new_confidence = calculate_time_decay(
                 current_confidence=fact.confidence,
                 last_reinforced=fact.last_accessed,
-                now=datetime.now(timezone.utc).replace(tzinfo=None),
+                now=datetime.now(UTC).replace(tzinfo=None),
                 decay_rate=self.DECAY_RATE_NORMAL,
                 min_confidence=0.1,
             )
@@ -345,7 +345,7 @@ class MemScheduler:
             new_confidence = calculate_time_decay(
                 current_confidence=belief.confidence,
                 last_reinforced=belief.last_reinforced,
-                now=datetime.now(timezone.utc).replace(tzinfo=None),
+                now=datetime.now(UTC).replace(tzinfo=None),
                 decay_rate=self.DECAY_RATE_SLOW,  # Beliefs decay slower
                 min_confidence=0.1,
             )
@@ -456,7 +456,7 @@ class MemScheduler:
 
             if cube:
                 cube.retention_policy = "archived"
-                cube.updated_at = datetime.now(timezone.utc).replace(tzinfo=None)
+                cube.updated_at = datetime.now(UTC).replace(tzinfo=None)
             else:
                 cube = MemoryCube(
                     id=uuid4(),
