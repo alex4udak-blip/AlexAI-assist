@@ -382,7 +382,7 @@ Always respond with valid JSON."""
             steps = len(self.history)
 
         # Rollback to previous state
-        target_snapshot = self.history[-(steps + 1)] if steps < len(self.history) else self.history[0]
+        target_snapshot = self.history[-steps] if steps <= len(self.history) else self.history[0]
 
         old_behavior = self.behavior.copy()
         self.behavior = target_snapshot["behavior"].copy()
