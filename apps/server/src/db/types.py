@@ -9,7 +9,7 @@ import uuid
 from typing import Any
 
 from sqlalchemy import Text, TypeDecorator
-from sqlalchemy.dialects import postgresql, sqlite
+from sqlalchemy.dialects import postgresql
 
 
 class PortableUUID(TypeDecorator):
