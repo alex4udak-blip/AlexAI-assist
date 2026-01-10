@@ -307,7 +307,7 @@ class BeliefNetwork:
         # Create new belief with inherited confidence
         new = await self.form(
             belief=new_belief,
-            belief_type=old.belief_type,
+            belief_type=old.belief_type or "inference",
             initial_confidence=old.confidence,
             supporting_facts=old.supporting_facts,
         )

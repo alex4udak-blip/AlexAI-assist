@@ -69,9 +69,9 @@ async def example_issue_handling() -> None:
     """Example of handling different issue types."""
 
     # Mock database session (replace with actual session in production)
-    db = None  # type: ignore
+    db = None
 
-    evolution = MemoryEvolution(db, session_id="test")
+    evolution = MemoryEvolution(db, session_id="test")  # type: ignore[arg-type]
 
     # Example 1: Memory overload
     print("Example 1: Memory Overload")

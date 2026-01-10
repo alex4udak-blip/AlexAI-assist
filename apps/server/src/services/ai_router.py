@@ -306,11 +306,15 @@ class AIRouter:
             response = self.client.messages.create(
                 model=model.value,
                 max_tokens=max_tokens,
-                messages=messages,
+                messages=messages,  # type: ignore[arg-type]
             )
 
-            # Extract response
-            response_text = response.content[0].text if response.content else ""
+            # Extract response (only TextBlock has .text attribute)
+            response_text = ""
+            if response.content:
+                first_block = response.content[0]
+                if hasattr(first_block, "text"):
+                    response_text = first_block.text
 
             # Calculate cost
             input_tokens = response.usage.input_tokens

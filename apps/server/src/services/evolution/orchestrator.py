@@ -1036,10 +1036,10 @@ Suggest specific behavior adjustments as JSON:
                 # Restore beliefs that were modified or deleted
                 for belief_data in snapshot.snapshot_data.get("beliefs", []):
                     belief_id = UUID(belief_data["id"])
-                    result = await self.db.execute(
+                    belief_result = await self.db.execute(
                         select(MemoryBelief).where(MemoryBelief.id == belief_id)
                     )
-                    existing_belief = result.scalar_one_or_none()
+                    existing_belief: MemoryBelief | None = belief_result.scalar_one_or_none()
 
                     if existing_belief:
                         # Restore original status if it was changed
@@ -1105,10 +1105,10 @@ Suggest specific behavior adjustments as JSON:
                 # Restore agent states from snapshot
                 for agent_data in snapshot.snapshot_data.get("agents", []):
                     agent_id = UUID(agent_data["id"])
-                    result = await self.db.execute(
+                    agent_result = await self.db.execute(
                         select(Agent).where(Agent.id == agent_id)
                     )
-                    agent = result.scalar_one_or_none()
+                    agent: Agent | None = agent_result.scalar_one_or_none()
 
                     if agent:
                         agent.status = agent_data["status"]
