@@ -138,6 +138,10 @@ async def create_events(
     db: AsyncSession = Depends(get_db_session),
 ) -> dict[str, Any]:
     """Receive events from collector."""
+    import logging
+    logger = logging.getLogger(__name__)
+    logger.info(f"Received {len(batch.events)} events from devices: {set(e.device_id for e in batch.events)}")
+
     # Ensure device exists - batch query to avoid N+1
     device_ids = {e.device_id for e in batch.events}
     result = await db.execute(
@@ -251,8 +255,11 @@ async def create_events(
     cache = get_cache()
     await cache.delete_pattern("timeline:*")
 
+    created_count = len(batch.events) - skipped_count
+    logger.info(f"Events processed: created={created_count}, skipped={skipped_count}")
+
     return {
-        "created": len(batch.events) - skipped_count,
+        "created": created_count,
         "skipped": skipped_count,
         "acked_event_ids": acked_event_ids,
         "session_events": session_events,
