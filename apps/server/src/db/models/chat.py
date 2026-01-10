@@ -4,10 +4,10 @@ import uuid
 from datetime import UTC, datetime
 
 from sqlalchemy import Index, String, Text
-from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
 from src.db.base import Base
+from src.db.types import PortableUUID
 
 
 class ChatMessage(Base):
@@ -16,7 +16,7 @@ class ChatMessage(Base):
     __tablename__ = "chat_messages"
 
     id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True),
+        PortableUUID(),
         primary_key=True,
         default=uuid.uuid4,
     )

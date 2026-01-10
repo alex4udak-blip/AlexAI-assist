@@ -5,10 +5,10 @@ from datetime import UTC, datetime
 from typing import Any
 
 from sqlalchemy import Boolean, Float, ForeignKey, Index, Integer, String, Text
-from sqlalchemy.dialects.postgresql import ARRAY, JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from src.db.base import Base
+from src.db.types import JSONType, PortableUUID, StringArray, UUIDArray
 
 # ===========================================
 # NETWORK 1: FACT NETWORK
@@ -20,7 +20,7 @@ class MemoryFact(Base):
 
     __tablename__ = "memory_facts"
 
-    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id: Mapped[uuid.UUID] = mapped_column(PortableUUID(), primary_key=True, default=uuid.uuid4)
     session_id: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
 
     # Content
@@ -35,8 +35,8 @@ class MemoryFact(Base):
     is_persona_event: Mapped[bool] = mapped_column(Boolean, default=False)
 
     # A-MEM Zettelkasten
-    keywords: Mapped[list[str] | None] = mapped_column(ARRAY(String), server_default="'{}'")
-    tags: Mapped[list[str] | None] = mapped_column(ARRAY(String), server_default="'{}'")
+    keywords: Mapped[list[str] | None] = mapped_column(StringArray(), server_default="'{}'")
+    tags: Mapped[list[str] | None] = mapped_column(StringArray(), server_default="'{}'")
     context: Mapped[str | None] = mapped_column(Text)
 
     # Hindsight temporal
@@ -48,9 +48,9 @@ class MemoryFact(Base):
     # Confidence & source
     confidence: Mapped[float] = mapped_column(Float, default=1.0)
     source: Mapped[str | None] = mapped_column(String(50))
-    source_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True)
+    source_id: Mapped[uuid.UUID | None] = mapped_column(PortableUUID(), nullable=True)
     evidence_ids: Mapped[list[uuid.UUID] | None] = mapped_column(
-        ARRAY(UUID(as_uuid=True)), server_default="'{}'"
+        UUIDArray(), server_default="'{}'"
     )
 
     # MemOS scheduling
@@ -80,7 +80,7 @@ class MemoryExperience(Base):
 
     __tablename__ = "memory_experiences"
 
-    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id: Mapped[uuid.UUID] = mapped_column(PortableUUID(), primary_key=True, default=uuid.uuid4)
     session_id: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
 
     # Content
@@ -91,7 +91,7 @@ class MemoryExperience(Base):
     # What happened
     action_taken: Mapped[str | None] = mapped_column(Text)
     outcome: Mapped[str | None] = mapped_column(String(50))  # success, failure, partial
-    outcome_details: Mapped[dict[str, Any] | None] = mapped_column(JSONB, server_default="'{}'")
+    outcome_details: Mapped[dict[str, Any] | None] = mapped_column(JSONType(), server_default="'{}'")
 
     # Learning
     lesson_learned: Mapped[str | None] = mapped_column(Text)
@@ -102,17 +102,17 @@ class MemoryExperience(Base):
     duration_seconds: Mapped[int | None] = mapped_column(Integer)
 
     # References
-    agent_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True)
+    agent_id: Mapped[uuid.UUID | None] = mapped_column(PortableUUID(), nullable=True)
     related_facts: Mapped[list[uuid.UUID] | None] = mapped_column(
-        ARRAY(UUID(as_uuid=True)), server_default="'{}'"
+        UUIDArray(), server_default="'{}'"
     )
     related_entities: Mapped[list[uuid.UUID] | None] = mapped_column(
-        ARRAY(UUID(as_uuid=True)), server_default="'{}'"
+        UUIDArray(), server_default="'{}'"
     )
 
     # Procedural
     is_procedural: Mapped[bool] = mapped_column(Boolean, default=False)
-    procedure_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True)
+    procedure_id: Mapped[uuid.UUID | None] = mapped_column(PortableUUID(), nullable=True)
 
     # Timestamps
     created_at: Mapped[datetime] = mapped_column(default=lambda: datetime.now(UTC).replace(tzinfo=None))
@@ -128,7 +128,7 @@ class MemoryEntity(Base):
 
     __tablename__ = "memory_entities"
 
-    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id: Mapped[uuid.UUID] = mapped_column(PortableUUID(), primary_key=True, default=uuid.uuid4)
     session_id: Mapped[str | None] = mapped_column(String(64), index=True)
 
     # Identity
@@ -139,8 +139,8 @@ class MemoryEntity(Base):
 
     # Synthesized profile
     summary: Mapped[str | None] = mapped_column(Text)
-    key_facts: Mapped[list[str] | None] = mapped_column(ARRAY(String), server_default="'{}'")
-    attributes: Mapped[dict[str, Any] | None] = mapped_column(JSONB, server_default="'{}'")
+    key_facts: Mapped[list[str] | None] = mapped_column(StringArray(), server_default="'{}'")
+    attributes: Mapped[dict[str, Any] | None] = mapped_column(JSONType(), server_default="'{}'")
 
     # Usage statistics
     mention_count: Mapped[int] = mapped_column(Integer, default=1)
@@ -180,15 +180,15 @@ class MemoryRelationship(Base):
 
     __tablename__ = "memory_relationships"
 
-    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id: Mapped[uuid.UUID] = mapped_column(PortableUUID(), primary_key=True, default=uuid.uuid4)
     session_id: Mapped[str | None] = mapped_column(String(64), index=True)
 
     # Nodes
     source_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("memory_entities.id", ondelete="CASCADE"), nullable=False
+        PortableUUID(), ForeignKey("memory_entities.id", ondelete="CASCADE"), nullable=False
     )
     target_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("memory_entities.id", ondelete="CASCADE"), nullable=False
+        PortableUUID(), ForeignKey("memory_entities.id", ondelete="CASCADE"), nullable=False
     )
 
     # Relationship
@@ -206,7 +206,7 @@ class MemoryRelationship(Base):
 
     # Evidence
     evidence: Mapped[list[uuid.UUID] | None] = mapped_column(
-        ARRAY(UUID(as_uuid=True)), server_default="'{}'"
+        UUIDArray(), server_default="'{}'"
     )
 
     # Timestamps
@@ -238,7 +238,7 @@ class MemoryBelief(Base):
 
     __tablename__ = "memory_beliefs"
 
-    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id: Mapped[uuid.UUID] = mapped_column(PortableUUID(), primary_key=True, default=uuid.uuid4)
     session_id: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
 
     # Content
@@ -248,14 +248,14 @@ class MemoryBelief(Base):
 
     # Confidence evolution
     confidence: Mapped[float] = mapped_column(Float, default=0.5)
-    confidence_history: Mapped[list[dict[str, Any]] | None] = mapped_column(JSONB, server_default="[]")
+    confidence_history: Mapped[list[dict[str, Any]] | None] = mapped_column(JSONType(), server_default="[]")
 
     # Evidence
     supporting_facts: Mapped[list[uuid.UUID] | None] = mapped_column(
-        ARRAY(UUID(as_uuid=True)), server_default="'{}'"
+        UUIDArray(), server_default="'{}'"
     )
     contradicting_facts: Mapped[list[uuid.UUID] | None] = mapped_column(
-        ARRAY(UUID(as_uuid=True)), server_default="'{}'"
+        UUIDArray(), server_default="'{}'"
     )
 
     # Evolution
@@ -267,7 +267,7 @@ class MemoryBelief(Base):
 
     # Status
     status: Mapped[str] = mapped_column(String(20), default="active")
-    superseded_by: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True)
+    superseded_by: Mapped[uuid.UUID | None] = mapped_column(PortableUUID(), nullable=True)
 
     # Timestamps
     created_at: Mapped[datetime] = mapped_column(default=lambda: datetime.now(UTC).replace(tzinfo=None))
@@ -289,7 +289,7 @@ class MemoryTopic(Base):
 
     __tablename__ = "memory_topics"
 
-    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id: Mapped[uuid.UUID] = mapped_column(PortableUUID(), primary_key=True, default=uuid.uuid4)
     session_id: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
 
     # Topic
@@ -297,7 +297,7 @@ class MemoryTopic(Base):
     description: Mapped[str | None] = mapped_column(Text)
 
     # Messages
-    message_ids: Mapped[list[uuid.UUID] | None] = mapped_column(ARRAY(UUID(as_uuid=True)), server_default="'{}'")
+    message_ids: Mapped[list[uuid.UUID] | None] = mapped_column(UUIDArray(), server_default="'{}'")
     message_count: Mapped[int] = mapped_column(Integer, default=0)
 
     # Temporal
@@ -306,7 +306,7 @@ class MemoryTopic(Base):
 
     # Summary
     summary: Mapped[str | None] = mapped_column(Text)
-    key_points: Mapped[list[str] | None] = mapped_column(ARRAY(String), server_default="'{}'")
+    key_points: Mapped[list[str] | None] = mapped_column(StringArray(), server_default="'{}'")
 
     # Timestamps
     created_at: Mapped[datetime] = mapped_column(default=lambda: datetime.now(UTC).replace(tzinfo=None))
@@ -318,12 +318,12 @@ class MemoryKeywordIndex(Base):
 
     __tablename__ = "memory_keyword_index"
 
-    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id: Mapped[uuid.UUID] = mapped_column(PortableUUID(), primary_key=True, default=uuid.uuid4)
     session_id: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
 
     keyword: Mapped[str] = mapped_column(String(100), nullable=False)
-    message_ids: Mapped[list[uuid.UUID] | None] = mapped_column(ARRAY(UUID(as_uuid=True)), server_default="'{}'")
-    fact_ids: Mapped[list[uuid.UUID] | None] = mapped_column(ARRAY(UUID(as_uuid=True)), server_default="'{}'")
+    message_ids: Mapped[list[uuid.UUID] | None] = mapped_column(UUIDArray(), server_default="'{}'")
+    fact_ids: Mapped[list[uuid.UUID] | None] = mapped_column(UUIDArray(), server_default="'{}'")
     occurrence_count: Mapped[int] = mapped_column(Integer, default=1)
 
     created_at: Mapped[datetime] = mapped_column(default=lambda: datetime.now(UTC).replace(tzinfo=None))
@@ -339,16 +339,16 @@ class MemoryCube(Base):
 
     __tablename__ = "memory_cubes"
 
-    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id: Mapped[uuid.UUID] = mapped_column(PortableUUID(), primary_key=True, default=uuid.uuid4)
     session_id: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
 
     # Reference
     memory_type: Mapped[str] = mapped_column(String(50), nullable=False)
-    memory_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
+    memory_id: Mapped[uuid.UUID] = mapped_column(PortableUUID(), nullable=False)
 
     # MemOS metadata
     version: Mapped[int] = mapped_column(Integer, default=1)
-    provenance: Mapped[dict[str, Any] | None] = mapped_column(JSONB, server_default="'{}'")
+    provenance: Mapped[dict[str, Any] | None] = mapped_column(JSONType(), server_default="'{}'")
 
     # Governance
     access_level: Mapped[str] = mapped_column(String(20), default="private")
@@ -361,8 +361,8 @@ class MemoryCube(Base):
     schedule_count: Mapped[int] = mapped_column(Integer, default=0)
 
     # Migration
-    migrated_from: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True)
-    migrated_to: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True)
+    migrated_from: Mapped[uuid.UUID | None] = mapped_column(PortableUUID(), nullable=True)
+    migrated_to: Mapped[uuid.UUID | None] = mapped_column(PortableUUID(), nullable=True)
 
     # Timestamps
     created_at: Mapped[datetime] = mapped_column(default=lambda: datetime.now(UTC).replace(tzinfo=None))
@@ -379,13 +379,13 @@ class MemoryLink(Base):
 
     __tablename__ = "memory_links"
 
-    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id: Mapped[uuid.UUID] = mapped_column(PortableUUID(), primary_key=True, default=uuid.uuid4)
 
     # Source and target
     source_type: Mapped[str] = mapped_column(String(50), nullable=False)
-    source_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
+    source_id: Mapped[uuid.UUID] = mapped_column(PortableUUID(), nullable=False)
     target_type: Mapped[str] = mapped_column(String(50), nullable=False)
-    target_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
+    target_id: Mapped[uuid.UUID] = mapped_column(PortableUUID(), nullable=False)
 
     # Link properties
     link_type: Mapped[str | None] = mapped_column(String(50))
@@ -409,17 +409,17 @@ class MemoryOperation(Base):
 
     __tablename__ = "memory_operations"
 
-    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id: Mapped[uuid.UUID] = mapped_column(PortableUUID(), primary_key=True, default=uuid.uuid4)
     session_id: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
 
     # Operation
     operation: Mapped[str] = mapped_column(String(20), nullable=False)
     memory_type: Mapped[str | None] = mapped_column(String(50))
-    memory_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True)
+    memory_id: Mapped[uuid.UUID | None] = mapped_column(PortableUUID(), nullable=True)
 
     # Context
     trigger: Mapped[str | None] = mapped_column(String(50))
-    trigger_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True)
+    trigger_id: Mapped[uuid.UUID | None] = mapped_column(PortableUUID(), nullable=True)
 
     # Decision
     reason: Mapped[str | None] = mapped_column(Text)
@@ -443,7 +443,7 @@ class MemoryEpisode(Base):
 
     __tablename__ = "memory_episodes"
 
-    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id: Mapped[uuid.UUID] = mapped_column(PortableUUID(), primary_key=True, default=uuid.uuid4)
     session_id: Mapped[str | None] = mapped_column(String(64), index=True)
 
     # Period
@@ -454,20 +454,20 @@ class MemoryEpisode(Base):
     # Content
     title: Mapped[str | None] = mapped_column(String(255))
     summary: Mapped[str] = mapped_column(Text, nullable=False)
-    key_points: Mapped[list[str] | None] = mapped_column(ARRAY(String), server_default="'{}'")
-    highlights: Mapped[list[dict[str, Any]] | None] = mapped_column(JSONB, server_default="[]")
+    key_points: Mapped[list[str] | None] = mapped_column(StringArray(), server_default="'{}'")
+    highlights: Mapped[list[dict[str, Any]] | None] = mapped_column(JSONType(), server_default="[]")
 
     # Metrics
-    metrics: Mapped[dict[str, Any] | None] = mapped_column(JSONB, server_default="'{}'")
+    metrics: Mapped[dict[str, Any] | None] = mapped_column(JSONType(), server_default="'{}'")
 
     # Extracted knowledge
-    facts_extracted: Mapped[list[uuid.UUID] | None] = mapped_column(ARRAY(UUID(as_uuid=True)), server_default="'{}'")
-    beliefs_formed: Mapped[list[uuid.UUID] | None] = mapped_column(ARRAY(UUID(as_uuid=True)), server_default="'{}'")
-    entities_mentioned: Mapped[list[uuid.UUID] | None] = mapped_column(ARRAY(UUID(as_uuid=True)), server_default="'{}'")
+    facts_extracted: Mapped[list[uuid.UUID] | None] = mapped_column(UUIDArray(), server_default="'{}'")
+    beliefs_formed: Mapped[list[uuid.UUID] | None] = mapped_column(UUIDArray(), server_default="'{}'")
+    entities_mentioned: Mapped[list[uuid.UUID] | None] = mapped_column(UUIDArray(), server_default="'{}'")
 
     # Sources
-    source_messages: Mapped[list[uuid.UUID] | None] = mapped_column(ARRAY(UUID(as_uuid=True)), server_default="'{}'")
-    source_events: Mapped[list[uuid.UUID] | None] = mapped_column(ARRAY(UUID(as_uuid=True)), server_default="'{}'")
+    source_messages: Mapped[list[uuid.UUID] | None] = mapped_column(UUIDArray(), server_default="'{}'")
+    source_events: Mapped[list[uuid.UUID] | None] = mapped_column(UUIDArray(), server_default="'{}'")
 
     # Timestamps
     created_at: Mapped[datetime] = mapped_column(default=lambda: datetime.now(UTC).replace(tzinfo=None))
@@ -483,7 +483,7 @@ class MemoryProcedure(Base):
 
     __tablename__ = "memory_procedures"
 
-    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id: Mapped[uuid.UUID] = mapped_column(PortableUUID(), primary_key=True, default=uuid.uuid4)
     session_id: Mapped[str | None] = mapped_column(String(64), index=True)
 
     # Identity
@@ -492,8 +492,8 @@ class MemoryProcedure(Base):
     procedure_type: Mapped[str | None] = mapped_column(String(50))
 
     # The procedure
-    trigger_conditions: Mapped[dict[str, Any] | None] = mapped_column(JSONB, server_default="'{}'")
-    steps: Mapped[list[dict[str, Any]] | None] = mapped_column(JSONB, server_default="[]")
+    trigger_conditions: Mapped[dict[str, Any] | None] = mapped_column(JSONType(), server_default="'{}'")
+    steps: Mapped[list[dict[str, Any]] | None] = mapped_column(JSONType(), server_default="[]")
     expected_outcome: Mapped[str | None] = mapped_column(Text)
 
     # Learning stats
@@ -504,12 +504,12 @@ class MemoryProcedure(Base):
 
     # Evolution
     version: Mapped[int] = mapped_column(Integer, default=1)
-    parent_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True)
+    parent_id: Mapped[uuid.UUID | None] = mapped_column(PortableUUID(), nullable=True)
     improvement_notes: Mapped[str | None] = mapped_column(Text)
 
     # Agent link
-    learned_from_agent_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True)
-    experience_ids: Mapped[list[uuid.UUID] | None] = mapped_column(ARRAY(UUID(as_uuid=True)), server_default="'{}'")
+    learned_from_agent_id: Mapped[uuid.UUID | None] = mapped_column(PortableUUID(), nullable=True)
+    experience_ids: Mapped[list[uuid.UUID] | None] = mapped_column(UUIDArray(), server_default="'{}'")
 
     # Timestamps
     last_used: Mapped[datetime | None] = mapped_column(nullable=True)
@@ -527,7 +527,7 @@ class MemoryMeta(Base):
 
     __tablename__ = "memory_meta"
 
-    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id: Mapped[uuid.UUID] = mapped_column(PortableUUID(), primary_key=True, default=uuid.uuid4)
     session_id: Mapped[str | None] = mapped_column(String(64), index=True)
 
     # Domain
@@ -544,8 +544,8 @@ class MemoryMeta(Base):
     experiences_count: Mapped[int] = mapped_column(Integer, default=0)
 
     # Knowledge gaps
-    unknown_areas: Mapped[list[str] | None] = mapped_column(ARRAY(String), server_default="'{}'")
-    questions_to_explore: Mapped[list[str] | None] = mapped_column(ARRAY(String), server_default="'{}'")
+    unknown_areas: Mapped[list[str] | None] = mapped_column(StringArray(), server_default="'{}'")
+    questions_to_explore: Mapped[list[str] | None] = mapped_column(StringArray(), server_default="'{}'")
 
     # Timestamps
     last_updated: Mapped[datetime | None] = mapped_column(nullable=True)

@@ -5,10 +5,10 @@ from datetime import UTC, datetime
 from typing import Any
 
 from sqlalchemy import DateTime, ForeignKey, Index, Integer, String, Text
-from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
 from src.db.base import Base
+from src.db.types import JSONType, PortableUUID
 
 
 class AuditLog(Base):
@@ -17,7 +17,7 @@ class AuditLog(Base):
     __tablename__ = "audit_logs"
 
     id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True),
+        PortableUUID(),
         primary_key=True,
         default=uuid.uuid4,
     )
@@ -41,7 +41,7 @@ class AuditLog(Base):
         ForeignKey("devices.id"),
     )
     command_type: Mapped[str | None] = mapped_column(String(100))
-    command_params: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
+    command_params: Mapped[dict[str, Any] | None] = mapped_column(JSONType())
     result: Mapped[str] = mapped_column(
         String(20),
         nullable=False,

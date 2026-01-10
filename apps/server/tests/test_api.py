@@ -85,7 +85,7 @@ def client(test_db_session: AsyncSession):
                     mock_memory.return_value = mock_memory_instance
 
                     # Mock WebSocket broadcast
-                    with patch("src.api.routes.events.broadcast_event") as mock_broadcast:
+                    with patch("src.core.websocket.broadcast_events_batch") as mock_broadcast:
                         mock_broadcast.return_value = asyncio.Future()
                         mock_broadcast.return_value.set_result(None)
 

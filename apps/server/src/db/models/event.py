@@ -5,10 +5,10 @@ from datetime import UTC, datetime
 from typing import Any
 
 from sqlalchemy import DateTime, ForeignKey, Index, String, Text
-from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
 from src.db.base import Base
+from src.db.types import JSONType, PortableUUID
 
 
 class Event(Base):
@@ -17,7 +17,7 @@ class Event(Base):
     __tablename__ = "events"
 
     id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True),
+        PortableUUID(),
         primary_key=True,
         default=uuid.uuid4,
     )
@@ -37,7 +37,7 @@ class Event(Base):
     app_name: Mapped[str | None] = mapped_column(String(255))
     window_title: Mapped[str | None] = mapped_column(Text)
     url: Mapped[str | None] = mapped_column(Text)
-    data: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict)
+    data: Mapped[dict[str, Any]] = mapped_column(JSONType(), default=dict)
     category: Mapped[str | None] = mapped_column(String(50))
     created_at: Mapped[datetime] = mapped_column(
         DateTime(),
