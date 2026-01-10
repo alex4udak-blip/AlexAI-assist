@@ -199,6 +199,8 @@ pub async fn start_collector(
                 break;
             }
             _ = tokio::time::sleep(tokio::time::Duration::from_millis(500)) => {
+                println!("[Loop] Tick - checking focus...");
+
                 // Check if collection is enabled
                 {
                     let state = state.lock().await;
@@ -272,22 +274,21 @@ pub async fn start_collector(
                             println!("[Screenshot] Saved: {}", path_str);
                             event.screenshot_path = Some(path_str.clone());
 
-                            // === OCR ===
-                            #[cfg(target_os = "macos")]
-                            {
-                                match crate::automation::ocr::extract_text_from_path(&path_str) {
-                                    Ok(ocr_result) => {
-                                        println!("[OCR] Extracted {} chars", ocr_result.text.len());
-                                        // Store OCR text in event data
-                                        if let serde_json::Value::Object(ref mut map) = event.data {
-                                            map.insert("ocr_text".to_string(), serde_json::json!(ocr_result.text));
-                                        }
-                                    }
-                                    Err(e) => {
-                                        eprintln!("[OCR] Error: {}", e);
-                                    }
-                                }
-                            }
+                            // === OCR DISABLED - blocks entire app (compiles Swift synchronously 5-30 sec) ===
+                            // #[cfg(target_os = "macos")]
+                            // {
+                            //     match crate::automation::ocr::extract_text_from_path(&path_str) {
+                            //         Ok(ocr_result) => {
+                            //             println!("[OCR] Extracted {} chars", ocr_result.text.len());
+                            //             if let serde_json::Value::Object(ref mut map) = event.data {
+                            //                 map.insert("ocr_text".to_string(), serde_json::json!(ocr_result.text));
+                            //             }
+                            //         }
+                            //         Err(e) => {
+                            //             eprintln!("[OCR] Error: {}", e);
+                            //         }
+                            //     }
+                            // }
                         }
 
                         // === MESSENGER MESSAGES ===

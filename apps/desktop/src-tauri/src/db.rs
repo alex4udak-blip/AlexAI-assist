@@ -65,6 +65,8 @@ impl EventDatabase {
     pub fn insert_event(&self, event: &Event) -> SqliteResult<()> {
         let conn = self.conn.lock().unwrap();
 
+        println!("[DB::insert_event] Inserting: {} | {}", event.id, event.app_name.as_deref().unwrap_or("?"));
+
         conn.execute(
             "INSERT INTO events (
                 id, device_id, event_type, timestamp, app_name, window_title, url,
