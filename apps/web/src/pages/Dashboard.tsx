@@ -65,7 +65,7 @@ export default function Dashboard() {
   // Connect to WebSocket for real-time updates
   useWebSocket();
 
-  const { data: summary } = useAnalyticsSummary();
+  const { data: summary, refetch: refetchSummary } = useAnalyticsSummary();
   const { data: productivity } = useProductivity();
   const { data: timeline, refetch: refetchTimeline } = useTimeline(24);
   const { data: agents, refetch: refetchAgents } = useAgents();
@@ -75,7 +75,8 @@ export default function Dashboard() {
   const handleEventsCreated = useCallback(() => {
     // Refetch timeline and analytics when new events arrive
     refetchTimeline();
-  }, [refetchTimeline]);
+    refetchSummary();
+  }, [refetchTimeline, refetchSummary]);
 
   // Subscribe to real-time events
   useEventsCreated(handleEventsCreated);

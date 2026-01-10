@@ -68,23 +68,23 @@ class AppUsage(BaseModel):
 class ProductivityScore(BaseModel):
     """Productivity score response."""
 
-    score: float = Field(
+    score: int = Field(
         ...,
-        ge=0.0,
-        le=100.0,
+        ge=0,
+        le=100,
         description="Productivity score (0-100)",
     )
-    productive_minutes: float = Field(
+    productive_events: int = Field(
         ...,
-        description="Time spent on productive activities",
+        description="Number of productive events",
     )
-    neutral_minutes: float = Field(
+    total_events: int = Field(
         ...,
-        description="Time spent on neutral activities",
+        description="Total number of events",
     )
-    distracting_minutes: float = Field(
+    trend: str = Field(
         ...,
-        description="Time spent on distracting activities",
+        description="Trend direction (up, down, stable)",
     )
 
 
