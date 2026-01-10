@@ -68,19 +68,6 @@ class Settings(BaseSettings):
             is_production = self.environment.lower() in ("production", "prod")
 
             if is_production:
-                # Print to stdout/stderr BEFORE raising - logging may not be configured yet
-                import sys
-                error_msg = (
-                    "\n" + "=" * 60 + "\n"
-                    "FATAL ERROR: SECRET_KEY environment variable is not set!\n"
-                    "=" * 60 + "\n"
-                    "In production, SECRET_KEY must be set.\n"
-                    "Generate one with: python -c 'import secrets; print(secrets.token_urlsafe(32))'\n"
-                    "Then add it to Railway environment variables.\n"
-                    "=" * 60 + "\n"
-                )
-                print(error_msg, file=sys.stderr, flush=True)
-                print(error_msg, flush=True)  # Also to stdout in case stderr is hidden
                 raise ValueError(
                     "SECRET_KEY must be set via environment variable in production. "
                     "Generate a secure key with: "
