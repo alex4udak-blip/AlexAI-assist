@@ -26,6 +26,8 @@ pub struct AppState {
     pub events_buffer: Vec<collector::Event>,
     pub buffer_warnings_logged: bool,
     pub db: Arc<db::EventDatabase>,
+    /// Cached top apps - persists across syncs (updated when events are collected)
+    pub top_apps_cache: std::collections::HashMap<String, u32>,
 }
 
 fn main() {
@@ -47,14 +49,23 @@ fn main() {
         println!("Loaded {} existing events from database", events_count);
     }
 
+    // Build initial top_apps_cache from existing events
+    let mut initial_top_apps: std::collections::HashMap<String, u32> = std::collections::HashMap::new();
+    for event in &existing_events {
+        if let Some(app_name) = &event.app_name {
+            *initial_top_apps.entry(app_name.clone()).or_insert(0) += 1;
+        }
+    }
+
     // Create app state with database
     let state = Arc::new(Mutex::new(AppState {
         collecting: true,
-        events_today: 0,
+        events_today: existing_events.len() as u32,
         last_sync: "Never".to_string(),
         events_buffer: existing_events,
         buffer_warnings_logged: false,
         db: db.clone(),
+        top_apps_cache: initial_top_apps,
     }));
     let shutdown_token = CancellationToken::new();
 
