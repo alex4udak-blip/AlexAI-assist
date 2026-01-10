@@ -38,13 +38,14 @@ Observer — это **персональный** AI мета-агентный п
 - Валидируйте все входные данные
 - Санитизируйте пользовательские данные
 
-## Версионирование Desktop App
-При каждом обновлении десктопного приложения:
-1. Обновить версию в `apps/desktop/src-tauri/tauri.conf.json`
-2. Обновить версию в `apps/desktop/src-tauri/Cargo.toml`
-3. Обновить версию в `apps/desktop/package.json` (для UI через __APP_VERSION__)
-4. Версии должны совпадать во всех трёх файлах
-5. Использовать semver: MAJOR.MINOR.PATCH
+## Версионирование
+При каждом обновлении приложения менять версию в 4 местах:
+1. `apps/desktop/src-tauri/tauri.conf.json` - версия бинарника
+2. `apps/desktop/src-tauri/Cargo.toml` - версия Rust пакета
+3. `apps/desktop/package.json` - для UI через __APP_VERSION__
+4. `apps/web/package.json` - fallback версия на странице загрузки
+5. Версии должны совпадать во всех четырёх файлах
+6. Использовать semver: MAJOR.MINOR.PATCH
    - MAJOR: breaking changes
    - MINOR: новые фичи, редизайн UI
    - PATCH: багфиксы
