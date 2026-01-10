@@ -16,17 +16,17 @@
       {
         "label": "main",
         "title": "Observer",
-        "width": 900,
-        "height": 680,
-        "minWidth": 600,
-        "minHeight": 500,
-        "visible": true,
-        "resizable": true,
+        "width": 320,
+        "height": 420,
+        "minWidth": 320,
+        "minHeight": 300,
+        "visible": false,
+        "resizable": false,
         "decorations": false,
         "transparent": true,
         "skipTaskbar": true,
-        "alwaysOnTop": false,
-        "center": true
+        "alwaysOnTop": true,
+        "focus": true
       }
     ],
     "trayIcon": {
