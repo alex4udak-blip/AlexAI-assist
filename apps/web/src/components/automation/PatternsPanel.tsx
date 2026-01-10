@@ -334,13 +334,13 @@ export function PatternsPanel({ onAgentCreated }: PatternsPanelProps) {
                       <span className={`text-sm px-3 py-1 rounded-full ${
                         detectedPatterns.context_switches.assessment === 'low'
                           ? 'text-emerald-400 bg-emerald-400/10'
-                          : detectedPatterns.context_switches.assessment === 'moderate'
+                          : detectedPatterns.context_switches.assessment === 'medium'
                           ? 'text-amber-400 bg-amber-400/10'
                           : 'text-red-400 bg-red-400/10'
                       }`}>
                         {detectedPatterns.context_switches.assessment === 'low'
                           ? 'Низкий уровень'
-                          : detectedPatterns.context_switches.assessment === 'moderate'
+                          : detectedPatterns.context_switches.assessment === 'medium'
                           ? 'Умеренный уровень'
                           : 'Высокий уровень'}
                       </span>
