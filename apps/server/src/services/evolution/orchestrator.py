@@ -754,11 +754,26 @@ Suggest specific behavior adjustments as JSON:
             response = await claude_client.complete(
                 prompt=prompt,
                 system="You are a behavior evolution specialist. "
-                       "Suggest parameter adjustments to improve system performance.",
+                       "Suggest parameter adjustments to improve system performance. "
+                       "Respond ONLY with valid JSON, no markdown formatting.",
                 max_tokens=2000,
             )
 
-            adjustments = json.loads(response)
+            # Clean response - remove markdown code blocks if present
+            clean_response = response.strip()
+            if clean_response.startswith("```"):
+                lines = clean_response.split("\n")
+                if lines[0].startswith("```"):
+                    lines = lines[1:]
+                if lines and lines[-1].strip() == "```":
+                    lines = lines[:-1]
+                clean_response = "\n".join(lines)
+
+            if not clean_response:
+                logger.warning("Empty response from LLM for behavior evolution")
+                return {"status": "skipped", "reason": "empty_response"}
+
+            adjustments = json.loads(clean_response)
 
             for adj in adjustments.get("adjustments", []):
                 logger.info(

@@ -76,7 +76,7 @@ export default function Main({ onOpenSettings }: Props) {
   };
 
   return (
-    <div className="min-h-screen bg-bg-primary flex flex-col">
+    <div className="h-full bg-bg-primary flex flex-col overflow-hidden">
       {/* Custom Titlebar - draggable area (no native decorations) */}
       <div
         data-tauri-drag-region

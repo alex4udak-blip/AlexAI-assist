@@ -81,10 +81,17 @@ class AuthMiddleware(BaseHTTPMiddleware):
                 },
                 level="WARNING",
             )
+            # Include CORS headers in error response
+            origin = request.headers.get("origin", "")
+            cors_headers = {
+                "WWW-Authenticate": "ApiKey",
+                "Access-Control-Allow-Origin": origin if origin else "*",
+                "Access-Control-Allow-Credentials": "true",
+            }
             return JSONResponse(
                 status_code=401,
                 content={"detail": "Invalid or missing API key"},
-                headers={"WWW-Authenticate": "ApiKey"},
+                headers=cors_headers,
             )
 
         return await call_next(request)

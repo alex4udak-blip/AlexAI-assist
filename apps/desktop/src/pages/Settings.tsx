@@ -97,7 +97,7 @@ export default function Settings({ onBack }: Props) {
   };
 
   return (
-    <div className="min-h-screen bg-bg-primary flex flex-col">
+    <div className="h-full bg-bg-primary flex flex-col overflow-hidden">
       {/* Header */}
       <div
         data-tauri-drag-region
