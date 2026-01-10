@@ -1,5 +1,4 @@
 use serde::{Deserialize, Serialize};
-use std::process::Command;
 
 /// Represents information about a browser tab
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -146,98 +145,26 @@ impl BrowserMonitor {
     /// Helper function to run AppleScript NATIVELY and parse tab information
     /// Uses NSAppleScript directly so macOS prompts for Automation permissions for Observer itself
     fn run_applescript_tab(&self, script: &str, browser_name: &str) -> Option<BrowserTab> {
-        #[cfg(target_os = "macos")]
-        {
-            use objc::runtime::{Class, Object};
-            use objc::{msg_send, sel, sel_impl};
-            use std::ffi::{CStr, CString};
+        let output_str = crate::native_applescript::execute(script)?;
 
-            unsafe {
-                // Get NSAppleScript class
-                let ns_applescript_class = Class::get("NSAppleScript")?;
-                let ns_string_class = Class::get("NSString")?;
-
-                // Create NSString from script
-                let script_cstr = CString::new(script).ok()?;
-                let source: *mut Object =
-                    msg_send![ns_string_class, stringWithUTF8String: script_cstr.as_ptr()];
-                if source.is_null() {
-                    println!("[Browser] {} failed to create NSString", browser_name);
-                    return None;
-                }
-
-                // Create NSAppleScript
-                let script_obj: *mut Object = msg_send![ns_applescript_class, alloc];
-                let script_obj: *mut Object = msg_send![script_obj, initWithSource: source];
-                if script_obj.is_null() {
-                    println!("[Browser] {} failed to create NSAppleScript", browser_name);
-                    return None;
-                }
-
-                // Execute script
-                let mut error: *mut Object = std::ptr::null_mut();
-                let result: *mut Object = msg_send![script_obj, executeAndReturnError: &mut error];
-
-                // Release script object
-                let _: () = msg_send![script_obj, release];
-
-                if result.is_null() {
-                    if !error.is_null() {
-                        let error_key: *mut Object = msg_send![ns_string_class, stringWithUTF8String: CString::new("NSAppleScriptErrorMessage").unwrap().as_ptr()];
-                        let error_desc: *mut Object = msg_send![error, objectForKey: error_key];
-                        if !error_desc.is_null() {
-                            let c_str: *const i8 = msg_send![error_desc, UTF8String];
-                            if !c_str.is_null() {
-                                let error_msg = CStr::from_ptr(c_str).to_string_lossy();
-                                println!(
-                                    "[Browser] {} AppleScript error: {}",
-                                    browser_name, error_msg
-                                );
-                            }
-                        }
-                    }
-                    return None;
-                }
-
-                // Get string value from result
-                let string_value: *mut Object = msg_send![result, stringValue];
-                if string_value.is_null() {
-                    println!("[Browser] {} result has no stringValue", browser_name);
-                    return None;
-                }
-
-                let c_str: *const i8 = msg_send![string_value, UTF8String];
-                if c_str.is_null() {
-                    println!("[Browser] {} UTF8String is null", browser_name);
-                    return None;
-                }
-
-                let output_str = CStr::from_ptr(c_str).to_string_lossy().trim().to_string();
-                println!("[Browser] {} returned: {}", browser_name, output_str);
-
-                if output_str.is_empty() {
-                    return None;
-                }
-
-                // Parse the output format: "URL|||Title"
-                let parts: Vec<&str> = output_str.split("|||").collect();
-                if parts.len() == 2 {
-                    Some(BrowserTab {
-                        browser: browser_name.to_string(),
-                        url: parts[0].to_string(),
-                        title: parts[1].to_string(),
-                        visible_text: None,
-                    })
-                } else {
-                    println!("[Browser] {} unexpected format: {}", browser_name, output_str);
-                    None
-                }
-            }
+        if output_str.is_empty() {
+            return None;
         }
 
-        #[cfg(not(target_os = "macos"))]
-        {
-            let _ = (script, browser_name);
+        // Log for debugging
+        println!("[Browser] {} returned: {}", browser_name, output_str);
+
+        // Parse the output format: "URL|||Title"
+        let parts: Vec<&str> = output_str.split("|||").collect();
+        if parts.len() == 2 {
+            Some(BrowserTab {
+                browser: browser_name.to_string(),
+                url: parts[0].to_string(),
+                title: parts[1].to_string(),
+                visible_text: None,
+            })
+        } else {
+            println!("[Browser] {} unexpected format: {}", browser_name, output_str);
             None
         }
     }
@@ -314,43 +241,32 @@ impl BrowserMonitor {
             _ => return vec![],
         };
 
-        let output = Command::new("osascript")
-            .arg("-e")
-            .arg(script)
-            .output();
+        let output_str = match crate::native_applescript::execute(script) {
+            Some(s) => s,
+            None => return vec![],
+        };
 
-        match output {
-            Ok(result) => {
-                if result.status.success() {
-                    let output_str = String::from_utf8_lossy(&result.stdout).trim().to_string();
-
-                    if output_str.is_empty() {
-                        return vec![];
-                    }
-
-                    // Parse the output - AppleScript returns comma-separated list
-                    output_str
-                        .split(", ")
-                        .filter_map(|item| {
-                            let parts: Vec<&str> = item.split("|||").collect();
-                            if parts.len() == 2 {
-                                Some(BrowserTab {
-                                    browser: browser.to_string(),
-                                    url: parts[0].to_string(),
-                                    title: parts[1].to_string(),
-                                    visible_text: None,
-                                })
-                            } else {
-                                None
-                            }
-                        })
-                        .collect()
-                } else {
-                    vec![]
-                }
-            }
-            Err(_) => vec![],
+        if output_str.is_empty() {
+            return vec![];
         }
+
+        // Parse the output - AppleScript returns comma-separated list
+        output_str
+            .split(", ")
+            .filter_map(|item| {
+                let parts: Vec<&str> = item.split("|||").collect();
+                if parts.len() == 2 {
+                    Some(BrowserTab {
+                        browser: browser.to_string(),
+                        url: parts[0].to_string(),
+                        title: parts[1].to_string(),
+                        visible_text: None,
+                    })
+                } else {
+                    None
+                }
+            })
+            .collect()
     }
 
     /// Get the current browser state with active browser and all tabs
@@ -385,22 +301,9 @@ impl BrowserMonitor {
             browser_name
         );
 
-        let output = Command::new("osascript")
-            .arg("-e")
-            .arg(&script)
-            .output();
-
-        match output {
-            Ok(result) => {
-                if result.status.success() {
-                    let output_str = String::from_utf8_lossy(&result.stdout).trim().to_string();
-                    output_str == "true"
-                } else {
-                    false
-                }
-            }
-            Err(_) => false,
-        }
+        crate::native_applescript::execute(&script)
+            .map(|s| s.trim().to_lowercase() == "true")
+            .unwrap_or(false)
     }
 
     /// Get list of currently running browsers

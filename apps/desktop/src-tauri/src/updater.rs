@@ -3,15 +3,49 @@
 use tauri::AppHandle;
 use tauri_plugin_updater::UpdaterExt;
 
-/// Restart the application after update
+/// Apply post-update fixes and restart the application
 fn restart_app() {
-    // Get the current executable path and restart
     if let Ok(exe) = std::env::current_exe() {
+        println!("Applying post-update fixes...");
+
+        // Get the .app bundle path (go up from executable)
+        // /Applications/Observer.app/Contents/MacOS/observer-desktop -> /Applications/Observer.app
+        #[cfg(target_os = "macos")]
+        {
+            let app_path = exe
+                .parent() // MacOS
+                .and_then(|p| p.parent()) // Contents
+                .and_then(|p| p.parent()); // Observer.app
+
+            if let Some(app_path) = app_path {
+                let app_path_str = app_path.to_string_lossy();
+
+                // Remove quarantine attribute
+                println!("Removing quarantine: xattr -cr {}", app_path_str);
+                let _ = std::process::Command::new("xattr")
+                    .args(["-cr", &app_path_str])
+                    .output();
+
+                // Re-sign the app with ad-hoc signature
+                println!(
+                    "Re-signing app: codesign --force --deep --sign - {}",
+                    app_path_str
+                );
+                let _ = std::process::Command::new("codesign")
+                    .args(["--force", "--deep", "--sign", "-", &app_path_str])
+                    .output();
+
+                println!("Post-update fixes applied!");
+            }
+        }
+
         println!("Restarting app from: {:?}", exe);
 
+        // Small delay to ensure signing completes
+        std::thread::sleep(std::time::Duration::from_secs(1));
+
         // Spawn a new instance of the app
-        let _ = std::process::Command::new(&exe)
-            .spawn();
+        let _ = std::process::Command::new(&exe).spawn();
 
         // Exit the current instance
         std::process::exit(0);

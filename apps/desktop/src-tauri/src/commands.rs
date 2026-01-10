@@ -530,6 +530,34 @@ pub async fn check_updates(app: tauri::AppHandle) -> Result<String, String> {
 }
 
 // ============================================================================
+// APP AUTOMATION PERMISSIONS
+// ============================================================================
+
+/// Get automation permissions for all required apps
+#[tauri::command]
+pub fn get_automation_permissions() -> Vec<permissions::AppPermissionStatus> {
+    permissions::check_automation_permissions()
+}
+
+/// Request automation permission for a specific app
+#[tauri::command]
+pub fn request_app_automation(app_name: String) -> bool {
+    permissions::request_automation_permission(&app_name)
+}
+
+/// Request automation permissions for all apps
+#[tauri::command]
+pub fn request_all_automations() -> Vec<permissions::AppPermissionStatus> {
+    permissions::request_all_automation_permissions()
+}
+
+/// Open automation settings in System Preferences
+#[tauri::command]
+pub fn open_automation_prefs() -> Result<(), String> {
+    permissions::open_automation_settings()
+}
+
+// ============================================================================
 // HELPER FUNCTIONS
 // ============================================================================
 

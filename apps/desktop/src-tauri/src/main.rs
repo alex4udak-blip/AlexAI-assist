@@ -4,6 +4,7 @@ mod automation;
 mod collector;
 mod commands;
 mod db;
+mod native_applescript;
 mod notifications;
 mod permissions;
 mod sync;
@@ -190,6 +191,11 @@ fn main() {
             // Debug commands
             commands::get_debug_info,
             commands::check_updates,
+            // App automation permissions
+            commands::get_automation_permissions,
+            commands::request_app_automation,
+            commands::request_all_automations,
+            commands::open_automation_prefs,
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application")
