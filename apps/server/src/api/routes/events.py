@@ -181,10 +181,10 @@ async def create_events(
     # Fetch all created events in a single batch query (avoids N+1 problem)
     if created_events:
         event_ids = [e.id for e in created_events]
-        result = await db.execute(
+        events_result = await db.execute(
             select(Event).where(Event.id.in_(event_ids))
         )
-        fetched_events: list[Event] = list(result.scalars().all())
+        fetched_events: list[Event] = list(events_result.scalars().all())
         fetched_events_map: dict[UUID, Event] = {e.id: e for e in fetched_events}
 
         # Process events in timestamp order
