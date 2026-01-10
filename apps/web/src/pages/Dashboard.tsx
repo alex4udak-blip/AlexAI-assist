@@ -317,10 +317,10 @@ export default function Dashboard() {
       .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
   }, [agents]);
 
-  // Generate timeline events
+  // Generate timeline events - use all events for full day visualization
   const timelineEvents = useMemo(() => {
     if (!timeline) return [];
-    return timeline.slice(0, 50).map(event => ({
+    return timeline.map(event => ({
       id: event.id,
       type: 'app' as const,
       name: event.app_name || 'Unknown',
