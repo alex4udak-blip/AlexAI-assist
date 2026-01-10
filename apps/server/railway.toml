@@ -2,7 +2,7 @@
 builder = "nixpacks"
 
 [deploy]
-startCommand = "alembic upgrade head && uvicorn src.main:app --host 0.0.0.0 --port ${PORT:-8000}"
+startCommand = "alembic upgrade head && echo '=== STARTING UVICORN ===' && uvicorn src.main:app --host 0.0.0.0 --port ${PORT:-8000} --log-level debug"
 healthcheckPath = "/ping"
 healthcheckTimeout = 120
 restartPolicyType = "on_failure"
