@@ -14,6 +14,7 @@ from src.services.evolution.orchestrator import EvolutionOrchestrator
 from src.services.pattern_detector import PatternDetectorService
 from src.services.agent_suggester import AgentSuggester
 from src.services.ai_router import AIRouter
+from src.core.websocket import broadcast_suggestion
 
 logger = logging.getLogger(__name__)
 
@@ -93,8 +94,20 @@ async def generate_suggestions_job() -> None:
                 )
                 db.add(suggestion)
                 await db.commit()
+                await db.refresh(suggestion)
+
+                # Broadcast to connected clients
+                await broadcast_suggestion({
+                    "id": str(suggestion.id),
+                    "title": suggestion.title,
+                    "description": suggestion.description,
+                    "confidence": suggestion.confidence,
+                    "impact": suggestion.impact,
+                    "agent_type": suggestion.agent_type,
+                })
+
                 logger.info(
-                    f"New suggestion generated: {suggestion.title} "
+                    f"New suggestion generated and broadcast: {suggestion.title} "
                     f"(confidence: {suggestion.confidence:.0%})"
                 )
             else:
