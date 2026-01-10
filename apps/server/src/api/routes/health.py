@@ -157,6 +157,17 @@ def check_disk() -> dict[str, Any]:
         }
 
 
+@router.get("/ping")
+async def ping() -> dict[str, str]:
+    """Simple ping endpoint for basic health checks.
+
+    This is a lightweight check that doesn't verify database connectivity.
+    Use /health for comprehensive health checks.
+    Use this endpoint for Railway/container healthchecks during startup.
+    """
+    return {"status": "ok"}
+
+
 @router.get("/health")
 async def health_check() -> JSONResponse:
     """Comprehensive health check with database, Redis, memory, and disk checks.

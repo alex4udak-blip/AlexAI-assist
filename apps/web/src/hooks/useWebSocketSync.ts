@@ -39,6 +39,15 @@ interface EventsCreated {
   }>;
 }
 
+interface SuggestionCreated {
+  id: string;
+  title: string;
+  description?: string;
+  confidence: number;
+  impact: string;
+  pattern_type: string;
+}
+
 // Type guards for runtime validation
 function isDeviceUpdate(data: unknown): data is DeviceUpdate {
   return (
@@ -74,6 +83,17 @@ function isEventsCreated(data: unknown): data is EventsCreated {
     Array.isArray((data as EventsCreated).device_ids) &&
     'events' in data &&
     Array.isArray((data as EventsCreated).events)
+  );
+}
+
+function isSuggestionCreated(data: unknown): data is SuggestionCreated {
+  return (
+    typeof data === 'object' &&
+    data !== null &&
+    'id' in data &&
+    typeof (data as SuggestionCreated).id === 'string' &&
+    'title' in data &&
+    typeof (data as SuggestionCreated).title === 'string'
   );
 }
 
@@ -135,3 +155,20 @@ export function useSyncStatus(
     return () => clearInterval(checkInterval);
   }, [onSync]);
 }
+
+export function useSuggestionCreated(onSuggestion: (data: SuggestionCreated) => void) {
+  const handleSuggestion = useCallback(
+    (data: unknown) => {
+      if (isSuggestionCreated(data)) {
+        onSuggestion(data);
+      } else {
+        console.warn('Invalid SuggestionCreated data received:', data);
+      }
+    },
+    [onSuggestion]
+  );
+
+  useWebSocketEvent('suggestion_created', handleSuggestion);
+}
+
+export type { SuggestionCreated };

@@ -59,3 +59,15 @@ async def broadcast_events_batch(events: list[dict[str, Any]], device_ids: list[
         "device_ids": device_ids,
         "events": events[:10],  # Send first 10 events for preview
     })
+
+
+async def broadcast_suggestion(suggestion: dict[str, Any]) -> None:
+    """Broadcast new automation suggestion to all connected clients."""
+    await broadcast_event("suggestion_created", {
+        "id": suggestion.get("id"),
+        "title": suggestion.get("title"),
+        "description": suggestion.get("description"),
+        "confidence": suggestion.get("confidence"),
+        "impact": suggestion.get("impact"),
+        "pattern_type": suggestion.get("agent_type"),
+    })

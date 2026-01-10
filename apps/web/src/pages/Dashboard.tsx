@@ -27,7 +27,7 @@ import { useSuggestions } from '../hooks/usePatterns';
 import { useMutation } from '../hooks/useApi';
 import { api } from '../lib/api';
 import { useIsMobile, useIsTablet } from '../hooks/useMediaQuery';
-import { useEventsCreated } from '../hooks/useWebSocketSync';
+import { useEventsCreated, useSuggestionCreated, SuggestionCreated } from '../hooks/useWebSocketSync';
 import { useWebSocket } from '../hooks/useWebSocket';
 
 const container = {
@@ -83,6 +83,23 @@ export default function Dashboard() {
 
   // Subscribe to real-time events
   useEventsCreated(handleEventsCreated);
+
+  // Handle new automation suggestions
+  const handleSuggestionCreated = useCallback((suggestion: SuggestionCreated) => {
+    // Refetch suggestions to update UI
+    refetchSuggestions();
+
+    // Show browser notification if permission granted
+    if (Notification.permission === 'granted') {
+      new Notification('Observer: Новый паттерн', {
+        body: `${suggestion.title}\nУверенность: ${Math.round(suggestion.confidence * 100)}%`,
+        icon: '/observer-icon.png',
+      });
+    }
+  }, [refetchSuggestions]);
+
+  // Subscribe to new suggestions
+  useSuggestionCreated(handleSuggestionCreated);
 
   const { mutate: runAgent } = useMutation(api.runAgent);
   const { mutate: enableAgent } = useMutation(api.enableAgent);
