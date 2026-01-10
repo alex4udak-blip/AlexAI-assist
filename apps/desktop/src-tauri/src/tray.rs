@@ -10,14 +10,15 @@ use tauri::{
 /// Global flag to track window visibility (more reliable than is_visible() on macOS)
 static WINDOW_VISIBLE: AtomicBool = AtomicBool::new(true);
 
-/// Create a proper eye-shaped tray icon for macOS menu bar
-/// Uses higher resolution (44x44) for Retina displays
+/// Create a minimal outline eye icon for macOS menu bar
+/// Simple black lines only - no fill, just outline like other menu bar icons
 fn create_eye_icon() -> (Vec<u8>, u32, u32) {
     let size = 44u32; // @2x for Retina
     let mut rgba = vec![0u8; (size * size * 4) as usize];
     let center_x = size as f32 / 2.0;
     let center_y = size as f32 / 2.0;
-    let scale = size as f32 / 22.0; // Scale factor for Retina
+    let scale = size as f32 / 22.0;
+    let stroke_width = 1.5 * scale; // Line thickness
 
     for y in 0..size {
         for x in 0..size {
@@ -27,48 +28,46 @@ fn create_eye_icon() -> (Vec<u8>, u32, u32) {
             let dx = px - center_x;
             let dy = py - center_y;
 
-            // Eye shape using almond/leaf curve (scaled for @2x)
+            // Eye shape: almond curve
             let norm_x = dx / (size as f32 / 2.0 - 4.0 * scale);
-            let eye_height = 7.0 * scale * (1.0 - norm_x * norm_x).max(0.0);
+            let eye_height = 7.0 * scale * (1.0 - norm_x * norm_x).max(0.0).sqrt();
 
-            // Pupil and iris (scaled)
-            let pupil_dist = (dx * dx + dy * dy).sqrt();
-            let pupil_radius = 5.0 * scale;
-            let iris_radius = 8.0 * scale;
+            // Iris circle (outline only)
+            let iris_dist = (dx * dx + dy * dy).sqrt();
+            let iris_radius = 6.0 * scale;
 
-            // For macOS template icons: use black with varying alpha
-            // This allows macOS to properly invert colors for dark/light mode
-            if pupil_dist <= pupil_radius {
-                // Pupil - solid black
-                rgba[idx] = 0;        // R
-                rgba[idx + 1] = 0;    // G
-                rgba[idx + 2] = 0;    // B
-                rgba[idx + 3] = 255;  // A (fully opaque)
-            } else if pupil_dist <= iris_radius && dy.abs() < eye_height {
-                // Iris - semi-transparent black
-                rgba[idx] = 0;
-                rgba[idx + 1] = 0;
-                rgba[idx + 2] = 0;
-                rgba[idx + 3] = 180;  // Semi-opaque
-            } else if dy.abs() < eye_height && norm_x.abs() < 1.0 {
-                // Eye white area - light gray (will show as white in menu bar)
-                rgba[idx] = 0;
-                rgba[idx + 1] = 0;
-                rgba[idx + 2] = 0;
-                rgba[idx + 3] = 60;   // Very transparent
-            } else if dy.abs() < eye_height + 2.0 * scale && norm_x.abs() < 1.05 {
-                // Eye outline - solid black
-                rgba[idx] = 0;
-                rgba[idx + 1] = 0;
-                rgba[idx + 2] = 0;
-                rgba[idx + 3] = 255;  // Fully opaque
-            } else {
-                // Transparent
-                rgba[idx] = 0;
-                rgba[idx + 1] = 0;
-                rgba[idx + 2] = 0;
-                rgba[idx + 3] = 0;
+            // Pupil (small solid dot in center)
+            let pupil_radius = 2.0 * scale;
+
+            let mut alpha = 0u8;
+
+            // Small solid pupil in center
+            if iris_dist <= pupil_radius {
+                alpha = 255;
             }
+            // Iris outline (circle, not filled)
+            else if (iris_dist - iris_radius).abs() < stroke_width && dy.abs() < eye_height {
+                alpha = 255;
+            }
+            // Eye outline (top and bottom curves)
+            else if norm_x.abs() < 1.0 {
+                let dist_to_edge = (dy.abs() - eye_height).abs();
+                if dist_to_edge < stroke_width {
+                    alpha = 255;
+                }
+            }
+            // Eye corners (pointed ends)
+            else if norm_x.abs() < 1.1 && dy.abs() < stroke_width * 1.5 {
+                let corner_dist = ((norm_x.abs() - 1.0) * 20.0).abs();
+                if corner_dist < stroke_width * 2.0 {
+                    alpha = 255;
+                }
+            }
+
+            rgba[idx] = 0; // R
+            rgba[idx + 1] = 0; // G
+            rgba[idx + 2] = 0; // B
+            rgba[idx + 3] = alpha;
         }
     }
 
@@ -134,7 +133,10 @@ pub fn create_tray(app: &App) -> Result<(), Box<dyn std::error::Error>> {
                             #[cfg(target_os = "macos")]
                             {
                                 // Get window size
-                                let size = window.outer_size().unwrap_or(tauri::PhysicalSize { width: 320, height: 400 });
+                                let size = window.outer_size().unwrap_or(tauri::PhysicalSize {
+                                    width: 320,
+                                    height: 400,
+                                });
                                 // Position below tray icon, centered
                                 let x = position.x as i32 - (size.width as i32 / 2);
                                 let y = position.y as i32 + 5; // Small offset below tray
@@ -160,10 +162,27 @@ pub fn create_tray(app: &App) -> Result<(), Box<dyn std::error::Error>> {
         .build(app)?;
 
     // Store tray in app state to prevent it from being dropped
-    app.manage(TrayState { _tray: tray });
+    app.manage(TrayState {
+        _tray: tray.clone(),
+    });
 
-    // Show window on first launch for better UX
+    // Show window near tray icon on first launch
     if let Some(window) = app.get_webview_window("main") {
+        #[cfg(target_os = "macos")]
+        {
+            // Get tray icon position and place window below it
+            if let Ok(rect) = tray.rect() {
+                let size = window.outer_size().unwrap_or(tauri::PhysicalSize {
+                    width: 320,
+                    height: 400,
+                });
+                // Center window horizontally under tray icon
+                let x =
+                    rect.position.x as i32 + (rect.size.width as i32 / 2) - (size.width as i32 / 2);
+                let y = rect.position.y as i32 + rect.size.height as i32 + 5; // Below tray with small gap
+                let _ = window.set_position(tauri::PhysicalPosition::new(x, y));
+            }
+        }
         let _ = window.show();
         let _ = window.set_focus();
     }
