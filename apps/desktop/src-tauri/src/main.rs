@@ -194,6 +194,7 @@ fn main() {
             // App automation permissions
             commands::get_automation_permissions,
             commands::request_app_automation,
+            commands::trigger_automation_permission,
             commands::request_all_automations,
             commands::open_automation_prefs,
         ])
