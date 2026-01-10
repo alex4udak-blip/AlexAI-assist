@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import { Plus, Bot } from 'lucide-react';
 import { AgentCard } from '../components/agents/AgentCard';
@@ -44,12 +44,14 @@ export default function Agents() {
   const { mutate: disableAgent } = useDisableAgent();
   const { mutate: deleteAgent } = useDeleteAgent();
 
-  const filteredAgents = agents?.filter((agent) => {
-    if (filter === 'all') return true;
-    return agent.status === filter;
-  });
+  const filteredAgents = useMemo(() => {
+    return agents?.filter((agent) => {
+      if (filter === 'all') return true;
+      return agent.status === filter;
+    });
+  }, [agents, filter]);
 
-  const handleCreate = async (data: {
+  const handleCreate = useCallback(async (data: {
     name: string;
     description: string;
     agent_type: string;
@@ -68,9 +70,9 @@ export default function Agents() {
     });
     setShowCreateModal(false);
     refetch();
-  };
+  }, [createAgent, refetch]);
 
-  const handleEdit = async (data: {
+  const handleEdit = useCallback(async (data: {
     name: string;
     description: string;
     agent_type: string;
@@ -90,29 +92,29 @@ export default function Agents() {
     setShowEditModal(false);
     setEditingAgentId(null);
     refetch();
-  };
+  }, [editingAgentId, updateAgent, refetch]);
 
-  const openEditModal = (id: string) => {
+  const openEditModal = useCallback((id: string) => {
     setEditingAgentId(id);
     setShowEditModal(true);
-  };
+  }, []);
 
-  const handleRun = async (id: string) => {
+  const handleRun = useCallback(async (id: string) => {
     await runAgent(id);
     refetch();
-  };
+  }, [runAgent, refetch]);
 
-  const handleEnable = async (id: string) => {
+  const handleEnable = useCallback(async (id: string) => {
     await enableAgent(id);
     refetch();
-  };
+  }, [enableAgent, refetch]);
 
-  const handleDisable = async (id: string) => {
+  const handleDisable = useCallback(async (id: string) => {
     await disableAgent(id);
     refetch();
-  };
+  }, [disableAgent, refetch]);
 
-  const handleDelete = async (id: string) => {
+  const handleDelete = useCallback(async (id: string) => {
     if (confirm('Вы уверены, что хотите удалить этого агента?')) {
       await deleteAgent(id);
       if (selectedAgentId === id) {
@@ -120,7 +122,7 @@ export default function Agents() {
       }
       refetch();
     }
-  };
+  }, [deleteAgent, selectedAgentId, refetch]);
 
   const selectedAgent = agents?.find((a) => a.id === selectedAgentId);
   const editingAgent = agents?.find((a) => a.id === editingAgentId);

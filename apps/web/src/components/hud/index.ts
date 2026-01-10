@@ -16,4 +16,3 @@ export { AgentCarousel } from './AgentCarousel';
 export { CompactHeatmap } from './CompactHeatmap';
 export { UnifiedFeed } from './UnifiedFeed';
 export { MobileAchievements } from './MobileAchievements';
-export { BottomNavigation } from './BottomNavigation';

@@ -204,7 +204,11 @@ Return "general" if no specific topic."""
                 system="Identify topics concisely.",
             )
             return topic.strip().lower()[:100]
-        except Exception:
+        except Exception as e:
+            logger.warning(
+                "Failed to identify topic from text",
+                extra={"error": str(e), "text_length": len(text)},
+            )
             return None
 
     async def get_or_create_topic(self, topic_name: str) -> MemoryTopic:

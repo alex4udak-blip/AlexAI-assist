@@ -101,7 +101,6 @@ export default function Settings() {
       // Sync to server
       try {
         await api.saveSettings(deviceId, settings as unknown as Record<string, unknown>);
-        console.log('Settings saved to server successfully');
       } catch (serverErr) {
         console.error('Failed to save settings to server:', serverErr);
         alert('Настройки сохранены локально, но не удалось синхронизировать с сервером');

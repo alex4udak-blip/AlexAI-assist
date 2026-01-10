@@ -1,9 +1,12 @@
 """WebSocket management module."""
 
+import logging
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from fastapi import WebSocket
+
+logger = logging.getLogger(__name__)
 
 # WebSocket connections store
 active_connections: set["WebSocket"] = set()
@@ -20,7 +23,11 @@ async def broadcast_event(event_type: str, data: dict[str, Any]) -> None:
     for websocket in active_connections:
         try:
             await websocket.send_json(message)
-        except Exception:
+        except Exception as e:
+            logger.warning(
+                "WebSocket broadcast failed, marking client for removal",
+                extra={"event_type": event_type, "error": str(e)},
+            )
             disconnected.add(websocket)
 
     # Clean up disconnected clients

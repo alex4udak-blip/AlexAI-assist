@@ -516,7 +516,11 @@ class MemoryManager:
     # ==========================================
 
     async def get_memory_stats(self) -> dict[str, Any]:
-        """Get overall memory statistics."""
+        """Get overall memory statistics.
+
+        OPTIMIZATION: Uses a single query with scalar subqueries instead of
+        5 separate COUNT queries. This reduces database round-trips from 5 to 1.
+        """
         from sqlalchemy import func, select
 
         from src.db.models.memory import (
@@ -527,50 +531,66 @@ class MemoryManager:
             MemoryTopic,
         )
 
-        stats: dict[str, Any] = {}
-
-        # Count facts
-        result = await self.db.execute(
-            select(func.count(MemoryFact.id)).where(
-                MemoryFact.session_id == self.session_id
-            )
+        # Build scalar subqueries for each count
+        facts_subq = (
+            select(func.count(MemoryFact.id))
+            .where(MemoryFact.session_id == self.session_id)
+            .correlate(None)
+            .scalar_subquery()
         )
-        stats["facts"] = result.scalar() or 0
 
-        # Count experiences
-        result = await self.db.execute(
-            select(func.count(MemoryExperience.id)).where(
-                MemoryExperience.session_id == self.session_id
-            )
+        experiences_subq = (
+            select(func.count(MemoryExperience.id))
+            .where(MemoryExperience.session_id == self.session_id)
+            .correlate(None)
+            .scalar_subquery()
         )
-        stats["experiences"] = result.scalar() or 0
 
-        # Count entities
-        result = await self.db.execute(
-            select(func.count(MemoryEntity.id)).where(
-                MemoryEntity.session_id == self.session_id
-            )
+        entities_subq = (
+            select(func.count(MemoryEntity.id))
+            .where(MemoryEntity.session_id == self.session_id)
+            .correlate(None)
+            .scalar_subquery()
         )
-        stats["entities"] = result.scalar() or 0
 
-        # Count active beliefs
-        result = await self.db.execute(
-            select(func.count(MemoryBelief.id)).where(
+        active_beliefs_subq = (
+            select(func.count(MemoryBelief.id))
+            .where(
                 MemoryBelief.session_id == self.session_id,
                 MemoryBelief.status == "active",
             )
+            .correlate(None)
+            .scalar_subquery()
         )
-        stats["active_beliefs"] = result.scalar() or 0
 
-        # Count topics
-        result = await self.db.execute(
-            select(func.count(MemoryTopic.id)).where(
-                MemoryTopic.session_id == self.session_id
-            )
+        topics_subq = (
+            select(func.count(MemoryTopic.id))
+            .where(MemoryTopic.session_id == self.session_id)
+            .correlate(None)
+            .scalar_subquery()
         )
-        stats["topics"] = result.scalar() or 0
 
-        # Scheduling stats
+        # Execute all counts in a single query (scalar subqueries don't need FROM)
+        combined_query = select(
+            facts_subq.label("facts"),
+            experiences_subq.label("experiences"),
+            entities_subq.label("entities"),
+            active_beliefs_subq.label("active_beliefs"),
+            topics_subq.label("topics"),
+        )
+
+        result = await self.db.execute(combined_query)
+        row = result.one()
+
+        stats: dict[str, Any] = {
+            "facts": row.facts or 0,
+            "experiences": row.experiences or 0,
+            "entities": row.entities or 0,
+            "active_beliefs": row.active_beliefs or 0,
+            "topics": row.topics or 0,
+        }
+
+        # Scheduling stats (separate async call, cannot be combined with SQL)
         stats["scheduling"] = await self.scheduler.get_scheduling_stats()
 
         return stats

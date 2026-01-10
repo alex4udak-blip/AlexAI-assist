@@ -31,26 +31,36 @@ export function ChatWindow() {
 
   // Load initial history
   useEffect(() => {
-    api.getChatHistory({ limit: MESSAGES_PER_PAGE, offset: 0 })
-      .then((response) => {
-        setMessages((currentMessages) => {
-          // Get IDs from history to avoid duplicates
-          const historyIds = new Set(response.messages.map((m) => m.id));
-          // Keep local messages that aren't in history (sent before history loaded)
-          const localOnlyMessages = currentMessages.filter(
-            (m) => !historyIds.has(m.id)
-          );
-          // Merge: history first, then any local messages
-          return [...response.messages, ...localOnlyMessages];
-        });
-        setHasMore(response.has_more);
-        setTotalMessages(response.total);
-        setHistoryLoaded(true);
-      })
-      .catch((err) => {
-        console.error('Failed to load chat history:', err);
-        setHistoryLoaded(true); // Allow sending even if history fails
-      });
+    let cancelled = false;
+
+    const loadHistory = async () => {
+      try {
+        const response = await api.getChatHistory({ limit: MESSAGES_PER_PAGE, offset: 0 });
+        if (!cancelled) {
+          setMessages((currentMessages) => {
+            // Get IDs from history to avoid duplicates
+            const historyIds = new Set(response.messages.map((m) => m.id));
+            // Keep local messages that aren't in history (sent before history loaded)
+            const localOnlyMessages = currentMessages.filter(
+              (m) => !historyIds.has(m.id)
+            );
+            // Merge: history first, then any local messages
+            return [...response.messages, ...localOnlyMessages];
+          });
+          setHasMore(response.has_more);
+          setTotalMessages(response.total);
+          setHistoryLoaded(true);
+        }
+      } catch (err) {
+        if (!cancelled) {
+          console.error('Failed to load chat history:', err);
+          setHistoryLoaded(true); // Allow sending even if history fails
+        }
+      }
+    };
+
+    loadHistory();
+    return () => { cancelled = true; };
   }, []);
 
   // Load more older messages

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { Card, CardHeader, CardTitle, CardContent } from '../ui/Card';
 import { Button } from '../ui/Button';
@@ -32,6 +32,28 @@ interface CommandResult {
   duration_ms?: number;
   error_message?: string;
   data?: Record<string, unknown>;
+}
+
+// Type-safe accessors for status object properties
+function getBoolean(obj: Record<string, unknown>, key: string): boolean | undefined {
+  const value = obj[key];
+  return typeof value === 'boolean' ? value : undefined;
+}
+
+function getString(obj: Record<string, unknown>, key: string): string | undefined {
+  const value = obj[key];
+  return typeof value === 'string' ? value : undefined;
+}
+
+function getStringOrNull(obj: Record<string, unknown>, key: string): string | null | undefined {
+  const value = obj[key];
+  if (value === null) return null;
+  return typeof value === 'string' ? value : undefined;
+}
+
+function getNumber(obj: Record<string, unknown>, key: string): number | undefined {
+  const value = obj[key];
+  return typeof value === 'number' ? value : undefined;
 }
 
 const container = {
@@ -84,46 +106,74 @@ export function AutomationPanel() {
   const [coordX, setCoordX] = useState('');
   const [coordY, setCoordY] = useState('');
 
+  // Refs for cleanup
+  const copyTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const commandTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const isMountedRef = useRef(true);
+
   // Connect to WebSocket
   const { isConnected } = useWebSocket();
 
-  const fetchDevices = useCallback(async () => {
+  // Cleanup on unmount
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+      if (copyTimeoutRef.current) {
+        clearTimeout(copyTimeoutRef.current);
+      }
+      if (commandTimeoutRef.current) {
+        clearTimeout(commandTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  const fetchDevices = useCallback(async (signal?: AbortSignal) => {
     try {
-      const response = await apiFetch('/api/v1/automation/devices');
+      const response = await apiFetch('/api/v1/automation/devices', { signal });
+      if (signal?.aborted) return;
       if (response.ok) {
         const data = await response.json();
 
         // Fetch sync status for each device
         const devicesWithSync = await Promise.all(
           data.map(async (device: DeviceStatus) => {
+            if (signal?.aborted) return device;
             try {
               const syncResponse = await apiFetch(
-                `/api/v1/automation/devices/${device.device_id}/sync-status`
+                `/api/v1/automation/devices/${device.device_id}/sync-status`,
+                { signal }
               );
               if (syncResponse.ok) {
                 const syncData = await syncResponse.json();
                 return { ...device, sync_status: syncData };
               }
             } catch (error) {
-              console.error(`Failed to fetch sync status for ${device.device_id}:`, error);
+              if ((error as Error).name !== 'AbortError') {
+                console.error(`Failed to fetch sync status for ${device.device_id}:`, error);
+              }
             }
             return device;
           })
         );
 
+        if (signal?.aborted) return;
         setDevices(devicesWithSync);
         if (!selectedDevice && devicesWithSync.length > 0) {
           setSelectedDevice(devicesWithSync[0].device_id);
         }
       }
     } catch (error) {
-      console.error('Failed to fetch devices:', error);
+      if ((error as Error).name !== 'AbortError') {
+        console.error('Failed to fetch devices:', error);
+      }
     }
   }, [selectedDevice]);
 
-  const fetchAIUsage = useCallback(async () => {
+  const fetchAIUsage = useCallback(async (signal?: AbortSignal) => {
     try {
-      const response = await apiFetch('/api/v1/analytics/ai-usage');
+      const response = await apiFetch('/api/v1/analytics/ai-usage', { signal });
+      if (signal?.aborted) return;
       if (response.ok) {
         const data = await response.json();
         // Transform backend format to frontend format
@@ -159,16 +209,24 @@ export function AutomationPanel() {
         setAiUsage(transformed);
       }
     } catch (error) {
-      console.error('Failed to fetch AI usage:', error);
+      if ((error as Error).name !== 'AbortError') {
+        console.error('Failed to fetch AI usage:', error);
+      }
     } finally {
-      setAiUsageLoading(false);
+      if (!signal?.aborted) {
+        setAiUsageLoading(false);
+      }
     }
   }, []);
 
   // Fetch devices on mount and when WebSocket connects
   useEffect(() => {
-    fetchDevices();
-    fetchAIUsage();
+    const abortController = new AbortController();
+    fetchDevices(abortController.signal);
+    fetchAIUsage(abortController.signal);
+    return () => {
+      abortController.abort();
+    };
   }, [isConnected, fetchDevices, fetchAIUsage]);
 
   // Handle real-time device updates via WebSocket
@@ -180,10 +238,10 @@ export function AutomationPanel() {
           d.device_id === update.device_id
             ? {
                 ...d,
-                connected: (update.status.connected as boolean) ?? d.connected,
-                active_app: (update.status.active_app as string | null) ?? d.active_app,
-                queue_size: (update.status.queue_size as number) ?? d.queue_size,
-                last_seen: (update.status.last_seen_at as string) ?? d.last_seen,
+                connected: getBoolean(update.status, 'connected') ?? d.connected,
+                active_app: getStringOrNull(update.status, 'active_app') ?? d.active_app,
+                queue_size: getNumber(update.status, 'queue_size') ?? d.queue_size,
+                last_seen: getString(update.status, 'last_seen_at') ?? d.last_seen,
               }
             : d
         );
@@ -191,14 +249,14 @@ export function AutomationPanel() {
       // New device connected - create with required defaults
       const newDevice: DeviceStatus = {
         device_id: update.device_id,
-        connected: (update.status.connected as boolean) ?? true,
-        active_app: (update.status.active_app as string | null) ?? null,
-        queue_size: (update.status.queue_size as number) ?? 0,
+        connected: getBoolean(update.status, 'connected') ?? true,
+        active_app: getStringOrNull(update.status, 'active_app') ?? null,
+        queue_size: getNumber(update.status, 'queue_size') ?? 0,
         permissions: {
-          accessibility: (update.status.accessibility as boolean) ?? false,
-          screen_recording: (update.status.screen_recording as boolean) ?? false,
+          accessibility: getBoolean(update.status, 'accessibility') ?? false,
+          screen_recording: getBoolean(update.status, 'screen_recording') ?? false,
         },
-        last_seen: update.status.last_seen_at as string,
+        last_seen: getString(update.status, 'last_seen_at') ?? new Date().toISOString(),
       };
       return [...prev, newDevice];
     });
@@ -207,6 +265,17 @@ export function AutomationPanel() {
   // Handle real-time command results via WebSocket
   const handleCommandResult = useCallback((result: { command_id: string; device_id: string; result: Record<string, unknown> }) => {
     const { command_id, result: resultData } = result;
+
+    // Type-safe extraction of result data
+    const extractResultData = (): Record<string, unknown> | undefined => {
+      const value = resultData.result;
+      if (value !== null && typeof value === 'object' && !Array.isArray(value)) {
+        return value as Record<string, unknown>;
+      }
+      return undefined;
+    };
+
+    const resultDataObj = extractResultData();
 
     // Update command history
     setCommandHistory((prev) => {
@@ -220,9 +289,9 @@ export function AutomationPanel() {
         command_type: 'unknown',
         timestamp: new Date().toISOString(),
         success: Boolean(resultData.success),
-        duration_ms: Number(resultData.duration_ms) || 0,
-        error_message: resultData.error ? String(resultData.error) : undefined,
-        result: resultData.result as Record<string, unknown> | undefined,
+        duration_ms: getNumber(resultData, 'duration_ms') ?? 0,
+        error_message: getString(resultData, 'error'),
+        result: resultDataObj,
       };
 
       return [newRecord, ...prev.slice(0, 19)];
@@ -231,9 +300,9 @@ export function AutomationPanel() {
     // Update last result display
     setLastResult({
       success: Boolean(resultData.success),
-      duration: resultData.duration_ms ? Number(resultData.duration_ms) : undefined,
-      error: resultData.error ? String(resultData.error) : undefined,
-      data: resultData.result as Record<string, unknown> | undefined,
+      duration: getNumber(resultData, 'duration_ms'),
+      error: getString(resultData, 'error'),
+      data: resultDataObj,
     });
 
     setLoading(false);
@@ -243,34 +312,54 @@ export function AutomationPanel() {
   useDeviceUpdates(handleDeviceUpdate);
   useCommandResults(handleCommandResult);
 
-  const fetchScreenshots = async (deviceId: string) => {
-    try {
-      const response = await apiFetch(
-        `/api/v1/automation/devices/${deviceId}/screenshots`
-      );
-      if (response.ok) {
-        const data = await response.json();
-        setScreenshots(data);
-      }
-    } catch (error) {
-      console.error('Failed to fetch screenshots:', error);
-    }
-  };
-
   // Fetch screenshots when selected device changes
   useEffect(() => {
-    if (selectedDevice) {
-      fetchScreenshots(selectedDevice);
-    } else {
+    if (!selectedDevice) {
       setScreenshots([]);
+      return;
     }
+
+    const abortController = new AbortController();
+
+    const fetchScreenshots = async () => {
+      try {
+        const response = await apiFetch(
+          `/api/v1/automation/devices/${selectedDevice}/screenshots`,
+          { signal: abortController.signal }
+        );
+        if (abortController.signal.aborted) return;
+        if (response.ok) {
+          const data = await response.json();
+          setScreenshots(data);
+        }
+      } catch (error) {
+        if ((error as Error).name !== 'AbortError') {
+          console.error('Failed to fetch screenshots:', error);
+        }
+      }
+    };
+
+    fetchScreenshots();
+
+    return () => {
+      abortController.abort();
+    };
   }, [selectedDevice]);
 
   const copyToClipboard = async (text: string) => {
     try {
       await navigator.clipboard.writeText(text);
       setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
+      // Clear any existing timeout before setting a new one
+      if (copyTimeoutRef.current) {
+        clearTimeout(copyTimeoutRef.current);
+      }
+      copyTimeoutRef.current = setTimeout(() => {
+        if (isMountedRef.current) {
+          setCopied(false);
+        }
+        copyTimeoutRef.current = null;
+      }, 2000);
     } catch (error) {
       console.error('Failed to copy text:', error);
     }
@@ -288,6 +377,12 @@ export function AutomationPanel() {
     setLoading(true);
     setLastResult(null);
     setCopied(false);
+
+    // Clear any existing command timeout
+    if (commandTimeoutRef.current) {
+      clearTimeout(commandTimeoutRef.current);
+      commandTimeoutRef.current = null;
+    }
 
     try {
       const response = await apiFetch(
@@ -319,23 +414,25 @@ export function AutomationPanel() {
       setCommandHistory((prev) => [newRecord, ...prev.slice(0, 19)]);
 
       // Set a timeout in case WebSocket result doesn't arrive
-      const timeout = setTimeout(() => {
-        setLastResult({
-          success: false,
-          error: 'Command timeout - result not received via WebSocket',
-        });
-        setLoading(false);
+      commandTimeoutRef.current = setTimeout(() => {
+        if (isMountedRef.current) {
+          setLastResult({
+            success: false,
+            error: 'Command timeout - result not received via WebSocket',
+          });
+          setLoading(false);
+        }
+        commandTimeoutRef.current = null;
       }, 30000);
-
-      // Cleanup will happen when WebSocket result arrives (in handleCommandResult)
-      return () => clearTimeout(timeout);
     } catch (error) {
       console.error('Command execution failed:', error);
-      setLastResult({
-        success: false,
-        error: error instanceof Error ? error.message : 'Unknown error',
-      });
-      setLoading(false);
+      if (isMountedRef.current) {
+        setLastResult({
+          success: false,
+          error: error instanceof Error ? error.message : 'Unknown error',
+        });
+        setLoading(false);
+      }
     }
   };
 

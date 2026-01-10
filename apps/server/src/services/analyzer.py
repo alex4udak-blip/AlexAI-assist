@@ -55,12 +55,37 @@ class AnalyzerService:
         if device_id:
             base_conditions.append(Event.device_id == device_id)
 
-        # Query 1: Get total event count
-        total_query = select(func.count(Event.id)).where(*base_conditions)
-        total_result = await self.db.execute(total_query)
-        total_events = total_result.scalar() or 0
+        # OPTIMIZATION NOTE: These queries cannot be combined into one because:
+        # 1. Each GROUP BY produces different result shapes (apps, categories, hours)
+        # 2. Combining them would require UNION which loses type information
+        # 3. Using multiple aggregations in one query would produce cartesian products
+        # The total_events is derived from categories query to save one round-trip.
+
+        # Query 1: Get category breakdown (GROUP BY category) + total via window
+        # This also gives us total_events without a separate query
+        categories_query = (
+            select(
+                Event.category,
+                func.count(Event.id).label("count"),
+                func.sum(func.count(Event.id)).over().label("total"),
+            )
+            .where(*base_conditions, Event.category.isnot(None))
+            .group_by(Event.category)
+        )
+        categories_result = await self.db.execute(categories_query)
+        categories_rows = categories_result.all()
+        categories = {row.category: row.count for row in categories_rows}
+        # Get total from first row's window function, or query if no categories
+        total_events = categories_rows[0].total if categories_rows else 0
+
+        # If no categorized events, we still need accurate total count
+        if not categories_rows:
+            total_query = select(func.count(Event.id)).where(*base_conditions)
+            total_result = await self.db.execute(total_query)
+            total_events = total_result.scalar() or 0
 
         # Query 2: Get top apps (GROUP BY app_name)
+        # Cannot combine with categories - different grouping dimension
         apps_query = (
             select(
                 Event.app_name,
@@ -74,19 +99,8 @@ class AnalyzerService:
         apps_result = await self.db.execute(apps_query)
         top_apps = [(row.app_name, row.count) for row in apps_result.all()]
 
-        # Query 3: Get category breakdown (GROUP BY category)
-        categories_query = (
-            select(
-                Event.category,
-                func.count(Event.id).label("count"),
-            )
-            .where(*base_conditions, Event.category.isnot(None))
-            .group_by(Event.category)
-        )
-        categories_result = await self.db.execute(categories_query)
-        categories = {row.category: row.count for row in categories_result.all()}
-
-        # Query 4: Get hourly activity (GROUP BY hour)
+        # Query 3: Get hourly activity (GROUP BY hour)
+        # Cannot combine - requires temporal extraction which differs by dialect
         dialect_name = _get_dialect_name(self.db)
         hour_expr = _extract_hour(Event.timestamp, dialect_name)
         hourly_query = (

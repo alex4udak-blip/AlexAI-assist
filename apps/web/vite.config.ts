@@ -17,12 +17,6 @@ export default defineConfig(({ mode }) => {
     ...process.env,
   };
 
-  // Debug: log env vars during build
-  console.log('=== VITE BUILD ENV DEBUG ===');
-  console.log('VITE_API_URL:', env.VITE_API_URL || '(not set)');
-  console.log('VITE_WS_URL:', env.VITE_WS_URL || '(not set)');
-  console.log('============================');
-
   return {
     plugins: [react()],
     resolve: {

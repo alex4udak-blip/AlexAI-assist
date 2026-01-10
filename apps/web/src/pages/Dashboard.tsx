@@ -66,17 +66,20 @@ export default function Dashboard() {
   useWebSocket();
 
   const { data: summary, refetch: refetchSummary } = useAnalyticsSummary();
-  const { data: productivity } = useProductivity();
+  const { data: productivity, refetch: refetchProductivity } = useProductivity();
   const { data: timeline, refetch: refetchTimeline } = useTimeline(24);
   const { data: agents, refetch: refetchAgents } = useAgents();
-  const { data: suggestions } = useSuggestions({ status: 'pending' });
+  const { data: suggestions, refetch: refetchSuggestions } = useSuggestions({ status: 'pending' });
 
   // Handle real-time event updates
   const handleEventsCreated = useCallback(() => {
-    // Refetch timeline and analytics when new events arrive
+    // Refetch all dashboard data when new events arrive
     refetchTimeline();
     refetchSummary();
-  }, [refetchTimeline, refetchSummary]);
+    refetchProductivity();
+    refetchSuggestions();
+    refetchAgents();
+  }, [refetchTimeline, refetchSummary, refetchProductivity, refetchSuggestions, refetchAgents]);
 
   // Subscribe to real-time events
   useEventsCreated(handleEventsCreated);
@@ -85,27 +88,27 @@ export default function Dashboard() {
   const { mutate: enableAgent } = useMutation(api.enableAgent);
   const { mutate: disableAgent } = useMutation(api.disableAgent);
 
-  const handleRunAgent = async (id: string) => {
+  const handleRunAgent = useCallback(async (id: string) => {
     await runAgent(id);
     refetchAgents();
-  };
+  }, [runAgent, refetchAgents]);
 
-  const handleToggleAgent = async (id: string, enabled: boolean) => {
+  const handleToggleAgent = useCallback(async (id: string, enabled: boolean) => {
     if (enabled) {
       await enableAgent(id);
     } else {
       await disableAgent(id);
     }
     refetchAgents();
-  };
+  }, [enableAgent, disableAgent, refetchAgents]);
 
-  const handleCreateAgent = () => {
+  const handleCreateAgent = useCallback(() => {
     navigate('/agents');
-  };
+  }, [navigate]);
 
-  const handleRefresh = async () => {
+  const handleRefresh = useCallback(async () => {
     await Promise.all([refetchAgents(), refetchTimeline()]);
-  };
+  }, [refetchAgents, refetchTimeline]);
 
   // Calculate activity rings data
   const ringsData = useMemo(() => ({
