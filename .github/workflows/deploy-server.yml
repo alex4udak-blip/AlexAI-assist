@@ -11,13 +11,26 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
+      - name: Check for Railway token
+        id: check_token
+        run: |
+          if [ -z "${{ secrets.RAILWAY_TOKEN }}" ]; then
+            echo "has_token=false" >> $GITHUB_OUTPUT
+            echo "::warning::RAILWAY_TOKEN not configured, skipping deploy"
+          else
+            echo "has_token=true" >> $GITHUB_OUTPUT
+          fi
+
       - name: Checkout
+        if: steps.check_token.outputs.has_token == 'true'
         uses: actions/checkout@v4
 
       - name: Install Railway CLI
+        if: steps.check_token.outputs.has_token == 'true'
         run: npm install -g @railway/cli
 
       - name: Deploy to Railway
+        if: steps.check_token.outputs.has_token == 'true'
         run: |
           cd apps/server
           railway up --service server
