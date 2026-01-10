@@ -42,8 +42,9 @@ Observer — это **персональный** AI мета-агентный п
 При каждом обновлении десктопного приложения:
 1. Обновить версию в `apps/desktop/src-tauri/tauri.conf.json`
 2. Обновить версию в `apps/desktop/src-tauri/Cargo.toml`
-3. Версии должны совпадать
-4. Использовать semver: MAJOR.MINOR.PATCH
+3. Обновить версию в `apps/desktop/package.json` (для UI через __APP_VERSION__)
+4. Версии должны совпадать во всех трёх файлах
+5. Использовать semver: MAJOR.MINOR.PATCH
    - MAJOR: breaking changes
    - MINOR: новые фичи, редизайн UI
    - PATCH: багфиксы
