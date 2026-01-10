@@ -20,6 +20,6 @@ jobs:
       - name: Deploy to Railway
         run: |
           cd apps/server
-          railway up --service observer-server
+          railway up --service server
         env:
           RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
