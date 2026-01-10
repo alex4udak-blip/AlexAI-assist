@@ -68,21 +68,23 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
             settings.redis_url,
             encoding="utf-8",
             decode_responses=False,
-            socket_connect_timeout=5,
-            socket_timeout=5,
+            socket_connect_timeout=3,
+            socket_timeout=3,
         )
         # Timeout ping to avoid hanging forever
-        await asyncio.wait_for(redis_client.ping(), timeout=5.0)
+        await asyncio.wait_for(redis_client.ping(), timeout=3.0)
         _rate_limiter.redis_client = redis_client
         logger.info("Rate limiter upgraded to Redis backend")
     except TimeoutError:
-        logger.warning("Redis connection timed out, using in-memory rate limiting")
+        logger.warning("Redis connection timed out (3s), using in-memory rate limiting")
     except Exception as e:
         logger.warning(f"Redis not available, using in-memory rate limiting: {e}")
 
     # Start background scheduler
+    logger.info("Starting background scheduler...")
     from src.core.scheduler import start_scheduler, stop_scheduler
     start_scheduler()
+    logger.info("Background scheduler started")
 
     logger.info("=== SERVER STARTUP COMPLETE - READY TO ACCEPT REQUESTS ===")
     yield
