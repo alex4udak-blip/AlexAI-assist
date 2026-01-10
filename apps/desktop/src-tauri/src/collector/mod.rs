@@ -2,14 +2,13 @@ mod accessibility;
 mod apps;
 mod browser;
 mod messenger;
-#[allow(dead_code)]
 mod screenshots;
 mod system_metrics;
 
 pub use accessibility::macos::*;
-// Only export types that are actually used in Event struct
 pub use browser::BrowserTab;
 pub use messenger::Message;
+pub use screenshots::{ScreenshotConfig, ScreenshotManager};
 pub use system_metrics::{SystemMetrics, SystemMetricsCollector};
 
 use crate::AppState;
@@ -82,7 +81,6 @@ impl Event {
 }
 
 fn get_device_id() -> String {
-    // Get or create a persistent device ID
     let config_dir = dirs::config_dir()
         .unwrap_or_else(|| std::path::PathBuf::from("."))
         .join("observer");
@@ -100,6 +98,19 @@ fn get_device_id() -> String {
     new_id
 }
 
+/// Check if app is a browser
+fn is_browser(app_name: &str) -> bool {
+    let app_lower = app_name.to_lowercase();
+    app_lower.contains("chrome")
+        || app_lower.contains("safari")
+        || app_lower.contains("firefox")
+        || app_lower.contains("edge")
+        || app_lower.contains("arc")
+        || app_lower.contains("brave")
+        || app_lower.contains("opera")
+        || app_lower.contains("vivaldi")
+}
+
 /// Get the currently focused application and window information
 pub fn get_current_focus() -> Option<FocusInfo> {
     // First try accessibility API for detailed info
@@ -107,22 +118,15 @@ pub fn get_current_focus() -> Option<FocusInfo> {
         if let Some((app_name, window_title)) = get_focused_element_info() {
             let selected_text = get_selected_text();
 
-            // Get URL using AppleScript for browsers (more reliable)
-            let url = {
-                let app_lower = app_name.to_lowercase();
-                let is_browser = app_lower.contains("chrome")
-                    || app_lower.contains("safari")
-                    || app_lower.contains("firefox")
-                    || app_lower.contains("edge")
-                    || app_lower.contains("arc")
-                    || app_lower.contains("brave");
-
-                if is_browser {
-                    let browser_monitor = browser::BrowserMonitor::new();
-                    browser_monitor.get_active_tab(&app_name).map(|tab| tab.url)
-                } else {
-                    None
-                }
+            // Get URL using AppleScript for browsers
+            let url = if is_browser(&app_name) {
+                let browser_monitor = browser::BrowserMonitor::new();
+                browser_monitor.get_active_tab(&app_name).map(|tab| {
+                    println!("[Browser] {} | {}", app_name, tab.url);
+                    tab.url
+                })
+            } else {
+                None
             };
 
             return Some(FocusInfo {
@@ -157,21 +161,26 @@ pub async fn start_collector(
     let mut last_title: Option<String> = None;
     let mut last_typed_text: Option<String> = None;
 
-    // Initialize system metrics collector
+    // Initialize collectors
     let metrics_collector = SystemMetricsCollector::new();
+    let mut screenshot_manager = ScreenshotManager::new(ScreenshotConfig::default());
+    let messenger_monitor = messenger::MessengerMonitor::new();
+    let browser_monitor = browser::BrowserMonitor::new();
 
-    // Request accessibility and screen recording permissions on start
+    println!("[Collector] Initialized: ScreenshotManager, MessengerMonitor, BrowserMonitor");
+
+    // Request permissions on start
     #[cfg(target_os = "macos")]
     {
         use crate::automation::{request_accessibility, request_screen_recording};
 
         if !has_accessibility_permission() {
-            println!("Requesting accessibility permission...");
+            println!("[Permissions] Requesting accessibility permission...");
             let granted = request_accessibility();
             if granted {
-                println!("Accessibility permission granted!");
+                println!("[Permissions] Accessibility permission granted!");
             } else {
-                eprintln!("Warning: Accessibility permission not granted. Some features will be limited.");
+                eprintln!("[Permissions] Warning: Accessibility permission not granted.");
             }
         }
 
@@ -179,15 +188,14 @@ pub async fn start_collector(
         request_screen_recording();
     }
 
-    println!("Collector started. Waiting for events...");
+    println!("[Collector] Started. Waiting for events...");
 
     loop {
-        // Use select! to handle both the polling and shutdown signal
         tokio::select! {
             _ = shutdown_token.cancelled() => {
-                println!("Shutdown signal received. Flushing events and cleaning up...");
+                println!("[Collector] Shutdown signal received. Flushing events...");
                 flush_events(&state).await;
-                println!("Collector shutdown complete.");
+                println!("[Collector] Shutdown complete.");
                 break;
             }
             _ = tokio::time::sleep(tokio::time::Duration::from_millis(500)) => {
@@ -199,19 +207,23 @@ pub async fn start_collector(
                     }
                 }
 
-                // Get current focus using accessibility API when available
+                // Get current focus
                 let focus_info = get_current_focus();
 
                 let (current_app, current_title) = if let Some(ref info) = focus_info {
                     (Some(info.app_name.clone()), Some(info.window_title.clone()))
                 } else {
-                    // Fallback to basic window info
                     apps::get_active_window()
                 };
 
                 // Check if there's a change
                 if current_app != last_app || current_title != last_title {
-                    if let Some(app_name) = &current_app {
+                    if let Some(ref app_name) = current_app {
+                        let window_title = current_title.clone().unwrap_or_default();
+
+                        // === DEBUG LOG: Focus Change ===
+                        println!("[Focus] {} | {}", app_name, window_title);
+
                         let mut event = Event::new(
                             "app_focus",
                             current_app.clone(),
@@ -219,16 +231,29 @@ pub async fn start_collector(
                         )
                         .with_category(categorize_app(app_name));
 
-                        // Collect system metrics
+                        // === SYSTEM METRICS ===
                         if let Ok(metrics) = metrics_collector.collect() {
                             event.system_metrics = Some(metrics);
                         }
 
-                        // Add URL if available from accessibility API
-                        if let Some(ref info) = focus_info {
-                            event.url = info.url.clone();
+                        // === BROWSER URL ===
+                        if is_browser(app_name) {
+                            if let Some(tab) = browser_monitor.get_active_tab(app_name) {
+                                println!("[Browser] {} | {}", app_name, tab.url);
+                                event.url = Some(tab.url.clone());
+                                event.browser_tab = Some(tab);
+                            }
+                        }
 
-                            // Add selected text to event data if available
+                        // Add URL from focus_info if not already set
+                        if event.url.is_none() {
+                            if let Some(ref info) = focus_info {
+                                event.url = info.url.clone();
+                            }
+                        }
+
+                        // Add selected text to event data
+                        if let Some(ref info) = focus_info {
                             if let Some(ref selected) = info.selected_text {
                                 if !selected.is_empty() {
                                     event.data = serde_json::json!({
@@ -238,21 +263,59 @@ pub async fn start_collector(
                             }
                         }
 
-                        // Capture browser input if in a browser
-                        let app_lower = app_name.to_lowercase();
-                        let is_browser = app_lower.contains("chrome")
-                            || app_lower.contains("safari")
-                            || app_lower.contains("firefox")
-                            || app_lower.contains("edge")
-                            || app_lower.contains("arc")
-                            || app_lower.contains("brave");
+                        // === SCREENSHOT CAPTURE ===
+                        if let Some(screenshot) = screenshot_manager.maybe_capture(
+                            app_name.clone(),
+                            window_title.clone(),
+                        ).await {
+                            let path_str = screenshot.path.to_string_lossy().to_string();
+                            println!("[Screenshot] Saved: {}", path_str);
+                            event.screenshot_path = Some(path_str.clone());
 
-                        if is_browser {
+                            // === OCR ===
+                            #[cfg(target_os = "macos")]
+                            {
+                                match crate::automation::ocr::extract_text_from_path(&path_str) {
+                                    Ok(ocr_result) => {
+                                        println!("[OCR] Extracted {} chars", ocr_result.text.len());
+                                        // Store OCR text in event data
+                                        if let serde_json::Value::Object(ref mut map) = event.data {
+                                            map.insert("ocr_text".to_string(), serde_json::json!(ocr_result.text));
+                                        }
+                                    }
+                                    Err(e) => {
+                                        eprintln!("[OCR] Error: {}", e);
+                                    }
+                                }
+                            }
+                        }
+
+                        // === MESSENGER MESSAGES ===
+                        if messenger_monitor.is_messenger(app_name) {
+                            if let Some(msg_state) = messenger_monitor.get_visible_messages(app_name) {
+                                let msg_count = msg_state.visible_messages.len();
+                                if msg_count > 0 {
+                                    println!("[Messenger] {} messages from {}", msg_count, app_name);
+                                    event.messages = Some(msg_state.visible_messages);
+
+                                    // Store chat name in data
+                                    if let Some(chat) = msg_state.active_chat {
+                                        if let serde_json::Value::Object(ref mut map) = event.data {
+                                            map.insert("chat_name".to_string(), serde_json::json!(chat));
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        // === BROWSER INPUT ===
+                        if is_browser(app_name) {
                             if let Some((url, typed_text)) = get_browser_input() {
-                                // Only update if text has changed
                                 if Some(&typed_text) != last_typed_text.as_ref() {
                                     event.typed_text = Some(typed_text.clone());
-                                    event.url = url.or(event.url);
+                                    if url.is_some() && event.url.is_none() {
+                                        event.url = url;
+                                    }
                                     last_typed_text = Some(typed_text);
                                 }
                             } else {
@@ -262,25 +325,20 @@ pub async fn start_collector(
                             last_typed_text = None;
                         }
 
-                        // Add to buffer with bounds checking
+                        // === SAVE TO DATABASE AND BUFFER ===
                         let mut state = state.lock().await;
 
                         let buffer_size = state.events_buffer.len();
 
-                        // Check if buffer is full
+                        // Check buffer capacity
                         if buffer_size >= crate::MAX_BUFFER_SIZE {
-                            // Drop oldest event to make room for new one
                             state.events_buffer.remove(0);
-                            eprintln!(
-                                "Warning: Event buffer full ({} events). Dropping oldest event.",
-                                crate::MAX_BUFFER_SIZE
-                            );
+                            eprintln!("[Buffer] Warning: Full ({} events). Dropping oldest.", crate::MAX_BUFFER_SIZE);
                         }
 
-                        // Log warning if buffer is filling up (only once per session until it drains)
                         if buffer_size >= crate::BUFFER_WARNING_THRESHOLD && !state.buffer_warnings_logged {
                             eprintln!(
-                                "Warning: Event buffer is {}% full ({}/{} events). Events may be lost if sync continues to fail.",
+                                "[Buffer] Warning: {}% full ({}/{} events)",
                                 (buffer_size * 100) / crate::MAX_BUFFER_SIZE,
                                 buffer_size,
                                 crate::MAX_BUFFER_SIZE
@@ -288,18 +346,26 @@ pub async fn start_collector(
                             state.buffer_warnings_logged = true;
                         }
 
-                        // Reset warning flag if buffer has drained significantly
                         if buffer_size < crate::BUFFER_WARNING_THRESHOLD / 2 {
                             state.buffer_warnings_logged = false;
                         }
 
-                        // Persist event to database
-                        if let Err(e) = state.db.insert_event(&event) {
-                            eprintln!("Warning: Failed to persist event to database: {}", e);
+                        // Persist to database
+                        match state.db.insert_event(&event) {
+                            Ok(_) => {
+                                println!("[DB] Event saved: {} | {} | {}",
+                                    event.id,
+                                    event.app_name.as_deref().unwrap_or("?"),
+                                    event.url.as_deref().unwrap_or("-")
+                                );
+                            }
+                            Err(e) => {
+                                eprintln!("[DB] Error: Failed to save event: {}", e);
+                            }
                         }
 
-                        // Update top_apps_cache (persists across syncs)
-                        if let Some(app_name) = &event.app_name {
+                        // Update top_apps_cache
+                        if let Some(ref app_name) = event.app_name {
                             *state.top_apps_cache.entry(app_name.clone()).or_insert(0) += 1;
                         }
 
@@ -311,19 +377,12 @@ pub async fn start_collector(
                     last_title = current_title.clone();
                 } else {
                     // No focus change, but check for browser input changes
-                    if let Some(app_name) = &current_app {
-                        let app_lower = app_name.to_lowercase();
-                        let is_browser = app_lower.contains("chrome")
-                            || app_lower.contains("safari")
-                            || app_lower.contains("firefox")
-                            || app_lower.contains("edge")
-                            || app_lower.contains("arc")
-                            || app_lower.contains("brave");
-
-                        if is_browser {
+                    if let Some(ref app_name) = current_app {
+                        if is_browser(app_name) {
                             if let Some((url, typed_text)) = get_browser_input() {
-                                // Only create event if text has changed
                                 if Some(&typed_text) != last_typed_text.as_ref() && !typed_text.is_empty() {
+                                    println!("[BrowserInput] {} | {}", app_name, typed_text);
+
                                     let mut event = Event::new(
                                         "browser_input",
                                         current_app.clone(),
@@ -331,7 +390,6 @@ pub async fn start_collector(
                                     )
                                     .with_category("browsing");
 
-                                    // Collect system metrics
                                     if let Ok(metrics) = metrics_collector.collect() {
                                         event.system_metrics = Some(metrics);
                                     }
@@ -340,40 +398,20 @@ pub async fn start_collector(
                                     event.url = url;
                                     last_typed_text = Some(typed_text);
 
-                                    // Add to buffer with bounds checking
                                     let mut state = state.lock().await;
 
                                     let buffer_size = state.events_buffer.len();
 
                                     if buffer_size >= crate::MAX_BUFFER_SIZE {
                                         state.events_buffer.remove(0);
-                                        eprintln!(
-                                            "Warning: Event buffer full ({} events). Dropping oldest event.",
-                                            crate::MAX_BUFFER_SIZE
-                                        );
                                     }
 
-                                    if buffer_size >= crate::BUFFER_WARNING_THRESHOLD && !state.buffer_warnings_logged {
-                                        eprintln!(
-                                            "Warning: Event buffer is {}% full ({}/{} events). Events may be lost if sync continues to fail.",
-                                            (buffer_size * 100) / crate::MAX_BUFFER_SIZE,
-                                            buffer_size,
-                                            crate::MAX_BUFFER_SIZE
-                                        );
-                                        state.buffer_warnings_logged = true;
+                                    match state.db.insert_event(&event) {
+                                        Ok(_) => println!("[DB] Browser input saved: {}", event.id),
+                                        Err(e) => eprintln!("[DB] Error: {}", e),
                                     }
 
-                                    if buffer_size < crate::BUFFER_WARNING_THRESHOLD / 2 {
-                                        state.buffer_warnings_logged = false;
-                                    }
-
-                                    // Persist event to database
-                                    if let Err(e) = state.db.insert_event(&event) {
-                                        eprintln!("Warning: Failed to persist event to database: {}", e);
-                                    }
-
-                                    // Update top_apps_cache (persists across syncs)
-                                    if let Some(app_name) = &event.app_name {
+                                    if let Some(ref app_name) = event.app_name {
                                         *state.top_apps_cache.entry(app_name.clone()).or_insert(0) += 1;
                                     }
 
@@ -381,7 +419,6 @@ pub async fn start_collector(
                                     state.events_today += 1;
                                 }
                             } else if last_typed_text.is_some() {
-                                // Typed text cleared or focus left text field
                                 last_typed_text = None;
                             }
                         }
@@ -398,9 +435,7 @@ async fn flush_events(state: &Arc<Mutex<AppState>>) {
     let event_count = state.events_buffer.len();
 
     if event_count > 0 {
-        println!("Flushing {} remaining events...", event_count);
-        // Events will be flushed by the periodic sync task or app shutdown
-        // This ensures we log the intention to flush
+        println!("[Collector] Flushing {} remaining events...", event_count);
     }
 }
 
@@ -411,15 +446,12 @@ fn categorize_app(app_name: &str) -> &'static str {
         || app_lower.contains("xcode")
         || app_lower.contains("terminal")
         || app_lower.contains("iterm")
+        || app_lower.contains("cursor")
     {
         return "coding";
     }
 
-    if app_lower.contains("chrome")
-        || app_lower.contains("safari")
-        || app_lower.contains("firefox")
-        || app_lower.contains("edge")
-    {
+    if is_browser(&app_lower) {
         return "browsing";
     }
 
@@ -427,6 +459,9 @@ fn categorize_app(app_name: &str) -> &'static str {
         || app_lower.contains("discord")
         || app_lower.contains("teams")
         || app_lower.contains("zoom")
+        || app_lower.contains("telegram")
+        || app_lower.contains("messages")
+        || app_lower.contains("whatsapp")
     {
         return "communication";
     }
@@ -435,6 +470,7 @@ fn categorize_app(app_name: &str) -> &'static str {
         || app_lower.contains("pages")
         || app_lower.contains("notion")
         || app_lower.contains("obsidian")
+        || app_lower.contains("notes")
     {
         return "writing";
     }
@@ -442,8 +478,16 @@ fn categorize_app(app_name: &str) -> &'static str {
     if app_lower.contains("figma")
         || app_lower.contains("sketch")
         || app_lower.contains("photoshop")
+        || app_lower.contains("illustrator")
     {
         return "design";
+    }
+
+    if app_lower.contains("finder")
+        || app_lower.contains("preview")
+        || app_lower.contains("system preferences")
+    {
+        return "system";
     }
 
     "other"
