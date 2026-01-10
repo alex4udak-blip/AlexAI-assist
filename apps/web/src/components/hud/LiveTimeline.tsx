@@ -1,6 +1,6 @@
 import { motion } from 'framer-motion';
 import { useRef, useEffect, useMemo } from 'react';
-import { Monitor, Bot, Clock } from 'lucide-react';
+import { Bot, Clock } from 'lucide-react';
 
 interface TimelineEvent {
   id: string;
@@ -21,10 +21,18 @@ interface GroupedEvent {
   eventCount: number;
 }
 
+interface AppTrack {
+  appName: string;
+  category: string;
+  events: GroupedEvent[];
+  totalEvents: number;
+}
+
 interface LiveTimelineProps {
   events: TimelineEvent[];
   startHour?: number;
   endHour?: number;
+  maxTracks?: number;
 }
 
 const categoryColors: Record<string, string> = {
@@ -36,65 +44,100 @@ const categoryColors: Record<string, string> = {
   other: '#6b7280',
 };
 
+// Generate consistent color for app name
+const getAppColor = (appName: string, category?: string): string => {
+  if (category && categoryColors[category]) {
+    return categoryColors[category];
+  }
+  // Generate color based on app name hash
+  let hash = 0;
+  for (let i = 0; i < appName.length; i++) {
+    hash = appName.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  const colors = ['#06b6d4', '#3b82f6', '#8b5cf6', '#10b981', '#f59e0b', '#ef4444', '#ec4899', '#14b8a6'];
+  return colors[Math.abs(hash) % colors.length];
+};
+
 export function LiveTimeline({
   events,
   startHour = 6,
   endHour = 23,
+  maxTracks = 5,
 }: LiveTimelineProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const hours = Array.from({ length: endHour - startHour + 1 }, (_, i) => startHour + i);
   const totalMinutes = (endHour - startHour + 1) * 60;
 
-  // Group consecutive events by app name to avoid overlapping bars
-  const groupedEvents = useMemo(() => {
+  // Group events by app and create tracks
+  const appTracks = useMemo(() => {
     const appEvents = events.filter(e => e.type === 'app');
     if (appEvents.length === 0) return [];
 
-    // Sort by time descending (most recent first), then reverse for chronological
-    const sorted = [...appEvents].sort((a, b) =>
-      new Date(a.startTime).getTime() - new Date(b.startTime).getTime()
-    );
+    // Group by app name
+    const appGroups: Record<string, TimelineEvent[]> = {};
+    appEvents.forEach(event => {
+      const key = event.name;
+      if (!appGroups[key]) appGroups[key] = [];
+      appGroups[key].push(event);
+    });
 
-    const groups: GroupedEvent[] = [];
-    let currentGroup: GroupedEvent | null = null;
+    // Create tracks for each app
+    const tracks: AppTrack[] = Object.entries(appGroups).map(([appName, events]) => {
+      // Sort events chronologically
+      const sorted = [...events].sort((a, b) =>
+        new Date(a.startTime).getTime() - new Date(b.startTime).getTime()
+      );
 
-    sorted.forEach((event) => {
-      const eventTime = new Date(event.startTime);
+      // Group consecutive events
+      const groups: GroupedEvent[] = [];
+      let currentGroup: GroupedEvent | null = null;
 
-      if (currentGroup && currentGroup.name === event.name) {
-        // Extend current group
-        const groupEnd = new Date(currentGroup.endTime);
-        const timeDiff = (eventTime.getTime() - groupEnd.getTime()) / 60000; // minutes
+      sorted.forEach((event) => {
+        const eventTime = new Date(event.startTime);
 
-        // If less than 5 minutes gap, extend the group
-        if (timeDiff < 5) {
-          currentGroup.endTime = new Date(eventTime.getTime() + 60000).toISOString(); // +1 min
-          currentGroup.eventCount++;
-          return;
+        if (currentGroup) {
+          const groupEnd = new Date(currentGroup.endTime);
+          const timeDiff = (eventTime.getTime() - groupEnd.getTime()) / 60000;
+
+          // If less than 3 minutes gap, extend the group
+          if (timeDiff < 3) {
+            currentGroup.endTime = new Date(eventTime.getTime() + 60000).toISOString();
+            currentGroup.eventCount++;
+            return;
+          }
         }
-      }
 
-      // Start new group
+        if (currentGroup) {
+          groups.push(currentGroup);
+        }
+
+        currentGroup = {
+          id: event.id,
+          name: event.name,
+          startTime: event.startTime,
+          endTime: new Date(eventTime.getTime() + 60000).toISOString(),
+          category: event.category,
+          eventCount: 1,
+        };
+      });
+
       if (currentGroup) {
         groups.push(currentGroup);
       }
 
-      currentGroup = {
-        id: event.id,
-        name: event.name,
-        startTime: event.startTime,
-        endTime: new Date(eventTime.getTime() + 60000).toISOString(), // Default 1 min duration
-        category: event.category,
-        eventCount: 1,
+      return {
+        appName,
+        category: events[0]?.category || 'other',
+        events: groups,
+        totalEvents: events.length,
       };
     });
 
-    if (currentGroup) {
-      groups.push(currentGroup);
-    }
-
-    return groups;
-  }, [events]);
+    // Sort by total events and take top N
+    return tracks
+      .sort((a, b) => b.totalEvents - a.totalEvents)
+      .slice(0, maxTracks);
+  }, [events, maxTracks]);
 
   // Auto-scroll to current time
   useEffect(() => {
@@ -119,12 +162,18 @@ export function LiveTimeline({
     const start = new Date(startTime);
     const end = new Date(endTime);
     const durationMinutes = Math.max(1, (end.getTime() - start.getTime()) / 60000);
-    return Math.max((durationMinutes / totalMinutes) * 100, 0.8); // Min 0.8% width
+    return Math.max((durationMinutes / totalMinutes) * 100, 0.5);
   };
 
   // Current time indicator
   const now = new Date();
   const currentPosition = ((now.getHours() - startHour) * 60 + now.getMinutes()) / totalMinutes * 100;
+
+  // Calculate height based on number of tracks
+  const trackHeight = 20;
+  const headerHeight = 24;
+  const agentTrackHeight = 24;
+  const contentHeight = headerHeight + (appTracks.length * trackHeight) + agentTrackHeight + 8;
 
   return (
     <motion.div
@@ -147,7 +196,7 @@ export function LiveTimeline({
         ref={scrollRef}
         className="overflow-x-auto scrollbar-hide pb-2"
       >
-        <div className="relative min-w-[800px] h-24">
+        <div className="relative min-w-[800px]" style={{ height: `${contentHeight}px` }}>
           {/* Hour markers */}
           <div className="absolute top-0 left-0 right-0 h-6 flex">
             {hours.map((hour) => (
@@ -165,54 +214,70 @@ export function LiveTimeline({
             {hours.map((hour) => (
               <div
                 key={hour}
-                className="absolute top-0 bottom-0 border-l border-border-subtle/50"
+                className="absolute top-0 bottom-0 border-l border-border-subtle/30"
                 style={{ left: `${((hour - startHour) / (endHour - startHour + 1)) * 100}%` }}
               />
             ))}
           </div>
 
-          {/* Events track - Apps (grouped) */}
-          <div className="absolute top-8 left-0 right-0 h-7">
-            {groupedEvents.map((event) => {
-              const color = categoryColors[event.category || 'other'];
-              const position = getEventPosition(event.startTime);
-              const width = getEventWidth(event.startTime, event.endTime);
+          {/* App tracks - each app on its own row */}
+          {appTracks.map((track, trackIndex) => {
+            const color = getAppColor(track.appName, track.category);
+            const topOffset = headerHeight + (trackIndex * trackHeight);
 
-              // Skip events that are outside visible range
-              if (position > 100 || position + width < 0) return null;
-
-              return (
-                <motion.div
-                  key={`${event.id}-${event.startTime}`}
-                  initial={{ opacity: 0, scaleX: 0 }}
-                  animate={{ opacity: 1, scaleX: 1 }}
-                  className="absolute top-0 h-full rounded-md flex items-center px-2
-                             overflow-hidden cursor-pointer group hover:z-10"
-                  style={{
-                    left: `${position}%`,
-                    width: `${width}%`,
-                    backgroundColor: `${color}30`,
-                    borderLeft: `3px solid ${color}`,
-                    minWidth: '60px',
-                  }}
-                  title={`${event.name} - ${event.category || 'other'} (${event.eventCount} событий)`}
+            return (
+              <div
+                key={track.appName}
+                className="absolute left-0 right-0"
+                style={{ top: `${topOffset}px`, height: `${trackHeight}px` }}
+              >
+                {/* App label on the left (outside scroll area would be better, but for now) */}
+                <div
+                  className="absolute left-0 top-0 h-full flex items-center z-10 pointer-events-none"
+                  style={{ width: '70px' }}
                 >
-                  <Monitor className="w-3 h-3 shrink-0" style={{ color }} />
-                  <span className="ml-1 text-[10px] text-text-primary truncate font-medium">
-                    {event.name}
+                  <span
+                    className="text-[9px] font-medium truncate px-1 py-0.5 rounded bg-bg-primary/80"
+                    style={{ color }}
+                    title={track.appName}
+                  >
+                    {track.appName.length > 10 ? track.appName.slice(0, 10) + '...' : track.appName}
                   </span>
-                  {event.eventCount > 1 && (
-                    <span className="ml-1 text-[9px] text-text-muted">
-                      ({event.eventCount})
-                    </span>
-                  )}
-                </motion.div>
-              );
-            })}
-          </div>
+                </div>
 
-          {/* Events track - Agents */}
-          <div className="absolute top-16 left-0 right-0 h-6">
+                {/* Events for this app */}
+                {track.events.map((event) => {
+                  const position = getEventPosition(event.startTime);
+                  const width = getEventWidth(event.startTime, event.endTime);
+
+                  if (position > 100 || position + width < 0) return null;
+
+                  return (
+                    <motion.div
+                      key={`${event.id}-${event.startTime}`}
+                      initial={{ opacity: 0, scaleX: 0 }}
+                      animate={{ opacity: 1, scaleX: 1 }}
+                      className="absolute top-1 h-4 rounded cursor-pointer hover:brightness-125 transition-all"
+                      style={{
+                        left: `${position}%`,
+                        width: `${Math.max(width, 0.3)}%`,
+                        backgroundColor: `${color}60`,
+                        borderLeft: `2px solid ${color}`,
+                        minWidth: '4px',
+                      }}
+                      title={`${event.name} (${event.eventCount} событий)`}
+                    />
+                  );
+                })}
+              </div>
+            );
+          })}
+
+          {/* Agents track - at the bottom */}
+          <div
+            className="absolute left-0 right-0"
+            style={{ top: `${headerHeight + (appTracks.length * trackHeight)}px`, height: `${agentTrackHeight}px` }}
+          >
             {events
               .filter((e) => e.type === 'agent')
               .map((event) => (
@@ -220,7 +285,7 @@ export function LiveTimeline({
                   key={event.id}
                   initial={{ opacity: 0, scale: 0 }}
                   animate={{ opacity: 1, scale: 1 }}
-                  className="absolute top-0 w-6 h-6 rounded-lg bg-hud-cyan/20 border border-hud-cyan/40
+                  className="absolute top-1 w-5 h-5 rounded-lg bg-hud-cyan/20 border border-hud-cyan/40
                              flex items-center justify-center cursor-pointer hover:shadow-hud-sm
                              transition-shadow"
                   style={{
@@ -229,7 +294,7 @@ export function LiveTimeline({
                   }}
                   title={event.name}
                 >
-                  <Bot className="w-3.5 h-3.5 text-hud-cyan" />
+                  <Bot className="w-3 h-3 text-hud-cyan" />
                 </motion.div>
               ))}
           </div>
@@ -239,7 +304,7 @@ export function LiveTimeline({
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
-              className="absolute top-6 bottom-0 w-0.5 bg-status-error z-10"
+              className="absolute top-6 bottom-0 w-0.5 bg-status-error z-20"
               style={{ left: `${currentPosition}%` }}
             >
               <div className="absolute -top-1 left-1/2 -translate-x-1/2 w-2 h-2 bg-status-error rounded-full
@@ -249,16 +314,20 @@ export function LiveTimeline({
         </div>
       </div>
 
-      {/* Legend */}
+      {/* Legend - show app colors */}
       <div className="flex items-center gap-3 mt-2 pt-2 border-t border-border-subtle overflow-x-auto">
-        <div className="flex items-center gap-1 flex-shrink-0">
-          <Monitor className="w-3 h-3 text-hud-cyan" />
-          <span className="text-[10px] text-text-muted">Apps</span>
-        </div>
-        <div className="flex items-center gap-1 flex-shrink-0">
-          <Bot className="w-3 h-3 text-hud-cyan" />
-          <span className="text-[10px] text-text-muted">Agents</span>
-        </div>
+        {appTracks.slice(0, 4).map((track) => {
+          const color = getAppColor(track.appName, track.category);
+          return (
+            <div key={track.appName} className="flex items-center gap-1 flex-shrink-0">
+              <div className="w-2 h-2 rounded-sm" style={{ backgroundColor: color }} />
+              <span className="text-[10px] text-text-muted truncate max-w-[60px]">{track.appName}</span>
+            </div>
+          );
+        })}
+        {appTracks.length > 4 && (
+          <span className="text-[10px] text-text-muted">+{appTracks.length - 4}</span>
+        )}
         <div className="flex items-center gap-1 ml-auto flex-shrink-0">
           <div className="w-1.5 h-1.5 bg-status-error rounded-full" />
           <span className="text-[10px] text-text-muted">Now</span>
