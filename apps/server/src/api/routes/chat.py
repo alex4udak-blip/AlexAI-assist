@@ -113,6 +113,9 @@ async def chat(
     analyzer = AnalyzerService(db)
     activity_context = await analyzer.get_summary()
 
+    # Get detailed recent activity (URLs, window titles, typed text)
+    detailed_activity = await analyzer.get_recent_activity_details(hours=4, limit=30)
+
     # Get memory context (Memory System 2026)
     memory_manager = MemoryManager(db, session_id)
     memory_context: dict[str, Any] = {}
@@ -142,13 +145,38 @@ async def chat(
     if memory_prompt_section:
         system_prompt += f"# MEMORY CONTEXT\n{memory_prompt_section}\n\n"
 
+    # Format detailed activity for context
+    detailed_activity_text = ""
+    if detailed_activity:
+        activity_lines = []
+        for act in detailed_activity[:20]:  # Limit to prevent context overflow
+            line = f"  - {act.get('timestamp', '??:??')} | {act.get('app', 'Unknown')}"
+            if act.get('title'):
+                line += f" | {act['title'][:60]}"
+            if act.get('url'):
+                line += f" | URL: {act['url'][:80]}"
+            if act.get('typed'):
+                line += f" | Typed: {act['typed'][:50]}"
+            activity_lines.append(line)
+        detailed_activity_text = "\n".join(activity_lines)
+
     system_prompt += (
         f"# CURRENT ACTIVITY\n"
         f"- Total events today: {activity_context.get('total_events', 0)}\n"
         f"- Top apps: {', '.join([app[0] for app in activity_context.get('top_apps', [])[:5]])}\n"
         f"- Categories: {activity_context.get('categories', {})}\n\n"
+    )
+
+    if detailed_activity_text:
+        system_prompt += (
+            f"# RECENT DETAILED ACTIVITY (last 4 hours)\n"
+            f"{detailed_activity_text}\n\n"
+        )
+
+    system_prompt += (
         "Be helpful, concise, and proactive in suggesting improvements. "
         "Use your memory of the user to personalize responses. "
+        "You can see detailed user activity including URLs, window titles, and what they typed. "
         "Respond in Russian. When appropriate, suggest creating automation agents."
     )
 

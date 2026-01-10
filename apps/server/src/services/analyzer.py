@@ -209,6 +209,59 @@ class AnalyzerService:
             "trend": "up" if score > 50 else "down",
         }
 
+    async def get_recent_activity_details(
+        self,
+        device_id: str | None = None,
+        hours: int = 4,
+        limit: int = 50,
+    ) -> list[dict[str, Any]]:
+        """Get recent detailed activity for AI context.
+
+        Returns recent events with full details:
+        - App names, window titles, URLs
+        - Typed text in browsers
+        - Timestamps
+        """
+        start_time = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(hours=hours)
+
+        conditions = [Event.timestamp >= start_time]
+        if device_id:
+            conditions.append(Event.device_id == device_id)
+
+        query = (
+            select(Event)
+            .where(*conditions)
+            .order_by(Event.timestamp.desc())
+            .limit(limit)
+        )
+
+        result = await self.db.execute(query)
+        events = result.scalars().all()
+
+        detailed_activity = []
+        for event in events:
+            activity = {
+                "timestamp": event.timestamp.strftime("%H:%M"),
+                "app": event.app_name,
+                "title": event.window_title,
+            }
+
+            # Add URL if present
+            if event.url:
+                activity["url"] = event.url
+
+            # Add typed text if present (browser search/input)
+            if event.typed_text:
+                activity["typed"] = event.typed_text[:200]  # Truncate for context
+
+            # Add category
+            if event.category:
+                activity["category"] = event.category
+
+            detailed_activity.append(activity)
+
+        return detailed_activity
+
     async def get_trends(
         self,
         device_id: str | None = None,

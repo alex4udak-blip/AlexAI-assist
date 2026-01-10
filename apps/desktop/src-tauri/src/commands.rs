@@ -70,17 +70,10 @@ pub async fn get_detailed_stats(
 ) -> Result<DetailedStats, String> {
     let state = state.lock().await;
 
-    // Calculate top apps from events buffer
-    let mut app_counts: std::collections::HashMap<String, u32> = std::collections::HashMap::new();
-    for event in &state.events_buffer {
-        if let Some(app_name) = &event.app_name {
-            *app_counts.entry(app_name.clone()).or_insert(0) += 1;
-        }
-    }
-
-    let mut top_apps: Vec<AppUsage> = app_counts
-        .into_iter()
-        .map(|(name, count)| AppUsage { name, count })
+    // Use cached top apps (persists across syncs)
+    let mut top_apps: Vec<AppUsage> = state.top_apps_cache
+        .iter()
+        .map(|(name, count)| AppUsage { name: name.clone(), count: *count })
         .collect();
     top_apps.sort_by(|a, b| b.count.cmp(&a.count));
     top_apps.truncate(10);

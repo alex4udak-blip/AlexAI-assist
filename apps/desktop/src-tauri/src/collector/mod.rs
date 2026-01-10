@@ -281,6 +281,11 @@ pub async fn start_collector(
                             eprintln!("Warning: Failed to persist event to database: {}", e);
                         }
 
+                        // Update top_apps_cache (persists across syncs)
+                        if let Some(app_name) = &event.app_name {
+                            *state.top_apps_cache.entry(app_name.clone()).or_insert(0) += 1;
+                        }
+
                         state.events_buffer.push(event);
                         state.events_today += 1;
                     }
@@ -348,6 +353,11 @@ pub async fn start_collector(
                                     // Persist event to database
                                     if let Err(e) = state.db.insert_event(&event) {
                                         eprintln!("Warning: Failed to persist event to database: {}", e);
+                                    }
+
+                                    // Update top_apps_cache (persists across syncs)
+                                    if let Some(app_name) = &event.app_name {
+                                        *state.top_apps_cache.entry(app_name.clone()).or_insert(0) += 1;
                                     }
 
                                     state.events_buffer.push(event);
