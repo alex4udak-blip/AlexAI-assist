@@ -636,7 +636,7 @@ Generate a JSON specification:
                     agent = result.scalar_one_or_none()
 
                     if agent:
-                        self.db.delete(agent)  # delete() is synchronous
+                        await self.db.delete(agent)
                         rollback_results["agents_deleted"].append(str(agent_id))
 
                 # Restore deactivated agents

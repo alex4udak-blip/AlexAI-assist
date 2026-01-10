@@ -403,7 +403,7 @@ async def chat(
     return ChatResponse(
         id=message_id,
         message=data.message,
-        response=response,
+        response=response or "",
         timestamp=timestamp,
     )
 
@@ -544,12 +544,15 @@ async def clear_chat_history(
     result = await db.execute(stmt)
     await db.commit()
 
+    # Get row count from cursor result
+    rows_deleted = getattr(result, "rowcount", 0)
+
     logger.info(
         "Chat history cleared",
         extra={
             "event_type": "chat_history_cleared",
             "session_id": session_id,
-            "rows_deleted": result.rowcount,
+            "rows_deleted": rows_deleted,
         },
     )
 

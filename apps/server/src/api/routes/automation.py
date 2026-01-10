@@ -14,7 +14,9 @@ from src.api.deps import get_db_session
 from src.api.middleware import validate_websocket_auth
 from src.core.logging import get_logger, log_error
 from src.core.websocket import broadcast_command_result, broadcast_device_update
-from src.db.models import CommandResult, DeviceStatus, Screenshot
+from src.db.models import CommandResult as DBCommandResult
+from src.db.models import DeviceStatus as DBDeviceStatus
+from src.db.models import Screenshot as DBScreenshot
 from src.db.models.audit_log import AuditLog
 from src.db.models.device import Device
 
@@ -50,16 +52,16 @@ async def get_or_create_device(db: AsyncSession, device_id: str) -> Device:
     return device
 
 
-async def get_or_create_device_status(db: AsyncSession, device_id: str) -> DeviceStatus:
+async def get_or_create_device_status(db: AsyncSession, device_id: str) -> DBDeviceStatus:
     """Get or create device status record."""
     result = await db.execute(
-        select(DeviceStatus).where(DeviceStatus.device_id == device_id)
+        select(DBDeviceStatus).where(DBDeviceStatus.device_id == device_id)
     )
     status = result.scalar_one_or_none()
     if not status:
         # Ensure device exists first
         await get_or_create_device(db, device_id)
-        status = DeviceStatus(
+        status = DBDeviceStatus(
             device_id=device_id,
             connected=False,
             status="idle",
@@ -76,7 +78,7 @@ async def update_device_status(
     connected: bool | None = None,
     status: str | None = None,
     status_data: dict[str, Any] | None = None,
-) -> DeviceStatus:
+) -> DBDeviceStatus:
     """Update device status in database."""
     device_status = await get_or_create_device_status(db, device_id)
 
@@ -106,11 +108,11 @@ async def save_command_result_to_db(
     result_data: dict[str, Any] | None = None,
     error: str | None = None,
     duration_ms: int | None = None,
-) -> CommandResult:
+) -> DBCommandResult:
     """Save command result to database."""
     # Check if command already exists
     result = await db.execute(
-        select(CommandResult).where(CommandResult.id == command_id)
+        select(DBCommandResult).where(DBCommandResult.id == command_id)
     )
     cmd_result = result.scalar_one_or_none()
 
@@ -125,7 +127,7 @@ async def save_command_result_to_db(
         cmd_result.completed_at = now
     else:
         # Create new
-        cmd_result = CommandResult(
+        cmd_result = DBCommandResult(
             id=command_id,
             device_id=device_id,
             command_type=command_type,
@@ -150,9 +152,9 @@ async def save_screenshot_to_db(
     screenshot_data: str,
     command_id: str | None = None,
     ocr_text: str | None = None,
-) -> Screenshot:
+) -> DBScreenshot:
     """Save screenshot to database."""
-    screenshot = Screenshot(
+    screenshot = DBScreenshot(
         device_id=device_id,
         command_id=command_id,
         screenshot_data=screenshot_data,
@@ -581,7 +583,7 @@ async def send_command(
     start_time = utc_now()
 
     # Store pending command in database
-    cmd_result = CommandResult(
+    cmd_result = DBCommandResult(
         id=command_id,
         device_id=device_id,
         command_type=command.command_type,
@@ -685,7 +687,7 @@ async def get_command_result(
     while (utc_now() - start_time).total_seconds() < timeout:
         # Query from database
         result = await db.execute(
-            select(CommandResult).where(CommandResult.id == command_id)
+            select(DBCommandResult).where(DBCommandResult.id == command_id)
         )
         cmd_result = result.scalar_one_or_none()
 
@@ -702,7 +704,7 @@ async def get_command_result(
 
     # Timeout - update command status
     result = await db.execute(
-        select(CommandResult).where(CommandResult.id == command_id)
+        select(DBCommandResult).where(DBCommandResult.id == command_id)
     )
     cmd_result = result.scalar_one_or_none()
     if cmd_result:
@@ -722,7 +724,7 @@ async def get_device_status(
 ) -> dict[str, Any]:
     """Get device status from database."""
     result = await db.execute(
-        select(DeviceStatus).where(DeviceStatus.device_id == device_id)
+        select(DBDeviceStatus).where(DBDeviceStatus.device_id == device_id)
     )
     status = result.scalar_one_or_none()
 
@@ -752,7 +754,7 @@ async def list_devices(
 ) -> list[dict[str, Any]]:
     """List all devices from database."""
     result = await db.execute(
-        select(DeviceStatus).order_by(desc(DeviceStatus.last_seen_at))
+        select(DBDeviceStatus).order_by(desc(DBDeviceStatus.last_seen_at))
     )
     statuses = result.scalars().all()
 
@@ -786,7 +788,7 @@ async def get_sync_status(
     """Get device sync status from database."""
     # Get device status from DB
     result = await db.execute(
-        select(DeviceStatus).where(DeviceStatus.device_id == device_id)
+        select(DBDeviceStatus).where(DBDeviceStatus.device_id == device_id)
     )
     status = result.scalar_one_or_none()
 
@@ -798,9 +800,9 @@ async def get_sync_status(
 
     # Count pending commands for this device
     pending_result = await db.execute(
-        select(func.count(CommandResult.id))
-        .where(CommandResult.device_id == device_id)
-        .where(CommandResult.success.is_(None))  # Pending = no result yet
+        select(func.count(DBCommandResult.id))
+        .where(DBCommandResult.device_id == device_id)
+        .where(DBCommandResult.success.is_(None))  # Pending = no result yet
     )
     events_since_sync = pending_result.scalar() or 0
 
@@ -828,7 +830,7 @@ async def get_screenshot_history(
     """Get screenshot history for a device from database."""
     # Check device exists
     result = await db.execute(
-        select(DeviceStatus).where(DeviceStatus.device_id == device_id)
+        select(DBDeviceStatus).where(DBDeviceStatus.device_id == device_id)
     )
     if not result.scalar_one_or_none():
         raise HTTPException(
@@ -838,9 +840,9 @@ async def get_screenshot_history(
 
     # Get screenshots from database
     result = await db.execute(
-        select(Screenshot)
-        .where(Screenshot.device_id == device_id)
-        .order_by(desc(Screenshot.captured_at))
+        select(DBScreenshot)
+        .where(DBScreenshot.device_id == device_id)
+        .order_by(desc(DBScreenshot.captured_at))
         .limit(limit)
     )
     screenshots = result.scalars().all()
@@ -882,7 +884,7 @@ async def save_command_result_endpoint(
     """Save command result from device (alternative to WebSocket)."""
     # Find device_id from existing command or create new
     existing = await db.execute(
-        select(CommandResult).where(CommandResult.id == command_id)
+        select(DBCommandResult).where(DBCommandResult.id == command_id)
     )
     cmd = existing.scalar_one_or_none()
 
@@ -896,7 +898,7 @@ async def save_command_result_endpoint(
         cmd.completed_at = utc_now()
     else:
         # Create new with unknown device
-        cmd = CommandResult(
+        cmd = DBCommandResult(
             id=command_id,
             device_id="unknown",
             command_type="unknown",
@@ -1039,7 +1041,7 @@ Return ONLY the JSON array, no other text."""
             }]
 
         # Store parent task
-        parent_cmd = CommandResult(
+        parent_cmd = DBCommandResult(
             id=task_id,
             device_id=device_id,
             command_type="compound_task",
@@ -1057,7 +1059,7 @@ Return ONLY the JSON array, no other text."""
             cmd_params = cmd.get("params", {})
 
             # Store command
-            step_cmd = CommandResult(
+            step_cmd = DBCommandResult(
                 id=cmd_id,
                 device_id=device_id,
                 command_type=cmd_type,
@@ -1120,7 +1122,7 @@ Return ONLY the JSON array, no other text."""
         )
 
         # Fallback: send task description as a single custom command
-        fallback_cmd = CommandResult(
+        fallback_cmd = DBCommandResult(
             id=task_id,
             device_id=device_id,
             command_type="custom",

@@ -199,7 +199,7 @@ class MemScheduler:
         )
         hot_facts = result.scalars().all()
 
-        preloaded = []
+        preloaded: list[dict[str, Any]] = []
         for fact in hot_facts:
             preloaded.append({
                 "type": "fact",
@@ -210,7 +210,7 @@ class MemScheduler:
 
         # Mark as scheduled
         for item in preloaded:
-            await self._mark_scheduled(item["type"], UUID(item["id"]))
+            await self._mark_scheduled(str(item["type"]), UUID(str(item["id"])))
 
         return preloaded
 
@@ -315,10 +315,10 @@ class MemScheduler:
         """
         if memory_type == "fact":
             from src.db.models.memory import MemoryFact
-            result = await self.db.execute(
+            fact_result = await self.db.execute(
                 select(MemoryFact).where(MemoryFact.id == memory_id)
             )
-            fact = result.scalar_one_or_none()
+            fact: MemoryFact | None = fact_result.scalar_one_or_none()
             if not fact or not fact.last_accessed:
                 return None
 
@@ -334,10 +334,10 @@ class MemScheduler:
 
         elif memory_type == "belief":
             from src.db.models.memory import MemoryBelief
-            result = await self.db.execute(
+            belief_result = await self.db.execute(
                 select(MemoryBelief).where(MemoryBelief.id == memory_id)
             )
-            belief = result.scalar_one_or_none()
+            belief: MemoryBelief | None = belief_result.scalar_one_or_none()
             if not belief or not belief.last_reinforced:
                 return None
 

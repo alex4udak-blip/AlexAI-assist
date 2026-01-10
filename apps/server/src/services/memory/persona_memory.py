@@ -57,7 +57,7 @@ class PersonaMemory:
                 )
             ).order_by(MemoryFact.confidence.desc())
         )
-        attributes = attrs_result.scalars().all()
+        attributes = list(attrs_result.scalars().all())
 
         # Get persona events
         events_result = await self.db.execute(
@@ -68,7 +68,7 @@ class PersonaMemory:
                 )
             ).order_by(MemoryFact.event_time.desc().nullsfirst()).limit(10)
         )
-        events = events_result.scalars().all()
+        events = list(events_result.scalars().all())
 
         # Build profile
         profile: dict[str, Any] = {

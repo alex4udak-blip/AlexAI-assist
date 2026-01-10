@@ -527,7 +527,7 @@ class MemoryManager:
             MemoryTopic,
         )
 
-        stats = {}
+        stats: dict[str, Any] = {}
 
         # Count facts
         result = await self.db.execute(
@@ -604,7 +604,7 @@ class MemoryManager:
 
         for table in tables:
             await self.db.execute(
-                delete(table).where(table.session_id == self.session_id)
+                delete(table).where(table.session_id == self.session_id)  # type: ignore[attr-defined]
             )
 
         await self.db.commit()
