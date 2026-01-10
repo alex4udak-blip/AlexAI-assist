@@ -125,6 +125,10 @@ class EventResponse(BaseModel):
         """
         if dt is None:
             return None
+        # Handle both naive and timezone-aware datetimes
+        if dt.tzinfo is not None:
+            # Convert to UTC and remove timezone for consistent output
+            dt = dt.astimezone(UTC).replace(tzinfo=None)
         return dt.isoformat() + "Z"
 
 
@@ -366,20 +370,19 @@ async def get_timeline(
     events = list(result.scalars().all())
 
     # Convert to serializable format for caching
-    # IMPORTANT: Append 'Z' suffix to indicate UTC timezone
-    # Without 'Z', JavaScript's new Date() parses as local time, causing display issues
+    # Note: 'Z' suffix is added by EventResponse.field_serializer during response serialization
     events_data = [
         {
             "id": str(e.id),
             "device_id": e.device_id,
             "event_type": e.event_type,
-            "timestamp": (e.timestamp.isoformat() + "Z") if e.timestamp else None,
+            "timestamp": e.timestamp.isoformat() if e.timestamp else None,
             "app_name": e.app_name,
             "window_title": e.window_title,
             "url": e.url,
             "data": e.data,
             "category": e.category,
-            "created_at": (e.created_at.isoformat() + "Z") if e.created_at else None,
+            "created_at": e.created_at.isoformat() if e.created_at else None,
         }
         for e in events
     ]
