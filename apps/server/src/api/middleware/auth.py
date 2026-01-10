@@ -18,6 +18,7 @@ logger = get_logger(__name__)
 # Paths that don't require authentication
 EXEMPT_PATHS = {
     "/",
+    "/ping",
     "/health",
     "/ready",
     "/docs",
