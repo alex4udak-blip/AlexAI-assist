@@ -1,6 +1,7 @@
 """User settings model."""
 
 from datetime import UTC, datetime
+from typing import Any
 
 from sqlalchemy import JSON, String
 from sqlalchemy.orm import Mapped, mapped_column
