@@ -2,7 +2,7 @@
 
 import asyncio
 from collections.abc import AsyncGenerator
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from unittest.mock import AsyncMock, MagicMock, patch
 from uuid import UUID, uuid4
 
@@ -269,14 +269,14 @@ class TestChatEndpoints:
                 session_id=session_id,
                 role="user",
                 content="Hello",
-                timestamp=datetime.now(timezone.utc).replace(tzinfo=None),
+                timestamp=datetime.now(UTC).replace(tzinfo=None),
             ),
             ChatMessage(
                 id=uuid4(),
                 session_id=session_id,
                 role="assistant",
                 content="Hi there!",
-                timestamp=datetime.now(timezone.utc).replace(tzinfo=None) + timedelta(seconds=1),
+                timestamp=datetime.now(UTC).replace(tzinfo=None) + timedelta(seconds=1),
             ),
         ]
 
@@ -312,7 +312,7 @@ class TestChatEndpoints:
             session_id=session_id,
             role="user",
             content="Test",
-            timestamp=datetime.now(timezone.utc).replace(tzinfo=None),
+            timestamp=datetime.now(UTC).replace(tzinfo=None),
         )
         test_db_session.add(msg)
         await test_db_session.commit()
@@ -345,7 +345,7 @@ class TestEventEndpoints:
                 {
                     "device_id": device_id,
                     "event_type": "app_activity",
-                    "timestamp": datetime.now(timezone.utc).replace(tzinfo=None).isoformat(),
+                    "timestamp": datetime.now(UTC).replace(tzinfo=None).isoformat(),
                     "app_name": "Chrome",
                     "window_title": "Google Search",
                     "category": "browsing",
@@ -354,7 +354,7 @@ class TestEventEndpoints:
                 {
                     "device_id": device_id,
                     "event_type": "app_activity",
-                    "timestamp": datetime.now(timezone.utc).replace(tzinfo=None).isoformat(),
+                    "timestamp": datetime.now(UTC).replace(tzinfo=None).isoformat(),
                     "app_name": "VSCode",
                     "window_title": "main.py",
                     "category": "development",
@@ -412,7 +412,7 @@ class TestEventEndpoints:
         device = Device(id="test-device", name="Test Device", os="Linux")
         test_db_session.add(device)
 
-        now = datetime.now(timezone.utc).replace(tzinfo=None)
+        now = datetime.now(UTC).replace(tzinfo=None)
         events = [
             Event(
                 id=uuid4(),
@@ -461,7 +461,7 @@ class TestEventEndpoints:
                 id=uuid4(),
                 device_id="test-device",
                 event_type="test",
-                timestamp=datetime.now(timezone.utc).replace(tzinfo=None) + timedelta(seconds=i),
+                timestamp=datetime.now(UTC).replace(tzinfo=None) + timedelta(seconds=i),
                 app_name=f"App{i}",
             )
             test_db_session.add(event)
@@ -486,7 +486,7 @@ class TestEventEndpoints:
         test_db_session.add(device)
 
         # Create events in last 24 hours
-        now = datetime.now(timezone.utc).replace(tzinfo=None)
+        now = datetime.now(UTC).replace(tzinfo=None)
         event = Event(
             id=uuid4(),
             device_id="test-device",

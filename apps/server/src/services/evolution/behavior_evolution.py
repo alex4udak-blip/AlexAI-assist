@@ -2,7 +2,7 @@
 
 import json
 import logging
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from sqlalchemy import select
@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 
 def _utc_now() -> datetime:
     """Get current UTC time as naive datetime for database compatibility."""
-    return datetime.now(timezone.utc).replace(tzinfo=None)
+    return datetime.now(UTC).replace(tzinfo=None)
 
 
 class BehaviorEvolution:

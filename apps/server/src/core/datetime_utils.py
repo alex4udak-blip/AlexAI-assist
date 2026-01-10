@@ -7,7 +7,7 @@ Python 3.12+ deprecates datetime.utcnow() in favor of timezone-aware
 datetime objects using datetime.now(timezone.utc).
 """
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 
 def utc_now() -> datetime:
@@ -19,7 +19,7 @@ def utc_now() -> datetime:
     Returns:
         Timezone-aware datetime in UTC
     """
-    return datetime.now(timezone.utc)
+    return datetime.now(UTC)
 
 
 def utc_now_naive() -> datetime:
@@ -32,7 +32,7 @@ def utc_now_naive() -> datetime:
     Returns:
         Naive datetime representing current UTC time
     """
-    return datetime.now(timezone.utc).replace(tzinfo=None)
+    return datetime.now(UTC).replace(tzinfo=None)
 
 
 def to_utc_naive(dt: datetime | None) -> datetime | None:
@@ -47,7 +47,7 @@ def to_utc_naive(dt: datetime | None) -> datetime | None:
     if dt is None:
         return None
     if dt.tzinfo is not None:
-        dt = dt.astimezone(timezone.utc).replace(tzinfo=None)
+        dt = dt.astimezone(UTC).replace(tzinfo=None)
     return dt
 
 
@@ -63,5 +63,5 @@ def ensure_utc(dt: datetime | None) -> datetime | None:
     if dt is None:
         return None
     if dt.tzinfo is None:
-        return dt.replace(tzinfo=timezone.utc)
-    return dt.astimezone(timezone.utc)
+        return dt.replace(tzinfo=UTC)
+    return dt.astimezone(UTC)

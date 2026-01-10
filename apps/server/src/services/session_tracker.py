@@ -1,12 +1,11 @@
 """Session tracker service for detecting work sessions and breaks."""
 
 import os
-import uuid
 from collections import defaultdict
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
-from sqlalchemy import and_, desc, select
+from sqlalchemy import desc, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.core.logging import get_logger
@@ -17,7 +16,7 @@ logger = get_logger(__name__)
 
 def utc_now() -> datetime:
     """Get current UTC time as naive datetime."""
-    return datetime.now(timezone.utc).replace(tzinfo=None)
+    return datetime.now(UTC).replace(tzinfo=None)
 
 
 class SessionTracker:

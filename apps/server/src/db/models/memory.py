@@ -1,7 +1,7 @@
 """Memory system models - Ultimate Memory Architecture 2026."""
 
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 from sqlalchemy import Boolean, Float, ForeignKey, Index, Integer, String, Text
@@ -40,10 +40,10 @@ class MemoryFact(Base):
     context: Mapped[str | None] = mapped_column(Text)
 
     # Hindsight temporal
-    valid_from: Mapped[datetime] = mapped_column(default=lambda: datetime.now(timezone.utc).replace(tzinfo=None))
+    valid_from: Mapped[datetime] = mapped_column(default=lambda: datetime.now(UTC).replace(tzinfo=None))
     valid_to: Mapped[datetime | None] = mapped_column(nullable=True)
     event_time: Mapped[datetime | None] = mapped_column(nullable=True)
-    record_time: Mapped[datetime] = mapped_column(default=lambda: datetime.now(timezone.utc).replace(tzinfo=None))
+    record_time: Mapped[datetime] = mapped_column(default=lambda: datetime.now(UTC).replace(tzinfo=None))
 
     # Confidence & source
     confidence: Mapped[float] = mapped_column(Float, default=1.0)
@@ -60,8 +60,8 @@ class MemoryFact(Base):
     decay_rate: Mapped[float] = mapped_column(Float, default=0.01)
 
     # Timestamps
-    created_at: Mapped[datetime] = mapped_column(default=lambda: datetime.now(timezone.utc).replace(tzinfo=None))
-    updated_at: Mapped[datetime | None] = mapped_column(onupdate=lambda: datetime.now(timezone.utc).replace(tzinfo=None))
+    created_at: Mapped[datetime] = mapped_column(default=lambda: datetime.now(UTC).replace(tzinfo=None))
+    updated_at: Mapped[datetime | None] = mapped_column(onupdate=lambda: datetime.now(UTC).replace(tzinfo=None))
 
     __table_args__ = (
         Index("idx_facts_session_type", "session_id", "fact_type"),
@@ -115,7 +115,7 @@ class MemoryExperience(Base):
     procedure_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True)
 
     # Timestamps
-    created_at: Mapped[datetime] = mapped_column(default=lambda: datetime.now(timezone.utc).replace(tzinfo=None))
+    created_at: Mapped[datetime] = mapped_column(default=lambda: datetime.now(UTC).replace(tzinfo=None))
 
 
 # ===========================================
@@ -148,12 +148,12 @@ class MemoryEntity(Base):
     total_duration_seconds: Mapped[int] = mapped_column(Integer, default=0)
 
     # Temporal
-    first_seen: Mapped[datetime] = mapped_column(default=lambda: datetime.now(timezone.utc).replace(tzinfo=None))
-    last_seen: Mapped[datetime] = mapped_column(default=lambda: datetime.now(timezone.utc).replace(tzinfo=None))
+    first_seen: Mapped[datetime] = mapped_column(default=lambda: datetime.now(UTC).replace(tzinfo=None))
+    last_seen: Mapped[datetime] = mapped_column(default=lambda: datetime.now(UTC).replace(tzinfo=None))
     last_updated: Mapped[datetime | None] = mapped_column(nullable=True)
 
     # Timestamps
-    created_at: Mapped[datetime] = mapped_column(default=lambda: datetime.now(timezone.utc).replace(tzinfo=None))
+    created_at: Mapped[datetime] = mapped_column(default=lambda: datetime.now(UTC).replace(tzinfo=None))
 
     # Relationships
     outgoing_relationships: Mapped[list["MemoryRelationship"]] = relationship(
@@ -196,7 +196,7 @@ class MemoryRelationship(Base):
     description: Mapped[str | None] = mapped_column(Text)
 
     # Bi-temporal (Zep)
-    valid_from: Mapped[datetime] = mapped_column(default=lambda: datetime.now(timezone.utc).replace(tzinfo=None))
+    valid_from: Mapped[datetime] = mapped_column(default=lambda: datetime.now(UTC).replace(tzinfo=None))
     valid_to: Mapped[datetime | None] = mapped_column(nullable=True)
     event_time: Mapped[datetime | None] = mapped_column(nullable=True)
 
@@ -210,7 +210,7 @@ class MemoryRelationship(Base):
     )
 
     # Timestamps
-    created_at: Mapped[datetime] = mapped_column(default=lambda: datetime.now(timezone.utc).replace(tzinfo=None))
+    created_at: Mapped[datetime] = mapped_column(default=lambda: datetime.now(UTC).replace(tzinfo=None))
     updated_at: Mapped[datetime | None] = mapped_column(nullable=True)
 
     # Back-references
@@ -259,7 +259,7 @@ class MemoryBelief(Base):
     )
 
     # Evolution
-    formed_at: Mapped[datetime] = mapped_column(default=lambda: datetime.now(timezone.utc).replace(tzinfo=None))
+    formed_at: Mapped[datetime] = mapped_column(default=lambda: datetime.now(UTC).replace(tzinfo=None))
     last_reinforced: Mapped[datetime | None] = mapped_column(nullable=True)
     last_challenged: Mapped[datetime | None] = mapped_column(nullable=True)
     times_reinforced: Mapped[int] = mapped_column(Integer, default=0)
@@ -270,7 +270,7 @@ class MemoryBelief(Base):
     superseded_by: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True)
 
     # Timestamps
-    created_at: Mapped[datetime] = mapped_column(default=lambda: datetime.now(timezone.utc).replace(tzinfo=None))
+    created_at: Mapped[datetime] = mapped_column(default=lambda: datetime.now(UTC).replace(tzinfo=None))
     updated_at: Mapped[datetime | None] = mapped_column(nullable=True)
 
     __table_args__ = (
@@ -309,7 +309,7 @@ class MemoryTopic(Base):
     key_points: Mapped[list[str] | None] = mapped_column(ARRAY(String), server_default="'{}'")
 
     # Timestamps
-    created_at: Mapped[datetime] = mapped_column(default=lambda: datetime.now(timezone.utc).replace(tzinfo=None))
+    created_at: Mapped[datetime] = mapped_column(default=lambda: datetime.now(UTC).replace(tzinfo=None))
     updated_at: Mapped[datetime | None] = mapped_column(nullable=True)
 
 
@@ -326,7 +326,7 @@ class MemoryKeywordIndex(Base):
     fact_ids: Mapped[list[uuid.UUID] | None] = mapped_column(ARRAY(UUID(as_uuid=True)), server_default="'{}'")
     occurrence_count: Mapped[int] = mapped_column(Integer, default=1)
 
-    created_at: Mapped[datetime] = mapped_column(default=lambda: datetime.now(timezone.utc).replace(tzinfo=None))
+    created_at: Mapped[datetime] = mapped_column(default=lambda: datetime.now(UTC).replace(tzinfo=None))
 
 
 # ===========================================
@@ -365,7 +365,7 @@ class MemoryCube(Base):
     migrated_to: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True)
 
     # Timestamps
-    created_at: Mapped[datetime] = mapped_column(default=lambda: datetime.now(timezone.utc).replace(tzinfo=None))
+    created_at: Mapped[datetime] = mapped_column(default=lambda: datetime.now(UTC).replace(tzinfo=None))
     updated_at: Mapped[datetime | None] = mapped_column(nullable=True)
 
 
@@ -396,7 +396,7 @@ class MemoryLink(Base):
     reason: Mapped[str | None] = mapped_column(Text)
 
     # Timestamps
-    created_at: Mapped[datetime] = mapped_column(default=lambda: datetime.now(timezone.utc).replace(tzinfo=None))
+    created_at: Mapped[datetime] = mapped_column(default=lambda: datetime.now(UTC).replace(tzinfo=None))
 
 
 # ===========================================
@@ -430,7 +430,7 @@ class MemoryOperation(Base):
     error: Mapped[str | None] = mapped_column(Text)
 
     # Timestamps
-    created_at: Mapped[datetime] = mapped_column(default=lambda: datetime.now(timezone.utc).replace(tzinfo=None))
+    created_at: Mapped[datetime] = mapped_column(default=lambda: datetime.now(UTC).replace(tzinfo=None))
 
 
 # ===========================================
@@ -470,7 +470,7 @@ class MemoryEpisode(Base):
     source_events: Mapped[list[uuid.UUID] | None] = mapped_column(ARRAY(UUID(as_uuid=True)), server_default="'{}'")
 
     # Timestamps
-    created_at: Mapped[datetime] = mapped_column(default=lambda: datetime.now(timezone.utc).replace(tzinfo=None))
+    created_at: Mapped[datetime] = mapped_column(default=lambda: datetime.now(UTC).replace(tzinfo=None))
 
 
 # ===========================================
@@ -513,7 +513,7 @@ class MemoryProcedure(Base):
 
     # Timestamps
     last_used: Mapped[datetime | None] = mapped_column(nullable=True)
-    created_at: Mapped[datetime] = mapped_column(default=lambda: datetime.now(timezone.utc).replace(tzinfo=None))
+    created_at: Mapped[datetime] = mapped_column(default=lambda: datetime.now(UTC).replace(tzinfo=None))
     updated_at: Mapped[datetime | None] = mapped_column(nullable=True)
 
 
@@ -549,4 +549,4 @@ class MemoryMeta(Base):
 
     # Timestamps
     last_updated: Mapped[datetime | None] = mapped_column(nullable=True)
-    created_at: Mapped[datetime] = mapped_column(default=lambda: datetime.now(timezone.utc).replace(tzinfo=None))
+    created_at: Mapped[datetime] = mapped_column(default=lambda: datetime.now(UTC).replace(tzinfo=None))

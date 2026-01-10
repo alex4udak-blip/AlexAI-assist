@@ -1,7 +1,7 @@
 """Background scheduler for periodic tasks."""
 
 import logging
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
@@ -10,8 +10,8 @@ from apscheduler.triggers.interval import IntervalTrigger
 from src.core.config import settings
 from src.db.session import async_session_maker
 from src.services.cleanup import CleanupService
-from src.services.pattern_detector import PatternDetectorService
 from src.services.evolution.orchestrator import EvolutionOrchestrator
+from src.services.pattern_detector import PatternDetectorService
 
 logger = logging.getLogger(__name__)
 
@@ -189,7 +189,7 @@ def start_scheduler() -> None:
         trigger=IntervalTrigger(hours=6),
         id="evolution_cycle",
         name="Run evolution cycle",
-        next_run_time=datetime.now(timezone.utc).replace(tzinfo=None) + timedelta(minutes=5),
+        next_run_time=datetime.now(UTC).replace(tzinfo=None) + timedelta(minutes=5),
         replace_existing=True,
         max_instances=1,
         coalesce=True,

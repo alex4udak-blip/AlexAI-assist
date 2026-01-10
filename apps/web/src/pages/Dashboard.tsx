@@ -218,9 +218,10 @@ export default function Dashboard() {
 
     // Count consecutive days from today backwards
     let streak = 0;
-    let checkDate = new Date(today);
+    const checkDate = new Date(today);
 
-    while (true) {
+    // Check up to 365 days max to avoid infinite loop
+    for (let i = 0; i < 365; i++) {
       if (daysWithActivity.has(checkDate.toISOString())) {
         streak++;
         checkDate.setDate(checkDate.getDate() - 1);

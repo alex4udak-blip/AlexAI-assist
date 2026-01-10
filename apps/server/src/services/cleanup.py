@@ -1,7 +1,7 @@
 """Data retention cleanup service."""
 
 import logging
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from sqlalchemy import delete, func, select
@@ -45,7 +45,7 @@ class CleanupService:
         Returns:
             Dictionary with cleanup results per table.
         """
-        cutoff_date = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(
+        cutoff_date = datetime.now(UTC).replace(tzinfo=None) - timedelta(
             days=retention_days
         )
 

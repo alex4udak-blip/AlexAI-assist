@@ -1,6 +1,6 @@
 """Device model."""
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from sqlalchemy import String
 from sqlalchemy.orm import Mapped, mapped_column
@@ -10,7 +10,7 @@ from src.db.base import Base
 
 def utc_now() -> datetime:
     """Get current UTC time as naive datetime."""
-    return datetime.now(timezone.utc).replace(tzinfo=None)
+    return datetime.now(UTC).replace(tzinfo=None)
 
 
 class Device(Base):

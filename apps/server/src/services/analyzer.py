@@ -1,6 +1,6 @@
 """Event analyzer service."""
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from sqlalchemy import case, func, select
@@ -23,9 +23,9 @@ class AnalyzerService:
     ) -> dict[str, Any]:
         """Get activity summary statistics using SQL aggregations."""
         if not start_date:
-            start_date = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(days=7)
+            start_date = datetime.now(UTC).replace(tzinfo=None) - timedelta(days=7)
         if not end_date:
-            end_date = datetime.now(timezone.utc).replace(tzinfo=None)
+            end_date = datetime.now(UTC).replace(tzinfo=None)
 
         # Base filter conditions
         base_conditions = [
@@ -96,7 +96,7 @@ class AnalyzerService:
         days: int = 7,
     ) -> list[dict[str, Any]]:
         """Get time spent by category."""
-        start_date = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(days=days)
+        start_date = datetime.now(UTC).replace(tzinfo=None) - timedelta(days=days)
 
         query = (
             select(
@@ -125,7 +125,7 @@ class AnalyzerService:
         limit: int = 20,
     ) -> list[dict[str, Any]]:
         """Get app usage statistics using SQL aggregation."""
-        start_date = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(days=days)
+        start_date = datetime.now(UTC).replace(tzinfo=None) - timedelta(days=days)
 
         # Use SQL GROUP BY for efficient aggregation
         query = (
@@ -158,7 +158,7 @@ class AnalyzerService:
         device_id: str | None = None,
     ) -> dict[str, Any]:
         """Calculate productivity score using SQL aggregations."""
-        today = datetime.now(timezone.utc).replace(
+        today = datetime.now(UTC).replace(
             hour=0, minute=0, second=0, microsecond=0, tzinfo=None
         )
 
@@ -222,7 +222,7 @@ class AnalyzerService:
         - Typed text in browsers
         - Timestamps
         """
-        start_time = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(hours=hours)
+        start_time = datetime.now(UTC).replace(tzinfo=None) - timedelta(hours=hours)
 
         conditions = [Event.timestamp >= start_time]
         if device_id:
@@ -268,7 +268,7 @@ class AnalyzerService:
         days: int = 30,
     ) -> list[dict[str, Any]]:
         """Get activity trends over time."""
-        start_date = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(days=days)
+        start_date = datetime.now(UTC).replace(tzinfo=None) - timedelta(days=days)
 
         date_trunc_expr = func.date_trunc("day", Event.timestamp)
         query = (

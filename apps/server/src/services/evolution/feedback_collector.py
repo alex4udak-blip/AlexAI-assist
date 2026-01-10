@@ -9,7 +9,7 @@ This module collects feedback from multiple sources:
 
 import logging
 import re
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 from uuid import uuid4
 
@@ -23,7 +23,7 @@ logger = logging.getLogger(__name__)
 
 def _utc_now() -> datetime:
     """Get current UTC time as naive datetime for database compatibility."""
-    return datetime.now(timezone.utc).replace(tzinfo=None)
+    return datetime.now(UTC).replace(tzinfo=None)
 
 
 class FeedbackCollector:

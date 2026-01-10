@@ -1,7 +1,7 @@
 """Suggestion model."""
 
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 from sqlalchemy import Float, ForeignKey, String, Text
@@ -35,4 +35,4 @@ class Suggestion(Base):
     status: Mapped[str] = mapped_column(String(20), default="pending")
     dismissed_at: Mapped[datetime | None] = mapped_column()
     accepted_at: Mapped[datetime | None] = mapped_column()
-    created_at: Mapped[datetime] = mapped_column(default=lambda: datetime.now(timezone.utc).replace(tzinfo=None))
+    created_at: Mapped[datetime] = mapped_column(default=lambda: datetime.now(UTC).replace(tzinfo=None))

@@ -4,7 +4,7 @@ Implements O-Mem's Persona Memory (PM), Working Memory (WM), and Episodic Memory
 """
 
 import logging
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 from uuid import UUID, uuid4
 
@@ -152,7 +152,7 @@ Return ONLY the summary, written in third person ("The user...")."""
             is_persona_attribute=True,
             confidence=confidence,
             source="inference",
-            valid_from=datetime.now(timezone.utc).replace(tzinfo=None),
+            valid_from=datetime.now(UTC).replace(tzinfo=None),
         )
         self.db.add(fact)
         logger.info(f"Added persona attribute: {content[:50]}...")
@@ -172,10 +172,10 @@ Return ONLY the summary, written in third person ("The user...")."""
             fact_type="persona_event",
             category=category,
             is_persona_event=True,
-            event_time=event_time or datetime.now(timezone.utc).replace(tzinfo=None),
+            event_time=event_time or datetime.now(UTC).replace(tzinfo=None),
             confidence=1.0,  # Events are factual
             source="observation",
-            valid_from=datetime.now(timezone.utc).replace(tzinfo=None),
+            valid_from=datetime.now(UTC).replace(tzinfo=None),
         )
         self.db.add(fact)
         logger.info(f"Added persona event: {content[:50]}...")
@@ -227,8 +227,8 @@ Return "general" if no specific topic."""
             id=uuid4(),
             session_id=self.session_id,
             topic=topic_name,
-            first_discussed=datetime.now(timezone.utc).replace(tzinfo=None),
-            last_discussed=datetime.now(timezone.utc).replace(tzinfo=None),
+            first_discussed=datetime.now(UTC).replace(tzinfo=None),
+            last_discussed=datetime.now(UTC).replace(tzinfo=None),
             message_count=0,
         )
         self.db.add(topic)
@@ -245,7 +245,7 @@ Return "general" if no specific topic."""
         topic = await self.get_or_create_topic(topic_name)
 
         # Update topic
-        topic.last_discussed = datetime.now(timezone.utc).replace(tzinfo=None)
+        topic.last_discussed = datetime.now(UTC).replace(tzinfo=None)
         topic.message_count += 1
 
         if message_id:
@@ -362,7 +362,7 @@ Key points:
 
             topic.summary = summary
             topic.key_points = key_points[:5]
-            topic.updated_at = datetime.now(timezone.utc).replace(tzinfo=None)
+            topic.updated_at = datetime.now(UTC).replace(tzinfo=None)
 
         except Exception as e:
             logger.error(f"Error updating topic summary: {e}")

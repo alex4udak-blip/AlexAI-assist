@@ -1,7 +1,7 @@
 """Pattern detection service."""
 
 from collections import defaultdict
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from typing import Any
 from uuid import UUID
 
@@ -24,7 +24,7 @@ class PatternDetectorService:
     ) -> dict[str, Any]:
         """Detect repeating patterns in user behavior."""
         # Get recent events (use naive datetime for PostgreSQL TIMESTAMP WITHOUT TIME ZONE)
-        start_date = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(days=7)
+        start_date = datetime.now(UTC).replace(tzinfo=None) - timedelta(days=7)
         query = select(Event).where(Event.timestamp >= start_date)
 
         if device_id:
@@ -146,8 +146,8 @@ class PatternDetectorService:
             sequence=sequence,
             occurrences=occurrences,
             automatable=automatable,
-            first_seen_at=datetime.now(timezone.utc).replace(tzinfo=None),
-            last_seen_at=datetime.now(timezone.utc).replace(tzinfo=None),
+            first_seen_at=datetime.now(UTC).replace(tzinfo=None),
+            last_seen_at=datetime.now(UTC).replace(tzinfo=None),
         )
         self.db.add(pattern)
         await self.db.flush()

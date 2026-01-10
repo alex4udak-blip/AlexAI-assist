@@ -1,6 +1,6 @@
 """Event endpoints."""
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 from uuid import UUID
 
@@ -29,7 +29,7 @@ def normalize_datetime(dt: datetime | None) -> datetime | None:
         return None
     if dt.tzinfo is not None:
         # Convert to UTC and remove timezone info
-        dt = dt.astimezone(timezone.utc).replace(tzinfo=None)
+        dt = dt.astimezone(UTC).replace(tzinfo=None)
     return dt
 
 router = APIRouter()
@@ -136,7 +136,7 @@ async def create_events(
             )
             db.add(device)
 
-        device.last_seen_at = datetime.now(timezone.utc).replace(tzinfo=None)
+        device.last_seen_at = datetime.now(UTC).replace(tzinfo=None)
 
     # Create events with deduplication
     session_events = []
@@ -317,7 +317,7 @@ async def get_timeline(
         return cached_data
 
     # Cache miss - fetch from database
-    start = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(hours=hours)
+    start = datetime.now(UTC).replace(tzinfo=None) - timedelta(hours=hours)
     query = (
         select(Event)
         .where(Event.timestamp >= start)

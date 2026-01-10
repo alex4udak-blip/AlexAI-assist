@@ -4,7 +4,7 @@ Implements Hindsight's Experience Network with procedural learning.
 """
 
 import logging
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from typing import Any
 from uuid import UUID, uuid4
 
@@ -135,7 +135,7 @@ class ExperienceNetwork:
             should_repeat=should_repeat,
             agent_id=agent_id,
             duration_seconds=duration_seconds,
-            occurred_at=occurred_at or datetime.now(timezone.utc).replace(tzinfo=None),
+            occurred_at=occurred_at or datetime.now(UTC).replace(tzinfo=None),
         )
 
         self.db.add(experience)
@@ -187,7 +187,7 @@ class ExperienceNetwork:
             filters.append(MemoryExperience.outcome.in_(outcomes))
 
         if hours:
-            cutoff = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(hours=hours)
+            cutoff = datetime.now(UTC).replace(tzinfo=None) - timedelta(hours=hours)
             filters.append(MemoryExperience.occurred_at >= cutoff)
 
         result = await self.db.execute(
@@ -325,7 +325,7 @@ class ExperienceNetwork:
         hours: int = 24,
     ) -> dict[str, Any]:
         """Calculate success rate for experiences."""
-        cutoff = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(hours=hours)
+        cutoff = datetime.now(UTC).replace(tzinfo=None) - timedelta(hours=hours)
         filters = [
             MemoryExperience.session_id == self.session_id,
             MemoryExperience.occurred_at >= cutoff,
@@ -451,7 +451,7 @@ class ExperienceNetwork:
 
     async def count_by_type(self, hours: int = 24) -> dict[str, int]:
         """Count experiences by type."""
-        cutoff = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(hours=hours)
+        cutoff = datetime.now(UTC).replace(tzinfo=None) - timedelta(hours=hours)
 
         result = await self.db.execute(
             select(

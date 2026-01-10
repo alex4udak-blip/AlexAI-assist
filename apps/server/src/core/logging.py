@@ -4,6 +4,7 @@ import logging
 import sys
 import traceback
 from contextvars import ContextVar
+from datetime import UTC
 from typing import Any
 
 # Context variable for request ID tracking
@@ -121,14 +122,14 @@ def setup_logging(
         # JSON format for production (structured logging)
         try:
             import json
-            from datetime import datetime, timezone
+            from datetime import datetime
 
             class JsonFormatter(logging.Formatter):
                 """JSON formatter for structured logging."""
 
                 def format(self, record: logging.LogRecord) -> str:
                     log_data = {
-                        "timestamp": datetime.now(timezone.utc).replace(tzinfo=None).isoformat() + "Z",
+                        "timestamp": datetime.now(UTC).replace(tzinfo=None).isoformat() + "Z",
                         "level": record.levelname,
                         "logger": record.name,
                         "message": record.getMessage(),

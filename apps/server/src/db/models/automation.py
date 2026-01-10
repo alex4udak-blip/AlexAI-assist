@@ -1,6 +1,6 @@
 """Automation state models for persistent storage."""
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 from uuid import uuid4
 
@@ -12,7 +12,7 @@ from src.db.base import Base
 
 def utc_now() -> datetime:
     """Get current UTC time as naive datetime."""
-    return datetime.now(timezone.utc).replace(tzinfo=None)
+    return datetime.now(UTC).replace(tzinfo=None)
 
 
 def generate_uuid() -> str:

@@ -4,7 +4,7 @@ Simple API key based authentication for single-user mode.
 All API requests must include a valid API key in the X-API-Key header.
 """
 
-from fastapi import Request, HTTPException
+from fastapi import HTTPException, Request
 from fastapi.responses import JSONResponse
 from starlette.middleware.base import BaseHTTPMiddleware
 

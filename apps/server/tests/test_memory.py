@@ -1,6 +1,6 @@
 """Tests for Memory System 2026."""
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from unittest.mock import AsyncMock, MagicMock
 from uuid import uuid4
 
@@ -655,7 +655,7 @@ class TestExperienceNetwork:
             "agent_run",  # experience_type
             "success",  # outcome
             "Learned something",  # lesson_learned
-            datetime.now(timezone.utc).replace(tzinfo=None),  # occurred_at
+            datetime.now(UTC).replace(tzinfo=None),  # occurred_at
             0.9  # score
         )
         mock_result = MagicMock()
@@ -1017,8 +1017,8 @@ class TestMemoryScheduler:
         # Test with high access and recent activity
         score = await scheduler.calculate_heat_score(
             access_count=10,
-            last_accessed=datetime.now(timezone.utc).replace(tzinfo=None),
-            created_at=datetime.now(timezone.utc).replace(tzinfo=None),
+            last_accessed=datetime.now(UTC).replace(tzinfo=None),
+            created_at=datetime.now(UTC).replace(tzinfo=None),
             importance=1.5
         )
 
@@ -1034,7 +1034,7 @@ class TestMemoryScheduler:
         scheduler = MemScheduler(db_mock, "test_session")
 
         # Test with old access (1 month ago)
-        old_date = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(days=30)
+        old_date = datetime.now(UTC).replace(tzinfo=None) - timedelta(days=30)
         score = await scheduler.calculate_heat_score(
             access_count=5,
             last_accessed=old_date,

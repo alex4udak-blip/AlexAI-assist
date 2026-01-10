@@ -1,13 +1,13 @@
 """Automation API endpoints for device control."""
 
 import asyncio
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 from uuid import uuid4
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, WebSocket, WebSocketDisconnect
 from pydantic import BaseModel, Field
-from sqlalchemy import desc, func, select, update
+from sqlalchemy import desc, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.api.deps import get_db_session
@@ -166,7 +166,7 @@ async def save_screenshot_to_db(
 
 def utc_now() -> datetime:
     """Get current UTC time as naive datetime."""
-    return datetime.now(timezone.utc).replace(tzinfo=None)
+    return datetime.now(UTC).replace(tzinfo=None)
 
 
 async def create_audit_log(
@@ -670,7 +670,7 @@ async def send_command(
         raise HTTPException(
             status_code=500,
             detail="Failed to send command to device",
-        )
+        ) from e
 
 
 @router.get("/result/{command_id}")
@@ -999,7 +999,8 @@ Return a JSON array of commands in order. Each command should have:
 
 Example response:
 [
-  {{"command_type": "navigate", "params": {{"browser": "chrome", "url": "https://example.com"}}, "description": "Open example.com"}},
+  {{"command_type": "navigate", "params": {{"browser": "chrome", "url": "https://example.com"}},
+   "description": "Open example.com"}},
   {{"command_type": "wait", "params": {{"milliseconds": 2000}}, "description": "Wait for page to load"}},
   {{"command_type": "click", "params": {{"x": 500, "y": 300}}, "description": "Click on the button"}}
 ]

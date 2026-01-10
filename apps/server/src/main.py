@@ -19,8 +19,10 @@ from src.api.routes import (
     memory,
     patterns,
     sessions,
-    settings as settings_router,
     suggestions,
+)
+from src.api.routes import (
+    settings as settings_router,
 )
 from src.core.config import settings
 from src.core.logging import get_logger, log_error, setup_logging
@@ -54,9 +56,11 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 
     # Run database migrations automatically
     try:
-        from alembic import command
-        from alembic.config import Config
         import os
+
+        from alembic.config import Config
+
+        from alembic import command
 
         alembic_cfg = Config(os.path.join(os.path.dirname(__file__), "..", "alembic.ini"))
         alembic_cfg.set_main_option("script_location", os.path.join(os.path.dirname(__file__), "..", "alembic"))
@@ -68,6 +72,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     # Try to upgrade rate limiter to Redis (optional, with timeout)
     try:
         import asyncio
+
         import redis.asyncio as redis
         logger.info("Attempting Redis connection...")
         redis_client = redis.from_url(
@@ -81,7 +86,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         await asyncio.wait_for(redis_client.ping(), timeout=5.0)
         _rate_limiter.redis_client = redis_client
         logger.info("Rate limiter upgraded to Redis backend")
-    except asyncio.TimeoutError:
+    except TimeoutError:
         logger.warning("Redis connection timed out, using in-memory rate limiting")
     except Exception as e:
         logger.warning(f"Redis not available, using in-memory rate limiting: {e}")
