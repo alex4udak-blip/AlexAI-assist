@@ -265,44 +265,59 @@ pub async fn start_collector(
 
                         // === META AGENT: Check on focus change ===
                         // Meta Agent decides: is this PR, Zoom, Railway, or just browsing?
+                        // Throttled to prevent overheating (min 10 seconds between calls)
                         {
-                            let agent_state_clone = agent_state.clone();
-                            let app_handle_clone = app_handle.clone();
-                            let app_for_meta = app_name.to_string();
-                            let title_for_meta = window_title.clone();
+                            static LAST_META_CALL: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+                            const META_AGENT_THROTTLE_SECS: u64 = 10;
 
-                            // Собираем текст для анализа (title + selected text)
-                            let mut meta_text_parts: Vec<String> = vec![window_title.clone()];
-                            if let Some(ref info) = focus_info {
-                                if let Some(ref selected) = info.selected_text {
-                                    if !selected.is_empty() {
-                                        meta_text_parts.push(selected.clone());
-                                    }
-                                }
-                            }
-                            let meta_text = meta_text_parts.join("\n");
+                            let now_secs = std::time::SystemTime::now()
+                                .duration_since(std::time::UNIX_EPOCH)
+                                .unwrap_or_default()
+                                .as_secs();
+                            let last_call = LAST_META_CALL.load(std::sync::atomic::Ordering::Relaxed);
 
-                            tokio::spawn(async move {
-                                let mut agent = agent_state_clone.lock().await;
-                                if agent.enabled && agent.manager.status() != crate::agents::AgentStatus::Running {
-                                    if let Some(result) = agent.manager.check_on_focus_change(
-                                        &meta_text,
-                                        &app_for_meta,
-                                        &title_for_meta,
-                                    ).await {
-                                        println!("[Agent] Response: action={}, reason={}",
-                                            result.final_action,
-                                            result.reason.chars().take(100).collect::<String>());
+                            // Call Meta Agent no more than once per 10 seconds
+                            if now_secs - last_call >= META_AGENT_THROTTLE_SECS {
+                                LAST_META_CALL.store(now_secs, std::sync::atomic::Ordering::Relaxed);
 
-                                        if result.needs_notification {
-                                            let _ = crate::notifications::notify_info(
-                                                &app_handle_clone,
-                                                &result.reason,
-                                            );
+                                let agent_state_clone = agent_state.clone();
+                                let app_handle_clone = app_handle.clone();
+                                let app_for_meta = app_name.to_string();
+                                let title_for_meta = window_title.clone();
+
+                                // Собираем текст для анализа (title + selected text)
+                                let mut meta_text_parts: Vec<String> = vec![window_title.clone()];
+                                if let Some(ref info) = focus_info {
+                                    if let Some(ref selected) = info.selected_text {
+                                        if !selected.is_empty() {
+                                            meta_text_parts.push(selected.clone());
                                         }
                                     }
                                 }
-                            });
+                                let meta_text = meta_text_parts.join("\n");
+
+                                tokio::spawn(async move {
+                                    let mut agent = agent_state_clone.lock().await;
+                                    if agent.enabled && agent.manager.status() != crate::agents::AgentStatus::Running {
+                                        if let Some(result) = agent.manager.check_on_focus_change(
+                                            &meta_text,
+                                            &app_for_meta,
+                                            &title_for_meta,
+                                        ).await {
+                                            println!("[Agent] Response: action={}, reason={}",
+                                                result.final_action,
+                                                result.reason.chars().take(100).collect::<String>());
+
+                                            if result.needs_notification {
+                                                let _ = crate::notifications::notify_info(
+                                                    &app_handle_clone,
+                                                    &result.reason,
+                                                );
+                                            }
+                                        }
+                                    }
+                                });
+                            }
                         }
 
                         let mut event = Event::new(
@@ -378,7 +393,7 @@ pub async fn start_collector(
                                         }
                                         Ok(Ok(Err(e))) => eprintln!("[OCR] Error: {}", e),
                                         Ok(Err(e)) => eprintln!("[OCR] Join error: {}", e),
-                                        Err(_) => eprintln!("[OCR] Timeout after 5s - skipping"),
+                                        Err(_) => eprintln!("[OCR] Timeout after 5s - check Vision framework permissions"),
                                     }
                                 });
                             }
