@@ -181,7 +181,7 @@ impl Default for CodeReviewAgent {
 
 impl AgentType for CodeReviewAgent {
     fn name(&self) -> &'static str {
-        "Code Review Agent"
+        "Code Review"
     }
 
     fn system_prompt(&self) -> &str {
@@ -359,7 +359,7 @@ mod tests {
     #[test]
     fn test_name() {
         let agent = CodeReviewAgent::new();
-        assert_eq!(agent.name(), "Code Review Agent");
+        assert_eq!(agent.name(), "Code Review");
     }
 
     #[test]
