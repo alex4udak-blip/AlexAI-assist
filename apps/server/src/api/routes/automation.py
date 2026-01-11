@@ -26,6 +26,31 @@ logger = get_logger(__name__)
 # WebSocket connections (runtime state, not persisted)
 connected_devices: dict[str, WebSocket] = {}
 
+
+async def send_suggestion_to_all_devices(suggestion: dict) -> int:
+    """Send automation suggestion to all connected devices."""
+    sent_count = 0
+    disconnected = []
+
+    for device_id, websocket in connected_devices.items():
+        try:
+            await websocket.send_json({
+                "type": "automation_suggestion",
+                "suggestion": suggestion,
+            })
+            sent_count += 1
+            logger.info(f"Sent suggestion to device {device_id}")
+        except Exception as e:
+            logger.warning(f"Failed to send suggestion to {device_id}: {e}")
+            disconnected.append(device_id)
+
+    # Clean up disconnected
+    for device_id in disconnected:
+        connected_devices.pop(device_id, None)
+
+    return sent_count
+
+
 # Database session for background tasks
 _db_session_factory: Any = None
 

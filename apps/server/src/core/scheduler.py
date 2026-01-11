@@ -96,7 +96,20 @@ async def generate_suggestions_job() -> None:
                 await db.commit()
                 await db.refresh(suggestion)
 
-                # Broadcast to connected clients
+                # Send to connected desktop devices
+                from src.api.routes.automation import send_suggestion_to_all_devices
+
+                sent = await send_suggestion_to_all_devices({
+                    "id": str(suggestion.id),
+                    "title": suggestion.title,
+                    "description": suggestion.description,
+                    "confidence": suggestion.confidence,
+                    "impact": suggestion.impact,
+                    "agent_type": suggestion.agent_type,
+                    "agent_config": suggestion.agent_config,
+                })
+
+                # Also broadcast to web clients
                 await broadcast_suggestion({
                     "id": str(suggestion.id),
                     "title": suggestion.title,
@@ -107,8 +120,8 @@ async def generate_suggestions_job() -> None:
                 })
 
                 logger.info(
-                    f"New suggestion generated and broadcast: {suggestion.title} "
-                    f"(confidence: {suggestion.confidence:.0%})"
+                    f"New suggestion generated: {suggestion.title} "
+                    f"(confidence: {suggestion.confidence:.0%}, sent to {sent} devices)"
                 )
             else:
                 logger.info("No new suggestions generated - not enough patterns yet")
