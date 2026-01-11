@@ -3,6 +3,7 @@
 //! Provides integration with Claude Code CLI for autonomous task execution.
 
 pub mod claude_code;
+pub mod prompts;
 pub mod task_queue;
 pub mod triggers;
 pub mod types;
@@ -178,16 +179,21 @@ pub struct AgentManager {
     status: AgentStatus,
     trigger_engine: TriggerEngine,
     current_agent_kind: AgentKind,
+    task_queue: TaskQueue,
 }
 
 impl AgentManager {
     /// Create new agent manager
     pub fn new(config: AgentConfig) -> Self {
+        // Try to load existing task queue, or create new one
+        let task_queue = TaskQueue::load().unwrap_or_else(|_| TaskQueue::new());
+
         Self {
             config,
             status: AgentStatus::Idle,
             trigger_engine: TriggerEngine::new(),
             current_agent_kind: AgentKind::Generic,
+            task_queue,
         }
     }
 
@@ -266,9 +272,15 @@ impl AgentManager {
         self.status = AgentStatus::Running;
         self.current_agent_kind = kind;
 
-        let agent = Self::create_agent(kind);
-        let system_prompt = agent.system_prompt();
-        let max_iterations = agent.max_iterations().min(self.config.max_iterations);
+        // Extract data from agent and drop it before await
+        // (Box<dyn AgentType> is not Send, so we can't hold it across await)
+        let (system_prompt, max_iterations) = {
+            let agent = Self::create_agent(kind);
+            (
+                agent.system_prompt().to_owned(),
+                agent.max_iterations().min(self.config.max_iterations),
+            )
+        };
 
         // Build context with system prompt
         let full_context = format!(
@@ -280,6 +292,7 @@ impl AgentManager {
             &full_context,
             max_iterations,
             &self.config.claude_path,
+            self.config.timeout_secs,
         ).await;
 
         match &result {
@@ -348,6 +361,132 @@ impl AgentManager {
     /// Update config
     pub fn set_config(&mut self, config: AgentConfig) {
         self.config = config;
+    }
+
+    // ========== Task Queue Methods ==========
+
+    /// Add a task to the queue
+    pub fn add_task(&mut self, description: &str, priority: Priority) -> AgentTask {
+        let task = self.task_queue.add_task(description, priority);
+        // Auto-save after adding
+        let _ = self.task_queue.save();
+        task
+    }
+
+    /// Add a task with project path to the queue
+    pub fn add_task_with_project(
+        &mut self,
+        description: &str,
+        priority: Priority,
+        project_path: &str,
+    ) -> AgentTask {
+        let task = self.task_queue.add_task_with_project(description, priority, project_path);
+        let _ = self.task_queue.save();
+        task
+    }
+
+    /// Get the next pending task
+    pub fn get_next_task(&self) -> Option<&AgentTask> {
+        self.task_queue.get_next_task()
+    }
+
+    /// Get the next task matching the current project context
+    pub fn get_next_task_for_project(&self, project_path: Option<&str>) -> Option<&AgentTask> {
+        self.task_queue.get_next_task_for_project(project_path)
+    }
+
+    /// Get pending task count
+    pub fn pending_task_count(&self) -> usize {
+        self.task_queue.pending_count()
+    }
+
+    /// Get all tasks
+    pub fn get_all_tasks(&self) -> &[AgentTask] {
+        self.task_queue.get_all_tasks()
+    }
+
+    /// Process the next task from the queue
+    ///
+    /// This picks the highest priority task, runs the agent,
+    /// and updates the task status based on the result.
+    pub async fn process_next_task(&mut self) -> Option<AgentTaskResult> {
+        // Get the next task
+        let task_id = {
+            let task = self.task_queue.get_next_task()?;
+            task.id.clone()
+        };
+
+        // Start the task
+        if let Err(e) = self.task_queue.start_task(&task_id) {
+            eprintln!("[TaskQueue] Failed to start task: {}", e);
+            return None;
+        }
+        let _ = self.task_queue.save();
+
+        // Get task details
+        let (description, project_path) = {
+            let task = self.task_queue.get_task(&task_id)?;
+            (task.description.clone(), task.project_path.clone())
+        };
+
+        // Build context
+        let context = if let Some(path) = &project_path {
+            format!("Project: {}\nTask: {}", path, description)
+        } else {
+            format!("Task: {}", description)
+        };
+
+        // Run the agent
+        let result = self.run(&context).await;
+
+        // Update task status based on result
+        match &result {
+            Ok(task_result) => {
+                let result_summary = format!(
+                    "Action: {}\nReason: {}",
+                    task_result.final_action, task_result.reason
+                );
+                if let Err(e) = self.task_queue.complete_task(&task_id, &result_summary) {
+                    eprintln!("[TaskQueue] Failed to complete task: {}", e);
+                }
+            }
+            Err(e) => {
+                if let Err(err) = self.task_queue.fail_task(&task_id, e) {
+                    eprintln!("[TaskQueue] Failed to mark task as failed: {}", err);
+                }
+            }
+        }
+
+        let _ = self.task_queue.save();
+        result.ok()
+    }
+
+    /// Cancel a task
+    pub fn cancel_task(&mut self, task_id: &str) -> Result<(), String> {
+        let result = self.task_queue.cancel_task(task_id);
+        let _ = self.task_queue.save();
+        result
+    }
+
+    /// Cleanup old completed/failed tasks
+    pub fn cleanup_old_tasks(&mut self, max_age_days: i64) {
+        self.task_queue.cleanup_old_tasks(chrono::Duration::days(max_age_days));
+        let _ = self.task_queue.save();
+    }
+
+    /// Save task queue to disk
+    pub fn save_task_queue(&self) -> Result<(), String> {
+        self.task_queue.save()
+    }
+
+    /// Get task queue reference
+    pub fn task_queue(&self) -> &TaskQueue {
+        &self.task_queue
+    }
+
+    /// Get mutable task queue reference
+    pub fn task_queue_mut(&mut self) -> &mut TaskQueue {
+        &mut self.task_queue
     }
 }
 

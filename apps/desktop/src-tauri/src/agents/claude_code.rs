@@ -2,8 +2,11 @@
 //!
 //! Provides functions to call Claude Code CLI and execute commands.
 
+use super::prompts;
 use serde::{Deserialize, Serialize};
 use std::process::Command;
+use std::time::Duration;
+use tokio::time::timeout;
 
 /// Safely truncate string to max chars (handles UTF-8 properly)
 fn truncate_str(s: &str, max_chars: usize) -> &str {
@@ -44,43 +47,27 @@ pub struct AgentResponse {
     pub next_step: Option<String>,
 }
 
-/// System prompt for Claude agents
-const SYSTEM_PROMPT: &str = r#"
-Ты AI агент Observer на Mac пользователя.
-Твоя задача — помогать с разработкой автоматически.
-
-ПРАВИЛА:
-1. Отвечай ТОЛЬКО валидным JSON
-2. Не выполняй деструктивные команды без подтверждения
-3. Если не уверен — используй action: "notify"
-4. Проверяй результат после каждого действия
-
-ФОРМАТ ОТВЕТА (строго JSON, без markdown):
-{
-  "action": "command" | "notify" | "skip" | "confirm",
-  "cmd": "команда или null",
-  "reason": "объяснение на русском",
-  "next_step": "что проверить после или null"
-}
-"#;
-
-/// Call Claude Code CLI with a prompt
-pub async fn ask_claude(prompt: &str, claude_path: &str) -> Result<AgentResponse, String> {
-    let full_prompt = format!("{}\n\nКОНТЕКСТ:\n{}", SYSTEM_PROMPT, prompt);
+/// Call Claude Code CLI with a prompt and timeout
+pub async fn ask_claude(prompt: &str, claude_path: &str, timeout_secs: u64) -> Result<AgentResponse, String> {
+    let system_prompt = prompts::load_system_prompt();
+    let full_prompt = format!("{}\n\nКОНТЕКСТ:\n{}", system_prompt, prompt);
     let claude_path = claude_path.to_string(); // Clone for 'static lifetime
 
-    println!("[Claude] Calling with prompt: {}...", truncate_str(prompt, 100));
+    println!("[Claude] Calling with prompt: {}... (timeout: {}s)", truncate_str(prompt, 100), timeout_secs);
 
-    // Call Claude CLI
-    let output = tokio::task::spawn_blocking(move || {
+    // Call Claude CLI with timeout
+    let cli_task = tokio::task::spawn_blocking(move || {
         Command::new(&claude_path)
             .arg("-p")
             .arg(&full_prompt)
             .output()
-    })
-    .await
-    .map_err(|e| format!("Ошибка выполнения задачи: {}", e))?
-    .map_err(|e| format!("Не удалось запустить Claude CLI: {}", e))?;
+    });
+
+    let output = timeout(Duration::from_secs(timeout_secs), cli_task)
+        .await
+        .map_err(|_| format!("Claude CLI тайм-аут после {} секунд", timeout_secs))?
+        .map_err(|e| format!("Ошибка выполнения задачи: {}", e))?
+        .map_err(|e| format!("Не удалось запустить Claude CLI: {}", e))?;
 
     if !output.status.success() {
         let stderr = String::from_utf8_lossy(&output.stderr);
@@ -236,6 +223,7 @@ pub async fn run_agent_task(
     initial_context: &str,
     max_iterations: u32,
     claude_path: &str,
+    timeout_secs: u64,
 ) -> Result<AgentTaskResult, String> {
     let mut context = initial_context.to_string();
     let mut iteration = 0;
@@ -245,14 +233,14 @@ pub async fn run_agent_task(
     let mut final_action = String::new();
     let mut final_reason = String::new();
 
-    println!("[Agent] Starting task with max {} iterations", max_iterations);
+    println!("[Agent] Starting task with max {} iterations (timeout: {}s)", max_iterations, timeout_secs);
 
     while iteration < max_iterations {
         iteration += 1;
         println!("[Agent] Iteration {}/{}", iteration, max_iterations);
 
         // Ask Claude what to do
-        let response = ask_claude(&context, claude_path).await?;
+        let response = ask_claude(&context, claude_path, timeout_secs).await?;
         results.push(format!("Iteration {}: {:?}", iteration, response));
         final_action = response.action.clone();
         final_reason = response.reason.clone();
