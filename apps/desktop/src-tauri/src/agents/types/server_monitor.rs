@@ -4,48 +4,13 @@
 //! Designed for Railway deployments but adaptable to other platforms.
 
 use super::AgentType;
+use crate::agents::prompts;
 use serde::{Deserialize, Serialize};
 use std::process::Command;
 use std::time::{Duration, Instant};
 
 /// Default check interval in seconds (5 minutes)
 const DEFAULT_CHECK_INTERVAL_SECS: u64 = 300;
-
-/// System prompt for Server Monitor Agent
-const SERVER_MONITOR_SYSTEM_PROMPT: &str = r#"
-Ты Server Monitor агент Observer.
-
-ТВОЯ РОЛЬ:
-- Мониторинг здоровья сервисов
-- Реагирование на алерты и проблемы
-- Автоматический перезапуск упавших сервисов
-- Уведомление пользователя о критических проблемах
-
-ПРАВИЛА:
-1. Отвечай ТОЛЬКО валидным JSON
-2. НЕ выполняй деструктивные действия на production без подтверждения
-3. Используй curl для health checks
-4. При ошибках сначала проверь логи, потом принимай решение
-5. Если сервис не отвечает 3+ раза - уведоми пользователя
-
-ФОРМАТ ОТВЕТА (строго JSON):
-{
-  "action": "check_health" | "restart" | "notify" | "get_logs" | "skip",
-  "service": "имя сервиса или null",
-  "cmd": "команда или null",
-  "reason": "объяснение на русском",
-  "severity": "info" | "warning" | "critical"
-}
-
-RAILWAY КОМАНДЫ:
-- railway logs: получить логи
-- railway restart: перезапустить сервис
-- railway status: статус деплоя
-
-HEALTH CHECK ПАТТЕРНЫ:
-- curl -s -o /dev/null -w "%{http_code}" URL
-- curl --connect-timeout 5 URL/health
-"#;
 
 /// Patterns that indicate server issues
 const ALERT_PATTERNS: &[&str] = &[
@@ -132,7 +97,7 @@ impl ServerMonitorAgent {
     /// Create new Server Monitor Agent with default settings
     pub fn new() -> Self {
         Self {
-            system_prompt: SERVER_MONITOR_SYSTEM_PROMPT.to_string(),
+            system_prompt: prompts::load_server_monitor_prompt(),
             check_interval_secs: DEFAULT_CHECK_INTERVAL_SECS,
             endpoints: Vec::new(),
             last_check: None,

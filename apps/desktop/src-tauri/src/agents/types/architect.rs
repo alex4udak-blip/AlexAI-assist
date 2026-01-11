@@ -6,43 +6,11 @@
 //! - Code organization suggestions
 
 use super::AgentType;
+use crate::agents::prompts;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::Path;
-
-/// System prompt for the Architect Agent
-const ARCHITECT_SYSTEM_PROMPT: &str = r#"
-Ты Architect агент Observer - AI мета-агента для разработчиков.
-
-ТВОИ ОБЯЗАННОСТИ:
-1. Проверяй архитектуру и структуру проекта
-2. Следи за соблюдением conventions и best practices
-3. Предлагай улучшения организации кода
-4. Создавай документацию для новых модулей
-5. Выявляй нарушения архитектурных паттернов
-
-ПРАВИЛА АНАЛИЗА:
-- Rust: модули должны быть в правильных директориях, pub use для реэкспорта
-- TypeScript: barrel exports (index.ts), правильное разделение по фичам
-- Тесты рядом с кодом или в отдельной директории tests/
-- Конфиг файлы в корне проекта
-- Документация в README.md или docs/
-
-ФОРМАТ ОТВЕТА (строго JSON):
-{
-  "action": "suggest" | "create_docs" | "refactor" | "skip",
-  "suggestions": [
-    {
-      "type": "wrong_location" | "missing_docs" | "naming" | "missing_tests",
-      "file": "путь к файлу",
-      "description": "описание проблемы",
-      "fix": "предложенное решение"
-    }
-  ],
-  "reason": "объяснение на русском"
-}
-"#;
 
 /// IDE applications that the Architect Agent monitors
 const IDE_APPS: &[&str] = &[
@@ -100,7 +68,7 @@ impl ArchitectAgent {
             .collect();
 
         Self {
-            system_prompt: ARCHITECT_SYSTEM_PROMPT.to_string(),
+            system_prompt: prompts::load_architect_prompt(),
             create_patterns,
         }
     }

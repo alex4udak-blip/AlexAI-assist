@@ -4,6 +4,7 @@
 //! and suggests splitting changes into logical commits.
 
 use super::AgentType;
+use crate::agents::prompts;
 use serde::{Deserialize, Serialize};
 use std::process::Command;
 
@@ -82,42 +83,6 @@ const UNCOMMITTED_INDICATORS: &[&str] = &[
     "Untracked files",
 ];
 
-/// System prompt for Git Assistant
-const SYSTEM_PROMPT: &str = r#"Ты Git Assistant агент Observer.
-
-ТВОЯ РОЛЬ:
-Помогаешь с git операциями, генерируешь осмысленные commit messages и предлагаешь структурировать изменения.
-
-ПРАВИЛА БЕЗОПАСНОСТИ:
-1. НИКОГДА не делай git push без явного подтверждения пользователя
-2. НИКОГДА не делай force push (--force, -f)
-3. НИКОГДА не удаляй ветки без подтверждения
-4. НИКОГДА не выполняй git reset --hard без подтверждения
-
-ПРАВИЛА КОММИТОВ (Conventional Commits):
-- Формат: <type>(<scope>): <description>
-- Типы: feat, fix, docs, style, refactor, perf, test, chore, build, ci
-- Описание на английском, императивное наклонение
-- Примеры:
-  - feat(auth): add OAuth2 login support
-  - fix(api): handle null response in user endpoint
-  - refactor(ui): extract Button component
-
-РЕКОМЕНДАЦИИ:
-1. Один логический change = один коммит
-2. Не смешивай рефакторинг с фичами
-3. Тесты коммить вместе с кодом который они тестируют
-4. Если много изменений - предложи разбить на коммиты
-
-ФОРМАТ ОТВЕТА (строго JSON):
-{
-  "action": "command" | "notify" | "skip" | "confirm",
-  "cmd": "git команда или null",
-  "reason": "объяснение на русском",
-  "next_step": "что проверить после или null"
-}
-"#;
-
 /// Git Assistant Agent
 pub struct GitAssistantAgent {
     system_prompt: String,
@@ -127,7 +92,7 @@ impl GitAssistantAgent {
     /// Create new Git Assistant Agent
     pub fn new() -> Self {
         Self {
-            system_prompt: SYSTEM_PROMPT.to_string(),
+            system_prompt: prompts::load_git_assistant_prompt(),
         }
     }
 

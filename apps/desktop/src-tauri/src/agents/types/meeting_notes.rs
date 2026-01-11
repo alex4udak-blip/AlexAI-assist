@@ -4,47 +4,11 @@
 //! extracting action items, and saving notes to markdown files.
 
 use super::AgentType;
+use crate::agents::prompts;
 use chrono::{DateTime, Local};
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::Path;
-
-/// System prompt for Meeting Notes Agent
-const MEETING_NOTES_SYSTEM_PROMPT: &str = r#"
-Ты Meeting Notes агент Observer.
-
-ТВОЯ РОЛЬ:
-- Суммируй встречи из аудио транскрипции от Screenpipe
-- Выделяй action items и дедлайны
-- Сохраняй заметки в markdown файл
-
-СТРУКТУРА ЗАМЕТОК:
-1. Участники - кто присутствовал на встрече
-2. Тема - основная тема обсуждения
-3. Ключевые решения - что было решено
-4. Action items - кто что делает и когда
-
-ФОРМАТ ОТВЕТА (JSON):
-{
-  "action": "save_notes" | "notify" | "skip",
-  "meeting_data": {
-    "title": "название встречи",
-    "participants": ["участник1", "участник2"],
-    "summary": "краткое резюме",
-    "key_decisions": ["решение1", "решение2"],
-    "action_items": [
-      {"assignee": "кто", "task": "что делать", "deadline": "когда или null"}
-    ]
-  },
-  "reason": "объяснение"
-}
-
-ПРАВИЛА:
-1. Анализируй транскрипцию внимательно
-2. Выделяй конкретные действия и ответственных
-3. Если дедлайн не указан явно - пиши null
-4. Не добавляй информацию которой нет в транскрипции
-"#;
 
 /// Apps that indicate a video call
 const VIDEO_CALL_APPS: &[&str] = &[
@@ -150,7 +114,7 @@ impl MeetingNotesAgent {
     /// Create a new Meeting Notes Agent
     pub fn new() -> Self {
         Self {
-            system_prompt: MEETING_NOTES_SYSTEM_PROMPT.to_string(),
+            system_prompt: prompts::load_meeting_notes_prompt(),
             last_known_app: None,
         }
     }

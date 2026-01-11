@@ -3,6 +3,7 @@
 //! Handles terminal errors, automatic fixes, and dependency installation.
 
 use super::AgentType;
+use crate::agents::prompts;
 
 /// Error types that the DevOps agent can recognize
 #[derive(Debug, Clone, PartialEq)]
@@ -233,7 +234,7 @@ impl DevOpsAgent {
     /// Create a new DevOps agent
     pub fn new() -> Self {
         Self {
-            system_prompt: DEVOPS_SYSTEM_PROMPT.to_string(),
+            system_prompt: prompts::load_devops_prompt(),
         }
     }
 
