@@ -1237,3 +1237,30 @@ async def get_audit_logs(
         }
         for log in logs
     ]
+
+
+@router.post("/test-suggestion")
+async def test_suggestion(
+    request: Request,
+    db: AsyncSession = Depends(get_db_session),
+) -> dict[str, Any]:
+    """Send a test automation suggestion to connected devices."""
+    body = await request.json()
+
+    suggestion = {
+        "id": str(uuid4()),
+        "title": body.get("title", "Test Suggestion"),
+        "description": body.get("description", "This is a test"),
+        "confidence": 0.85,
+        "impact": "medium",
+        "agent_type": "test",
+        "agent_config": {},
+    }
+
+    sent = await send_suggestion_to_all_devices(suggestion)
+
+    return {
+        "status": "ok",
+        "suggestion_id": suggestion["id"],
+        "sent_to_devices": sent,
+    }
