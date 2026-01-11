@@ -470,7 +470,7 @@ pub async fn start_collector(
                 // Runs on EVERY tick (500ms), not just on focus change
                 // This allows idle trigger and continuous monitoring to work
                 {
-                    let agent = agent_state.lock().await;
+                    let mut agent = agent_state.lock().await;
                     // Debug: log agent state periodically
                     static AGENT_STATE_LOG: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
                     let now_secs = std::time::SystemTime::now()
@@ -561,8 +561,8 @@ pub async fn start_collector(
                                 }
                             }
 
-                            // Check triggers (non-blocking check)
-                            let triggers = agent.manager.trigger_engine().check(&trigger_text, &app);
+                            // Check triggers (non-blocking check, with cooldown protection)
+                            let triggers = agent.manager.trigger_engine_mut().check(&trigger_text, &app);
                             if !triggers.is_empty() {
                                 for t in &triggers {
                                     println!("[Trigger] Matched: {:?} in app={}", t.trigger, &app);
