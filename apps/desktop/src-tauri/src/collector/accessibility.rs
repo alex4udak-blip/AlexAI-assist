@@ -801,6 +801,11 @@ pub mod macos {
         None
     }
 
+    /// Get terminal content (non-macOS fallback)
+    pub fn get_terminal_content() -> Option<String> {
+        None
+    }
+
     /// Get browser input data including the current text being typed
     pub fn get_browser_input() -> Option<(Option<String>, String)> {
         None
