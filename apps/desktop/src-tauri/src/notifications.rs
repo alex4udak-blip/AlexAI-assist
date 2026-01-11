@@ -118,7 +118,7 @@ pub fn notify_info(
     message: &str,
 ) -> Result<(), String> {
     let config = NotificationConfig {
-        title: "AI Agent".to_string(),
+        title: "AI Агент".to_string(),
         body: message.to_string(),
         priority: NotificationPriority::Normal,
         action: None,

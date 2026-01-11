@@ -51,10 +51,10 @@ impl AgentConfig {
         }
 
         let content = std::fs::read_to_string(&path)
-            .map_err(|e| format!("Failed to read config: {}", e))?;
+            .map_err(|e| format!("Не удалось прочитать конфиг: {}", e))?;
 
         serde_json::from_str(&content)
-            .map_err(|e| format!("Failed to parse config: {}", e))
+            .map_err(|e| format!("Не удалось распарсить конфиг: {}", e))
     }
 
     /// Save config to file
@@ -64,14 +64,14 @@ impl AgentConfig {
         // Ensure parent directory exists
         if let Some(parent) = path.parent() {
             std::fs::create_dir_all(parent)
-                .map_err(|e| format!("Failed to create config dir: {}", e))?;
+                .map_err(|e| format!("Не удалось создать директорию конфига: {}", e))?;
         }
 
         let content = serde_json::to_string_pretty(self)
-            .map_err(|e| format!("Failed to serialize config: {}", e))?;
+            .map_err(|e| format!("Не удалось сериализовать конфиг: {}", e))?;
 
         std::fs::write(&path, content)
-            .map_err(|e| format!("Failed to write config: {}", e))
+            .map_err(|e| format!("Не удалось записать конфиг: {}", e))
     }
 }
 
