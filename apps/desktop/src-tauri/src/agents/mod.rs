@@ -331,75 +331,84 @@ impl AgentManager {
     }
 
     /// Check triggers and run agent if triggered
-    /// Uses Meta Agent for intelligent routing when enabled
+    /// Uses Meta Agent for intelligent routing
     pub async fn check_and_run(&mut self, ocr_text: &str, app_name: &str) -> Option<AgentTaskResult> {
-        // Use Meta Agent if enabled
-        if self.use_meta_agent {
-            return self.check_and_run_with_meta(ocr_text, app_name).await;
+        // Сначала быстрая проверка триггеров (regex, мгновенно)
+        let triggers = self.trigger_engine.check(ocr_text, app_name);
+
+        if !triggers.is_empty() {
+            // Есть триггер (ошибка или idle) — вызываем Meta Agent для выбора агента
+            println!("[Trigger] Matched: {:?}", triggers.iter().map(|t| &t.trigger).collect::<Vec<_>>());
+            return self.run_meta_agent(ocr_text, app_name).await;
         }
 
-        // Fallback to legacy trigger-based routing
-        self.check_and_run_legacy(ocr_text, app_name).await
+        None
     }
 
-    /// Smart routing using Meta Agent
-    /// Hybrid approach: triggers decide WHEN to act, Meta Agent decides WHICH agent
-    async fn check_and_run_with_meta(&mut self, ocr_text: &str, app_name: &str) -> Option<AgentTaskResult> {
-        // First check legacy triggers - is there a reason to act at all?
-        // This prevents calling Claude on every tick (500ms)
-        let triggers = self.trigger_engine.check(ocr_text, app_name);
-        if triggers.is_empty() {
-            return None; // No trigger - don't waste tokens on Meta Agent
+    /// Вызывается при смене фокуса (из collector)
+    /// Meta Agent решает нужно ли действовать
+    pub async fn check_on_focus_change(
+        &mut self,
+        ocr_text: &str,
+        app_name: &str,
+        window_title: &str,
+    ) -> Option<AgentTaskResult> {
+        // Meta Agent сам решит — это PR, Zoom, Railway или просто браузинг
+        self.run_meta_agent_with_title(ocr_text, app_name, window_title).await
+    }
+
+    /// Внутренний метод — вызов Meta Agent
+    async fn run_meta_agent(&mut self, ocr_text: &str, app_name: &str) -> Option<AgentTaskResult> {
+        self.run_meta_agent_with_title(ocr_text, app_name, app_name).await
+    }
+
+    /// Core Meta Agent logic with full context
+    async fn run_meta_agent_with_title(
+        &mut self,
+        ocr_text: &str,
+        app_name: &str,
+        window_title: &str,
+    ) -> Option<AgentTaskResult> {
+        if !self.use_meta_agent {
+            return self.check_and_run_legacy(ocr_text, app_name).await;
         }
 
-        println!("[Trigger] Matched: {:?}", triggers.iter().map(|t| &t.trigger).collect::<Vec<_>>());
-
-        // Build rich context
         let rich_context = RichContext::builder()
             .app(app_name)
-            .window_title(app_name) // In real use, window_title would come from system
+            .window_title(window_title)
             .ocr_text(ocr_text)
             .build();
 
-        // Now call Meta Agent for intelligent agent selection
         let meta_agent = self.meta_agent.as_mut()?;
         let decision = match meta_agent.analyze(&rich_context).await {
             Ok(d) => d,
             Err(e) => {
                 eprintln!("[MetaAgent] Error: {}", e);
-                // Fall back to legacy on error
-                return self.check_and_run_legacy(ocr_text, app_name).await;
+                return None;
             }
         };
 
-        // Check if we should act
         if !decision.should_act {
-            println!("[MetaAgent] Skip: {}", decision.reason);
+            // Логируем только если это не просто "юзер читает"
+            if !decision.reason.contains("читает") && !decision.reason.contains("скроллит") {
+                println!("[MetaAgent] Skip: {}", decision.reason);
+            }
             return None;
         }
 
-        // Get the agent to use
         let agent_kind = decision.agent.unwrap_or(AgentKind::Generic);
         println!(
             "[MetaAgent] Action: {} | Agent: {:?} | Priority: {:?}",
             decision.reason, agent_kind, decision.priority
         );
 
-        // Build context with Meta Agent's summary
-        let context = if decision.context_summary.is_empty() {
-            format!(
-                "App: {}\nOCR Text: {}\n",
-                app_name,
-                &ocr_text.chars().take(2000).collect::<String>()
-            )
-        } else {
-            format!(
-                "Context Summary: {}\n\nApp: {}\nOCR Text: {}\n",
-                decision.context_summary,
-                app_name,
-                &ocr_text.chars().take(2000).collect::<String>()
-            )
-        };
+        let context = format!(
+            "Context: {}\n\nApp: {}\nWindow: {}\nText: {}\n",
+            decision.context_summary,
+            app_name,
+            window_title,
+            &ocr_text.chars().take(2000).collect::<String>()
+        );
 
         match self.run_with_kind(&context, agent_kind).await {
             Ok(result) => Some(result),
