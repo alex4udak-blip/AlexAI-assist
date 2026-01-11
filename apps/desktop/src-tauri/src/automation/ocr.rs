@@ -272,6 +272,42 @@ pub async fn extract_text_cloud(image_base64: &str, api_key: &str) -> Result<Ocr
     })
 }
 
+/// Get latest OCR text from Screenpipe database
+/// Screenpipe runs locally and stores OCR data in SQLite
+pub fn get_screenpipe_ocr() -> Result<OcrResult, String> {
+    let home = std::env::var("HOME").map_err(|_| "HOME env not set")?;
+    let db_path = format!("{}/.screenpipe/db.sqlite", home);
+
+    // Check if Screenpipe database exists
+    if !std::path::Path::new(&db_path).exists() {
+        return Err("Screenpipe database not found. Is Screenpipe running?".to_string());
+    }
+
+    let conn = rusqlite::Connection::open(&db_path)
+        .map_err(|e| format!("Failed to open Screenpipe db: {}", e))?;
+
+    // Get last 30 seconds of OCR data
+    let mut stmt = conn.prepare(
+        "SELECT text FROM ocr_text
+         WHERE timestamp > datetime('now', '-30 seconds')
+         ORDER BY timestamp DESC LIMIT 10"
+    ).map_err(|e| format!("Query prepare error: {}", e))?;
+
+    let texts: Vec<String> = stmt.query_map([], |row| row.get(0))
+        .map_err(|e| format!("Query error: {}", e))?
+        .filter_map(|r| r.ok())
+        .collect();
+
+    let combined_text = texts.join("\n");
+
+    Ok(OcrResult {
+        text: combined_text,
+        confidence: 1.0, // Screenpipe doesn't provide confidence
+        language: None,
+        bounding_boxes: Vec::new(),
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

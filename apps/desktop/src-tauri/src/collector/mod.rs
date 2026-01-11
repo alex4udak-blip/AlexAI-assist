@@ -368,32 +368,37 @@ pub async fn start_collector(
                             println!("[Screenshot] Saved: {}", path_str);
                             event.screenshot_path = Some(path_str.clone());
 
-                            // === ASYNC OCR with timeout - non-blocking ===
+                            // === SCREENPIPE OCR - read from local database ===
                             #[cfg(target_os = "macos")]
                             {
-                                let ocr_path = path_str.clone();
                                 let ocr_text_clone = last_ocr_text.clone();
 
-                                // Fire-and-forget with timeout - does NOT block main loop
-                                // OCR result will be available on next tick
+                                // Read OCR from Screenpipe's SQLite database (non-blocking)
                                 tokio::spawn(async move {
-                                    let ocr_handle = tokio::task::spawn_blocking(move || {
-                                        crate::automation::ocr::extract_text_from_path(&ocr_path)
+                                    let ocr_handle = tokio::task::spawn_blocking(|| {
+                                        crate::automation::ocr::get_screenpipe_ocr()
                                     });
 
                                     match tokio::time::timeout(
-                                        tokio::time::Duration::from_secs(5),
+                                        tokio::time::Duration::from_secs(2),
                                         ocr_handle
                                     ).await {
                                         Ok(Ok(Ok(ocr_result))) => {
-                                            println!("[OCR] Extracted {} chars", ocr_result.text.len());
-                                            if let Ok(mut guard) = ocr_text_clone.lock() {
-                                                *guard = Some(ocr_result.text);
+                                            if !ocr_result.text.is_empty() {
+                                                println!("[OCR] Screenpipe: {} chars", ocr_result.text.len());
+                                                if let Ok(mut guard) = ocr_text_clone.lock() {
+                                                    *guard = Some(ocr_result.text);
+                                                }
                                             }
                                         }
-                                        Ok(Ok(Err(e))) => eprintln!("[OCR] Error: {}", e),
+                                        Ok(Ok(Err(e))) => {
+                                            // Only log if not "db not found" (Screenpipe may not be running)
+                                            if !e.contains("not found") {
+                                                eprintln!("[OCR] Screenpipe error: {}", e);
+                                            }
+                                        }
                                         Ok(Err(e)) => eprintln!("[OCR] Join error: {}", e),
-                                        Err(_) => eprintln!("[OCR] Timeout after 5s - check Vision framework permissions"),
+                                        Err(_) => eprintln!("[OCR] Screenpipe timeout"),
                                     }
                                 });
                             }
