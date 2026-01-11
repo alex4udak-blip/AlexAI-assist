@@ -58,6 +58,12 @@ MeetingNotes:
 - Ночное время (23:00-06:00) — только urgent
 - Нет явной проблемы или задачи
 
+ИСКЛЮЧЕНИЯ (действовать даже ночью):
+- Если видишь "Pull Request" в заголовке → CodeReview
+- Если видишь "Zoom", "Meet", "Teams" → MeetingNotes
+- Если видишь "railway.app", "vercel.com", "Deployments" → ServerMonitor
+- Если видишь критическую ошибку (500, panic, fatal) → DevOps
+
 ПРИОРИТЕТЫ:
 - urgent: Продакшен падает, критическая ошибка, срочный дедлайн
 - high: Ошибка блокирует работу, важный PR
