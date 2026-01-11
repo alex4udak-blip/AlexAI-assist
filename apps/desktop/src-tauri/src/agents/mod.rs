@@ -343,7 +343,17 @@ impl AgentManager {
     }
 
     /// Smart routing using Meta Agent
+    /// Hybrid approach: triggers decide WHEN to act, Meta Agent decides WHICH agent
     async fn check_and_run_with_meta(&mut self, ocr_text: &str, app_name: &str) -> Option<AgentTaskResult> {
+        // First check legacy triggers - is there a reason to act at all?
+        // This prevents calling Claude on every tick (500ms)
+        let triggers = self.trigger_engine.check(ocr_text, app_name);
+        if triggers.is_empty() {
+            return None; // No trigger - don't waste tokens on Meta Agent
+        }
+
+        println!("[Trigger] Matched: {:?}", triggers.iter().map(|t| &t.trigger).collect::<Vec<_>>());
+
         // Build rich context
         let rich_context = RichContext::builder()
             .app(app_name)
@@ -351,7 +361,7 @@ impl AgentManager {
             .ocr_text(ocr_text)
             .build();
 
-        // Get Meta Agent's decision
+        // Now call Meta Agent for intelligent agent selection
         let meta_agent = self.meta_agent.as_mut()?;
         let decision = match meta_agent.analyze(&rich_context).await {
             Ok(d) => d,
