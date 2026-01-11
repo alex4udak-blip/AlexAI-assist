@@ -12,6 +12,7 @@ from src.db.session import async_session_maker
 from src.services.cleanup import CleanupService
 from src.services.evolution.orchestrator import EvolutionOrchestrator
 from src.services.pattern_detector import PatternDetectorService
+
 # DEPRECATED: AgentSuggester и AIRouter больше не используются для suggestions
 # Теперь используются Claude Code агенты на стороне desktop клиента
 

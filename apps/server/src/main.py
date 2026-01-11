@@ -7,7 +7,12 @@ from fastapi import FastAPI, HTTPException, Request, WebSocket, WebSocketDisconn
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from src.api.middleware import AuthMiddleware, RateLimiterMiddleware, RequestLoggingMiddleware, validate_websocket_auth
+from src.api.middleware import (
+    AuthMiddleware,
+    RateLimiterMiddleware,
+    RequestLoggingMiddleware,
+    validate_websocket_auth,
+)
 from src.api.middleware.rate_limiter import RateLimiter
 from src.api.routes import (
     agent_tasks,
@@ -22,10 +27,10 @@ from src.api.routes import (
     sessions,
     suggestions,
 )
-from src.api.routes.automation import automation_websocket
 from src.api.routes import (
     settings as settings_router,
 )
+from src.api.routes.automation import automation_websocket
 from src.core.config import settings
 from src.core.logging import get_logger, log_error, setup_logging
 from src.core.websocket import active_connections

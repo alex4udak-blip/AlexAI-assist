@@ -140,10 +140,10 @@ async def create_events(
     """Receive events from collector."""
     import logging
     logger = logging.getLogger(__name__)
-    logger.info(f"Received {len(batch.events)} events from devices: {set(e.device_id for e in batch.events)}")
 
     # Ensure device exists - batch query to avoid N+1
     device_ids = {e.device_id for e in batch.events}
+    logger.info(f"Received {len(batch.events)} events from devices: {device_ids}")
     result = await db.execute(
         select(Device).where(Device.id.in_(device_ids))
     )
@@ -408,8 +408,10 @@ async def receive_screenpipe_events(
     db: AsyncSession = Depends(get_db_session),
 ) -> dict:
     """Receive events from Screenpipe sync pipe."""
-    from src.api.routes.automation import get_or_create_device
     import logging
+
+    from src.api.routes.automation import get_or_create_device
+
     logger = logging.getLogger(__name__)
 
     device_id = data.get("device_id", "unknown")
