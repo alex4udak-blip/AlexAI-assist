@@ -5,8 +5,8 @@
 pub mod claude_code;
 pub mod triggers;
 
-pub use claude_code::{AgentResponse, AgentTaskResult, ask_claude, execute_command, run_agent_task};
-pub use triggers::{Trigger, TriggerEngine};
+pub use claude_code::{AgentTaskResult, run_agent_task};
+pub use triggers::TriggerEngine;
 
 use serde::{Deserialize, Serialize};
 
