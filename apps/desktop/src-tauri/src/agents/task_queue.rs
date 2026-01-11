@@ -151,7 +151,8 @@ impl TaskQueue {
                 match a.priority.cmp(&b.priority) {
                     std::cmp::Ordering::Equal => {
                         // Same priority: older tasks first (smaller created_at is better)
-                        b.created_at.cmp(&a.created_at)
+                        // Note: We want older (smaller) created_at to win, so reverse comparison
+                        a.created_at.cmp(&b.created_at).reverse()
                     }
                     other => other,
                 }
@@ -178,7 +179,7 @@ impl TaskQueue {
                 (Some(task_path), Some(current)) => task_path == current,
             })
             .max_by(|a, b| match a.priority.cmp(&b.priority) {
-                std::cmp::Ordering::Equal => b.created_at.cmp(&a.created_at),
+                std::cmp::Ordering::Equal => a.created_at.cmp(&b.created_at).reverse(),
                 other => other,
             })
     }

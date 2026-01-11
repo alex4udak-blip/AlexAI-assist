@@ -35,11 +35,12 @@ impl FileStatus {
     /// Parse git status code to FileStatus
     fn from_git_code(code: &str) -> Self {
         match code.trim() {
-            "A" | "??" => Self::Added,
+            "A" => Self::Added,
             "M" | " M" | "MM" => Self::Modified,
             "D" | " D" => Self::Deleted,
             "R" => Self::Renamed,
             "C" => Self::Copied,
+            "??" => Self::Untracked,
             _ => Self::Untracked,
         }
     }

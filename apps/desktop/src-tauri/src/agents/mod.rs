@@ -221,11 +221,10 @@ impl AgentManager {
 
     /// Select the best agent for the given context
     ///
-    /// Iterates through all agent types and returns the first one
-    /// that can handle the context (based on `should_handle()`).
+    /// Collects all agents that can handle the context and returns
+    /// the one with highest priority (based on `priority()` method).
     /// Falls back to Generic if no specialized agent matches.
     pub fn select_agent_for_context(app_name: &str, text: &str) -> AgentKind {
-        // Check specialized agents first (ordered by priority)
         let specialized_agents = [
             AgentKind::ServerMonitor,
             AgentKind::DevOps,
@@ -235,15 +234,22 @@ impl AgentManager {
             AgentKind::MeetingNotes,
         ];
 
+        // Collect all agents that can handle this context with their priorities
+        let mut candidates: Vec<(AgentKind, u32)> = Vec::new();
+
         for kind in specialized_agents {
             let agent = Self::create_agent(kind);
             if agent.should_handle(app_name, text) {
-                return kind;
+                candidates.push((kind, agent.priority()));
             }
         }
 
-        // Fallback to generic
-        AgentKind::Generic
+        // Return agent with highest priority, or Generic if no candidates
+        candidates
+            .into_iter()
+            .max_by_key(|(_, priority)| *priority)
+            .map(|(kind, _)| kind)
+            .unwrap_or(AgentKind::Generic)
     }
 
     /// Run agent with context (backward compatible)

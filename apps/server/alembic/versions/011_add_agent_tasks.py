@@ -36,11 +36,11 @@ def upgrade() -> None:
         sa.Column("error", sa.Text),
         sa.Column(
             "created_at",
-            sa.DateTime(timezone=True),
+            sa.DateTime(),
             server_default=sa.text("now()"),
         ),
-        sa.Column("started_at", sa.DateTime(timezone=True)),
-        sa.Column("completed_at", sa.DateTime(timezone=True)),
+        sa.Column("started_at", sa.DateTime()),
+        sa.Column("completed_at", sa.DateTime()),
     )
     op.create_index("idx_agent_tasks_status", "agent_tasks", ["status"])
     op.create_index("idx_agent_tasks_priority", "agent_tasks", ["priority"])
