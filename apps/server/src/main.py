@@ -21,6 +21,7 @@ from src.api.routes import (
     sessions,
     suggestions,
 )
+from src.api.routes.automation import automation_websocket
 from src.api.routes import (
     settings as settings_router,
 )
@@ -140,6 +141,9 @@ app.include_router(chat.router, prefix="/api/v1/chat", tags=["Chat"])
 app.include_router(memory.router, prefix="/api/v1/memory", tags=["Memory"])
 app.include_router(automation.router, prefix="/api/v1/automation", tags=["Automation"])
 app.include_router(settings_router.router, prefix="/api/v1/settings", tags=["Settings"])
+
+# WebSocket endpoint at root level (not under /api/v1/automation prefix)
+app.add_api_websocket_route("/ws/automation/{device_id}", automation_websocket)
 
 
 @app.exception_handler(HTTPException)
