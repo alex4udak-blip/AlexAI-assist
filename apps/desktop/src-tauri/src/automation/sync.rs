@@ -52,6 +52,12 @@ pub enum WsMessage {
 
     #[serde(rename = "auth_error")]
     AuthError { message: String },
+
+    /// Server sends automation suggestion for user approval
+    #[serde(rename = "automation_suggestion")]
+    AutomationSuggestion {
+        suggestion: serde_json::Value,
+    },
 }
 
 /// WebSocket connection manager
@@ -232,6 +238,22 @@ impl AutomationSync {
             }
             WsMessage::AuthError { message } => {
                 eprintln!("Authentication error: {}", message);
+            }
+            WsMessage::AutomationSuggestion { suggestion } => {
+                let title = suggestion.get("title")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("Automation Suggestion");
+                let description = suggestion.get("description")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("");
+                let suggestion_id = suggestion.get("id")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("unknown");
+
+                println!("[Suggestion] Received: {} - {}", title, description);
+                println!("[Suggestion] ID: {} | Full data: {:?}", suggestion_id, suggestion);
+
+                // TODO: Show macOS notification with Accept/Decline buttons
             }
             _ => {
                 println!("Received unknown message type");
