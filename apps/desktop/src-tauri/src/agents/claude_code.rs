@@ -5,6 +5,14 @@
 use serde::{Deserialize, Serialize};
 use std::process::Command;
 
+/// Safely truncate string to max chars (handles UTF-8 properly)
+fn truncate_str(s: &str, max_chars: usize) -> &str {
+    match s.char_indices().nth(max_chars) {
+        Some((idx, _)) => &s[..idx],
+        None => s,
+    }
+}
+
 /// Dangerous command patterns that require confirmation
 const DANGEROUS_PATTERNS: &[&str] = &[
     "rm -rf",
@@ -61,7 +69,7 @@ pub async fn ask_claude(prompt: &str, claude_path: &str) -> Result<AgentResponse
     let full_prompt = format!("{}\n\nКОНТЕКСТ:\n{}", SYSTEM_PROMPT, prompt);
     let claude_path = claude_path.to_string(); // Clone for 'static lifetime
 
-    println!("[Claude] Calling with prompt: {}...", &prompt[..prompt.len().min(100)]);
+    println!("[Claude] Calling with prompt: {}...", truncate_str(prompt, 100));
 
     // Call Claude CLI
     let output = tokio::task::spawn_blocking(move || {
@@ -80,7 +88,7 @@ pub async fn ask_claude(prompt: &str, claude_path: &str) -> Result<AgentResponse
     }
 
     let response_text = String::from_utf8_lossy(&output.stdout).to_string();
-    println!("[Claude] Raw response: {}", &response_text[..response_text.len().min(200)]);
+    println!("[Claude] Raw response ({}): {}", response_text.len(), truncate_str(&response_text, 200));
 
     // Parse JSON response
     parse_agent_response(&response_text)
@@ -132,7 +140,7 @@ fn extract_json(text: &str) -> Result<String, String> {
         }
     }
 
-    Err(format!("JSON не найден в ответе: {}", &text[..text.len().min(200)]))
+    Err(format!("JSON не найден в ответе: {}", truncate_str(text, 200)))
 }
 
 /// Find the closing brace of a JSON object
@@ -208,7 +216,7 @@ pub async fn execute_command(cmd: &str) -> Result<String, String> {
         return Err(format!("Команда завершилась с ошибкой: {}\n{}", stderr, stdout));
     }
 
-    println!("[Execute] Success: {}...", &stdout[..stdout.len().min(100)]);
+    println!("[Execute] Success: {}...", truncate_str(&stdout, 100));
     Ok(format!("{}\n{}", stdout, stderr))
 }
 
