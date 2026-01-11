@@ -1,6 +1,7 @@
 """Database models."""
 
 from src.db.models.agent import Agent, AgentLog
+from src.db.models.agent_task import AgentTask
 from src.db.models.audit_log import AuditLog
 from src.db.models.automation import CommandResult, DeviceStatus, Feedback, Screenshot
 from src.db.models.chat import ChatMessage
@@ -29,6 +30,7 @@ from src.db.models.user_settings import UserSettings
 __all__ = [
     "Agent",
     "AgentLog",
+    "AgentTask",
     "AuditLog",
     "ChatMessage",
     "CommandResult",

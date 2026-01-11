@@ -3,12 +3,81 @@
 //! Provides integration with Claude Code CLI for autonomous task execution.
 
 pub mod claude_code;
+pub mod task_queue;
 pub mod triggers;
+pub mod types;
 
 pub use claude_code::{AgentTaskResult, run_agent_task};
+pub use task_queue::{AgentTask, Priority, TaskQueue, TaskStatus};
 pub use triggers::TriggerEngine;
+pub use types::{
+    ActionItem,
+    AgentType,
+    ArchitectAgent,
+    CodeReviewAgent,
+    DevOpsAgent,
+    ErrorType,
+    GitAssistantAgent,
+    HealthStatus,
+    MeetingData,
+    MeetingNotesAgent,
+    ServerMonitorAgent,
+};
 
 use serde::{Deserialize, Serialize};
+
+/// Kind of agent for selection
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum AgentKind {
+    /// DevOps operations (CI/CD, deployments)
+    DevOps,
+    /// Code review and quality analysis
+    CodeReview,
+    /// Architecture and design decisions
+    Architect,
+    /// Server monitoring and health checks
+    ServerMonitor,
+    /// Git operations and commit assistance
+    GitAssistant,
+    /// Meeting notes and summarization
+    MeetingNotes,
+    /// Generic agent - default for backward compatibility
+    Generic,
+}
+
+impl AgentKind {
+    /// Get all available agent kinds
+    pub fn all() -> &'static [AgentKind] {
+        &[
+            AgentKind::DevOps,
+            AgentKind::CodeReview,
+            AgentKind::Architect,
+            AgentKind::ServerMonitor,
+            AgentKind::GitAssistant,
+            AgentKind::MeetingNotes,
+            AgentKind::Generic,
+        ]
+    }
+
+    /// Get display name for the agent kind
+    pub fn display_name(&self) -> &'static str {
+        match self {
+            AgentKind::DevOps => "DevOps",
+            AgentKind::CodeReview => "Code Review",
+            AgentKind::Architect => "Architect",
+            AgentKind::ServerMonitor => "Server Monitor",
+            AgentKind::GitAssistant => "Git Assistant",
+            AgentKind::MeetingNotes => "Meeting Notes",
+            AgentKind::Generic => "Generic",
+        }
+    }
+}
+
+impl Default for AgentKind {
+    fn default() -> Self {
+        AgentKind::Generic
+    }
+}
 
 /// Agent configuration
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -85,11 +154,30 @@ pub enum AgentStatus {
     Failed,
 }
 
+/// Generic agent for backward compatibility
+struct GenericAgent;
+
+impl AgentType for GenericAgent {
+    fn name(&self) -> &'static str {
+        "Generic"
+    }
+
+    fn system_prompt(&self) -> &str {
+        "You are a helpful AI assistant. Analyze the context and provide assistance."
+    }
+
+    fn should_handle(&self, _app_name: &str, _text: &str) -> bool {
+        // Generic agent always handles as fallback
+        true
+    }
+}
+
 /// Agent manager for coordinating multiple agents
 pub struct AgentManager {
     config: AgentConfig,
     status: AgentStatus,
     trigger_engine: TriggerEngine,
+    current_agent_kind: AgentKind,
 }
 
 impl AgentManager {
@@ -99,6 +187,7 @@ impl AgentManager {
             config,
             status: AgentStatus::Idle,
             trigger_engine: TriggerEngine::new(),
+            current_agent_kind: AgentKind::Generic,
         }
     }
 
@@ -107,13 +196,83 @@ impl AgentManager {
         self.status
     }
 
-    /// Run agent with context
+    /// Get current agent kind
+    pub fn current_agent_kind(&self) -> AgentKind {
+        self.current_agent_kind
+    }
+
+    /// Set current agent kind
+    pub fn set_agent_kind(&mut self, kind: AgentKind) {
+        self.current_agent_kind = kind;
+    }
+
+    /// Create an agent instance based on kind
+    pub fn create_agent(kind: AgentKind) -> Box<dyn AgentType> {
+        match kind {
+            AgentKind::DevOps => Box::new(DevOpsAgent::new()),
+            AgentKind::CodeReview => Box::new(CodeReviewAgent::new()),
+            AgentKind::Architect => Box::new(ArchitectAgent::new()),
+            AgentKind::ServerMonitor => Box::new(ServerMonitorAgent::new()),
+            AgentKind::GitAssistant => Box::new(GitAssistantAgent::new()),
+            AgentKind::MeetingNotes => Box::new(MeetingNotesAgent::new()),
+            AgentKind::Generic => Box::new(GenericAgent),
+        }
+    }
+
+    /// Select the best agent for the given context
+    ///
+    /// Iterates through all agent types and returns the first one
+    /// that can handle the context (based on `should_handle()`).
+    /// Falls back to Generic if no specialized agent matches.
+    pub fn select_agent_for_context(app_name: &str, text: &str) -> AgentKind {
+        // Check specialized agents first (ordered by priority)
+        let specialized_agents = [
+            AgentKind::ServerMonitor,
+            AgentKind::DevOps,
+            AgentKind::CodeReview,
+            AgentKind::GitAssistant,
+            AgentKind::Architect,
+            AgentKind::MeetingNotes,
+        ];
+
+        for kind in specialized_agents {
+            let agent = Self::create_agent(kind);
+            if agent.should_handle(app_name, text) {
+                return kind;
+            }
+        }
+
+        // Fallback to generic
+        AgentKind::Generic
+    }
+
+    /// Run agent with context (backward compatible)
     pub async fn run(&mut self, context: &str) -> Result<AgentTaskResult, String> {
+        self.run_with_kind(context, self.current_agent_kind).await
+    }
+
+    /// Run agent with specific kind
+    pub async fn run_with_kind(
+        &mut self,
+        context: &str,
+        kind: AgentKind,
+    ) -> Result<AgentTaskResult, String> {
         self.status = AgentStatus::Running;
+        self.current_agent_kind = kind;
+
+        let agent = Self::create_agent(kind);
+        let system_prompt = agent.system_prompt();
+        let max_iterations = agent.max_iterations().min(self.config.max_iterations);
+
+        // Build context with system prompt
+        let full_context = format!(
+            "{}\n\n---\n\nContext:\n{}",
+            system_prompt, context
+        );
 
         let result = run_agent_task(
-            context,
-            self.config.max_iterations,
+            &full_context,
+            max_iterations,
             &self.config.claude_path,
         ).await;
 
@@ -141,13 +300,17 @@ impl AgentManager {
 
         println!("[Agent] Triggered by: {:?}", triggers);
 
+        // Select appropriate agent for context
+        let agent_kind = Self::select_agent_for_context(app_name, ocr_text);
+        println!("[Agent] Selected agent: {:?}", agent_kind);
+
         // Build context from triggers
         let context = format!(
             "Triggers: {:?}\nOCR Text: {}\nApp: {}",
             triggers, ocr_text, app_name
         );
 
-        match self.run(&context).await {
+        match self.run_with_kind(&context, agent_kind).await {
             Ok(result) => Some(result),
             Err(e) => {
                 eprintln!("[Agent] Error: {}", e);
@@ -197,5 +360,66 @@ mod tests {
     fn test_agent_manager_status() {
         let manager = AgentManager::new(AgentConfig::default());
         assert_eq!(manager.status(), AgentStatus::Idle);
+    }
+
+    #[test]
+    fn test_agent_kind_default() {
+        let kind = AgentKind::default();
+        assert_eq!(kind, AgentKind::Generic);
+    }
+
+    #[test]
+    fn test_agent_kind_all() {
+        let all = AgentKind::all();
+        assert_eq!(all.len(), 7);
+        assert!(all.contains(&AgentKind::DevOps));
+        assert!(all.contains(&AgentKind::CodeReview));
+        assert!(all.contains(&AgentKind::Architect));
+        assert!(all.contains(&AgentKind::ServerMonitor));
+        assert!(all.contains(&AgentKind::GitAssistant));
+        assert!(all.contains(&AgentKind::MeetingNotes));
+        assert!(all.contains(&AgentKind::Generic));
+    }
+
+    #[test]
+    fn test_agent_kind_display_name() {
+        assert_eq!(AgentKind::DevOps.display_name(), "DevOps");
+        assert_eq!(AgentKind::CodeReview.display_name(), "Code Review");
+        assert_eq!(AgentKind::Generic.display_name(), "Generic");
+    }
+
+    #[test]
+    fn test_create_agent() {
+        let agent = AgentManager::create_agent(AgentKind::DevOps);
+        assert_eq!(agent.name(), "DevOps");
+
+        let agent = AgentManager::create_agent(AgentKind::CodeReview);
+        assert_eq!(agent.name(), "Code Review");
+
+        let agent = AgentManager::create_agent(AgentKind::Generic);
+        assert_eq!(agent.name(), "Generic");
+    }
+
+    #[test]
+    fn test_agent_manager_current_kind() {
+        let mut manager = AgentManager::new(AgentConfig::default());
+        assert_eq!(manager.current_agent_kind(), AgentKind::Generic);
+
+        manager.set_agent_kind(AgentKind::DevOps);
+        assert_eq!(manager.current_agent_kind(), AgentKind::DevOps);
+    }
+
+    #[test]
+    fn test_select_agent_for_context_git() {
+        // Git context should select GitAssistant
+        let kind = AgentManager::select_agent_for_context("Terminal", "git status");
+        assert_eq!(kind, AgentKind::GitAssistant);
+    }
+
+    #[test]
+    fn test_select_agent_for_context_fallback() {
+        // Random text should fall back to Generic
+        let kind = AgentManager::select_agent_for_context("TextEdit", "hello world");
+        assert_eq!(kind, AgentKind::Generic);
     }
 }

@@ -1,6 +1,7 @@
 """API routes."""
 
 from src.api.routes import (
+    agent_tasks,
     agents,
     analytics,
     automation,
@@ -15,6 +16,7 @@ from src.api.routes import (
 )
 
 __all__ = [
+    "agent_tasks",
     "agents",
     "analytics",
     "automation",

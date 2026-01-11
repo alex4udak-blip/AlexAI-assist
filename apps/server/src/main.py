@@ -10,6 +10,7 @@ from fastapi.responses import JSONResponse
 from src.api.middleware import AuthMiddleware, RateLimiterMiddleware, RequestLoggingMiddleware, validate_websocket_auth
 from src.api.middleware.rate_limiter import RateLimiter
 from src.api.routes import (
+    agent_tasks,
     agents,
     analytics,
     automation,
@@ -136,6 +137,7 @@ app.include_router(patterns.router, prefix="/api/v1/patterns", tags=["Patterns"]
 app.include_router(sessions.router, prefix="/api/v1/sessions", tags=["Sessions"])
 app.include_router(suggestions.router, prefix="/api/v1/suggestions", tags=["Suggestions"])
 app.include_router(agents.router, prefix="/api/v1/agents", tags=["Agents"])
+app.include_router(agent_tasks.router, prefix="/api/v1/agent-tasks", tags=["Agent Tasks"])
 app.include_router(analytics.router, prefix="/api/v1/analytics", tags=["Analytics"])
 app.include_router(chat.router, prefix="/api/v1/chat", tags=["Chat"])
 app.include_router(memory.router, prefix="/api/v1/memory", tags=["Memory"])

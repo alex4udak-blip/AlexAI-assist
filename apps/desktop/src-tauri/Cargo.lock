@@ -3247,7 +3247,7 @@ dependencies = [
 
 [[package]]
 name = "observer-desktop"
-version = "0.4.15"
+version = "0.4.23"
 dependencies = [
  "base64 0.21.7",
  "block",
