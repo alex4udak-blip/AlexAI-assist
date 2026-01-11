@@ -63,6 +63,10 @@ MeetingNotes:
 - Если видишь "Zoom", "Meet", "Teams" → MeetingNotes
 - Если видишь "railway.app", "vercel.com", "Deployments" → ServerMonitor
 - Если видишь критическую ошибку (500, panic, fatal) → DevOps
+- Если видишь "git status", "git diff" с изменениями → GitAssistant
+
+Ночной режим (23:00-06:00) скипает только ПАССИВНЫЙ браузинг.
+Активные задачи (PR, Meet, ошибки, git) — обрабатывать ВСЕГДА.
 
 ПРИОРИТЕТЫ:
 - urgent: Продакшен падает, критическая ошибка, срочный дедлайн
