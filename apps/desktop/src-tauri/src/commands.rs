@@ -565,6 +565,87 @@ pub fn open_automation_prefs() -> Result<(), String> {
 }
 
 // ============================================================================
+// AI AGENT COMMANDS
+// ============================================================================
+
+/// Agent status response
+#[derive(Serialize)]
+pub struct AgentStatusResponse {
+    pub enabled: bool,
+    pub status: String,
+    pub triggers_enabled: bool,
+}
+
+/// Get agent status
+#[tauri::command]
+pub async fn agent_status(
+    agent_state: State<'_, Arc<Mutex<crate::AgentState>>>,
+) -> Result<AgentStatusResponse, String> {
+    let state = agent_state.lock().await;
+    let status = match state.manager.status() {
+        crate::agents::AgentStatus::Idle => "idle",
+        crate::agents::AgentStatus::Running => "running",
+        crate::agents::AgentStatus::WaitingConfirmation => "waiting_confirmation",
+        crate::agents::AgentStatus::Completed => "completed",
+        crate::agents::AgentStatus::Failed => "failed",
+    };
+
+    Ok(AgentStatusResponse {
+        enabled: state.enabled,
+        status: status.to_string(),
+        triggers_enabled: state.manager.trigger_engine().config().enabled,
+    })
+}
+
+/// Enable agent
+#[tauri::command]
+pub async fn agent_enable(
+    agent_state: State<'_, Arc<Mutex<crate::AgentState>>>,
+) -> Result<(), String> {
+    let mut state = agent_state.lock().await;
+    state.enabled = true;
+    println!("[Agent] Enabled");
+    Ok(())
+}
+
+/// Disable agent
+#[tauri::command]
+pub async fn agent_disable(
+    agent_state: State<'_, Arc<Mutex<crate::AgentState>>>,
+) -> Result<(), String> {
+    let mut state = agent_state.lock().await;
+    state.enabled = false;
+    println!("[Agent] Disabled");
+    Ok(())
+}
+
+/// Get agent config
+#[tauri::command]
+pub async fn agent_get_config(
+    agent_state: State<'_, Arc<Mutex<crate::AgentState>>>,
+) -> Result<crate::agents::AgentConfig, String> {
+    let state = agent_state.lock().await;
+    Ok(state.manager.config().clone())
+}
+
+/// Set agent config
+#[tauri::command]
+pub async fn agent_set_config(
+    config: crate::agents::AgentConfig,
+    agent_state: State<'_, Arc<Mutex<crate::AgentState>>>,
+) -> Result<(), String> {
+    // Save to file first
+    config.save()?;
+
+    // Update manager
+    let mut state = agent_state.lock().await;
+    state.manager.set_config(config);
+
+    println!("[Agent] Config updated and saved");
+    Ok(())
+}
+
+// ============================================================================
 // HELPER FUNCTIONS
 // ============================================================================
 

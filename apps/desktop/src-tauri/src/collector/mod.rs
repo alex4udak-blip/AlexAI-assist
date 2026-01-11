@@ -154,7 +154,8 @@ pub fn get_current_focus() -> Option<FocusInfo> {
 
 pub async fn start_collector(
     state: Arc<Mutex<AppState>>,
-    _app_handle: AppHandle,
+    agent_state: Arc<Mutex<crate::AgentState>>,
+    app_handle: AppHandle,
     shutdown_token: CancellationToken,
 ) {
     let mut last_app: Option<String> = None;
@@ -167,7 +168,7 @@ pub async fn start_collector(
     let messenger_monitor = messenger::MessengerMonitor::new();
     let browser_monitor = browser::BrowserMonitor::new();
 
-    println!("[Collector] Initialized: ScreenshotManager, MessengerMonitor, BrowserMonitor");
+    println!("[Collector] Initialized: ScreenshotManager, MessengerMonitor, BrowserMonitor, AgentManager");
 
     // Request permissions on start
     #[cfg(target_os = "macos")]
@@ -372,6 +373,56 @@ pub async fn start_collector(
 
                         state.events_buffer.push(event);
                         state.events_today += 1;
+                    }
+
+                    // === AGENT TRIGGER CHECK ===
+                    // Check if agent should be triggered based on window content
+                    {
+                        let mut agent = agent_state.lock().await;
+                        if agent.enabled {
+                            // Record activity to reset idle timer
+                            agent.manager.record_activity();
+
+                            // Get window title or selected text for trigger checking
+                            let trigger_text = if let Some(ref info) = focus_info {
+                                info.selected_text.clone().unwrap_or_else(|| info.window_title.clone())
+                            } else {
+                                current_title.clone().unwrap_or_default()
+                            };
+
+                            let app = current_app.clone().unwrap_or_default();
+
+                            // Check triggers (non-blocking check)
+                            let triggers = agent.manager.trigger_engine().check(&trigger_text, &app);
+                            if !triggers.is_empty() {
+                                println!("[Agent] Triggers detected: {:?}", triggers.iter().map(|t| &t.trigger).collect::<Vec<_>>());
+
+                                // Run agent in background if triggered
+                                let agent_state_clone = agent_state.clone();
+                                let app_handle_clone = app_handle.clone();
+                                let context = format!(
+                                    "App: {}\nWindow: {}\nText: {}",
+                                    app,
+                                    current_title.clone().unwrap_or_default(),
+                                    trigger_text
+                                );
+
+                                tokio::spawn(async move {
+                                    let mut agent = agent_state_clone.lock().await;
+                                    if let Ok(result) = agent.manager.run(&context).await {
+                                        println!("[Agent] Task completed: {}", result.final_action);
+
+                                        // Send notification if needed
+                                        if result.needs_notification {
+                                            let _ = crate::notifications::notify_info(
+                                                &app_handle_clone,
+                                                &result.reason
+                                            );
+                                        }
+                                    }
+                                });
+                            }
+                        }
                     }
 
                     last_app = current_app.clone();

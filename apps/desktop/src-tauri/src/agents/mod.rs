@@ -34,6 +34,47 @@ impl Default for AgentConfig {
     }
 }
 
+impl AgentConfig {
+    /// Get config file path
+    fn config_path() -> std::path::PathBuf {
+        dirs::config_dir()
+            .unwrap_or_else(|| std::path::PathBuf::from("."))
+            .join("observer")
+            .join("agent_config.json")
+    }
+
+    /// Load config from file
+    pub fn load() -> Result<Self, String> {
+        let path = Self::config_path();
+        if !path.exists() {
+            return Ok(Self::default());
+        }
+
+        let content = std::fs::read_to_string(&path)
+            .map_err(|e| format!("Failed to read config: {}", e))?;
+
+        serde_json::from_str(&content)
+            .map_err(|e| format!("Failed to parse config: {}", e))
+    }
+
+    /// Save config to file
+    pub fn save(&self) -> Result<(), String> {
+        let path = Self::config_path();
+
+        // Ensure parent directory exists
+        if let Some(parent) = path.parent() {
+            std::fs::create_dir_all(parent)
+                .map_err(|e| format!("Failed to create config dir: {}", e))?;
+        }
+
+        let content = serde_json::to_string_pretty(self)
+            .map_err(|e| format!("Failed to serialize config: {}", e))?;
+
+        std::fs::write(&path, content)
+            .map_err(|e| format!("Failed to write config: {}", e))
+    }
+}
+
 /// Agent status
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum AgentStatus {
@@ -120,9 +161,24 @@ impl AgentManager {
         self.trigger_engine.record_activity();
     }
 
-    /// Get trigger engine for configuration
+    /// Get trigger engine for configuration (mutable)
     pub fn trigger_engine_mut(&mut self) -> &mut TriggerEngine {
         &mut self.trigger_engine
+    }
+
+    /// Get trigger engine (immutable)
+    pub fn trigger_engine(&self) -> &TriggerEngine {
+        &self.trigger_engine
+    }
+
+    /// Get current config
+    pub fn config(&self) -> &AgentConfig {
+        &self.config
+    }
+
+    /// Update config
+    pub fn set_config(&mut self, config: AgentConfig) {
+        self.config = config;
     }
 }
 

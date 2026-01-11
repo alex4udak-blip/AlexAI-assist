@@ -112,6 +112,21 @@ pub fn notify_error(
     send_notification(app, config)
 }
 
+/// Send info notification (for AI agent messages)
+pub fn notify_info(
+    app: &tauri::AppHandle,
+    message: &str,
+) -> Result<(), String> {
+    let config = NotificationConfig {
+        title: "AI Agent".to_string(),
+        body: message.to_string(),
+        priority: NotificationPriority::Normal,
+        action: None,
+    };
+
+    send_notification(app, config)
+}
+
 /// Send sync notification
 pub fn notify_sync_status(
     app: &tauri::AppHandle,
