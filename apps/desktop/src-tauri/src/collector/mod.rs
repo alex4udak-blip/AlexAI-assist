@@ -440,6 +440,19 @@ pub async fn start_collector(
                 // This allows idle trigger and continuous monitoring to work
                 {
                     let agent = agent_state.lock().await;
+                    // Debug: log agent state periodically
+                    static AGENT_STATE_LOG: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+                    let now_secs = std::time::SystemTime::now()
+                        .duration_since(std::time::UNIX_EPOCH)
+                        .unwrap_or_default()
+                        .as_secs();
+                    let last_state_log = AGENT_STATE_LOG.load(std::sync::atomic::Ordering::Relaxed);
+                    if now_secs - last_state_log >= 30 {
+                        AGENT_STATE_LOG.store(now_secs, std::sync::atomic::Ordering::Relaxed);
+                        println!("[Agent] Статус: enabled={}, status={:?}",
+                            agent.enabled, agent.manager.status());
+                    }
+
                     if agent.enabled {
                         // Skip if agent is already running (debounce)
                         if agent.manager.status() == crate::agents::AgentStatus::Running {
@@ -453,6 +466,19 @@ pub async fn start_collector(
                             };
 
                             let app = current_app.clone().unwrap_or_default();
+
+                            // Debug: log trigger check (every 10 seconds to avoid spam)
+                            static LAST_LOG: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+                            let now = std::time::SystemTime::now()
+                                .duration_since(std::time::UNIX_EPOCH)
+                                .unwrap_or_default()
+                                .as_secs();
+                            let last = LAST_LOG.load(std::sync::atomic::Ordering::Relaxed);
+                            if now - last >= 10 {
+                                LAST_LOG.store(now, std::sync::atomic::Ordering::Relaxed);
+                                println!("[Agent] Проверка триггеров: app={}, text={}...",
+                                    &app, &trigger_text[..trigger_text.len().min(50)]);
+                            }
 
                             // Check triggers (non-blocking check)
                             let triggers = agent.manager.trigger_engine().check(&trigger_text, &app);
