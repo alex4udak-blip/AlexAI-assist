@@ -267,7 +267,7 @@ mod tests {
 
     #[test]
     fn test_error_trigger() {
-        let engine = TriggerEngine::new();
+        let mut engine = TriggerEngine::new();
         let triggers = engine.check("Error: Module 'lodash' not found", "Terminal");
         assert!(!triggers.is_empty());
 
@@ -278,14 +278,14 @@ mod tests {
 
     #[test]
     fn test_app_pattern_trigger() {
-        let engine = TriggerEngine::new();
+        let mut engine = TriggerEngine::new();
         let triggers = engine.check("npm ERR! missing dependency", "Terminal");
         assert!(!triggers.is_empty());
     }
 
     #[test]
     fn test_no_trigger() {
-        let engine = TriggerEngine::new();
+        let mut engine = TriggerEngine::new();
         let triggers = engine.check("Build successful", "Terminal");
         // Only idle trigger may be present
         let non_idle: Vec<_> = triggers.iter()

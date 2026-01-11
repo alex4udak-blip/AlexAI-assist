@@ -109,7 +109,7 @@ impl ServerMonitorAgent {
     pub fn with_config(check_interval_secs: u64, endpoints: Vec<String>) -> Self {
         let failure_counts = vec![0; endpoints.len()];
         Self {
-            system_prompt: SERVER_MONITOR_SYSTEM_PROMPT.to_string(),
+            system_prompt: prompts::load_server_monitor_prompt(),
             check_interval_secs,
             endpoints,
             last_check: None,
