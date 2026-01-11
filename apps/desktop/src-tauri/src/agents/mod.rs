@@ -1,14 +1,21 @@
 //! AI Agents module for Observer
 //!
 //! Provides integration with Claude Code CLI for autonomous task execution.
+//! Uses Meta Agent pattern for intelligent routing to specialized agents.
 
 pub mod claude_code;
+pub mod context;
+pub mod memory;
+pub mod meta_agent;
 pub mod prompts;
 pub mod task_queue;
 pub mod triggers;
 pub mod types;
 
 pub use claude_code::{AgentTaskResult, run_agent_task};
+pub use context::{ProjectContext, RecentAction, RichContext, TimeContext, UserResponse};
+pub use memory::AgentMemory;
+pub use meta_agent::{MetaAgent, MetaDecision, Priority as MetaPriority};
 pub use task_queue::{AgentTask, Priority, TaskQueue, TaskStatus};
 pub use triggers::TriggerEngine;
 pub use types::{
@@ -174,12 +181,16 @@ impl AgentType for GenericAgent {
 }
 
 /// Agent manager for coordinating multiple agents
+/// Uses Meta Agent pattern for intelligent routing
 pub struct AgentManager {
     config: AgentConfig,
     status: AgentStatus,
     trigger_engine: TriggerEngine,
     current_agent_kind: AgentKind,
     task_queue: TaskQueue,
+    meta_agent: Option<MetaAgent>,
+    /// Use Meta Agent for routing (can be disabled for backward compatibility)
+    use_meta_agent: bool,
 }
 
 impl AgentManager {
@@ -188,13 +199,28 @@ impl AgentManager {
         // Try to load existing task queue, or create new one
         let task_queue = TaskQueue::load().unwrap_or_else(|_| TaskQueue::new());
 
+        // Create Meta Agent
+        let meta_agent = Some(MetaAgent::new(&config.claude_path, config.timeout_secs));
+
         Self {
             config,
             status: AgentStatus::Idle,
             trigger_engine: TriggerEngine::new(),
             current_agent_kind: AgentKind::Generic,
             task_queue,
+            meta_agent,
+            use_meta_agent: true,
         }
+    }
+
+    /// Enable or disable Meta Agent routing
+    pub fn set_use_meta_agent(&mut self, use_meta: bool) {
+        self.use_meta_agent = use_meta;
+    }
+
+    /// Check if Meta Agent routing is enabled
+    pub fn is_meta_agent_enabled(&self) -> bool {
+        self.use_meta_agent && self.meta_agent.is_some()
     }
 
     /// Get current status
@@ -310,7 +336,77 @@ impl AgentManager {
     }
 
     /// Check triggers and run agent if triggered
+    /// Uses Meta Agent for intelligent routing when enabled
     pub async fn check_and_run(&mut self, ocr_text: &str, app_name: &str) -> Option<AgentTaskResult> {
+        // Use Meta Agent if enabled
+        if self.use_meta_agent {
+            return self.check_and_run_with_meta(ocr_text, app_name).await;
+        }
+
+        // Fallback to legacy trigger-based routing
+        self.check_and_run_legacy(ocr_text, app_name).await
+    }
+
+    /// Smart routing using Meta Agent
+    async fn check_and_run_with_meta(&mut self, ocr_text: &str, app_name: &str) -> Option<AgentTaskResult> {
+        // Build rich context
+        let rich_context = RichContext::builder()
+            .app(app_name)
+            .window_title(app_name) // In real use, window_title would come from system
+            .ocr_text(ocr_text)
+            .build();
+
+        // Get Meta Agent's decision
+        let meta_agent = self.meta_agent.as_mut()?;
+        let decision = match meta_agent.analyze(&rich_context).await {
+            Ok(d) => d,
+            Err(e) => {
+                eprintln!("[MetaAgent] Error: {}", e);
+                // Fall back to legacy on error
+                return self.check_and_run_legacy(ocr_text, app_name).await;
+            }
+        };
+
+        // Check if we should act
+        if !decision.should_act {
+            println!("[MetaAgent] Skip: {}", decision.reason);
+            return None;
+        }
+
+        // Get the agent to use
+        let agent_kind = decision.agent.unwrap_or(AgentKind::Generic);
+        println!(
+            "[MetaAgent] Action: {} | Agent: {:?} | Priority: {:?}",
+            decision.reason, agent_kind, decision.priority
+        );
+
+        // Build context with Meta Agent's summary
+        let context = if decision.context_summary.is_empty() {
+            format!(
+                "App: {}\nOCR Text: {}\n",
+                app_name,
+                &ocr_text.chars().take(2000).collect::<String>()
+            )
+        } else {
+            format!(
+                "Context Summary: {}\n\nApp: {}\nOCR Text: {}\n",
+                decision.context_summary,
+                app_name,
+                &ocr_text.chars().take(2000).collect::<String>()
+            )
+        };
+
+        match self.run_with_kind(&context, agent_kind).await {
+            Ok(result) => Some(result),
+            Err(e) => {
+                eprintln!("[Agent] Error: {}", e);
+                None
+            }
+        }
+    }
+
+    /// Legacy trigger-based routing (for backward compatibility)
+    async fn check_and_run_legacy(&mut self, ocr_text: &str, app_name: &str) -> Option<AgentTaskResult> {
         let triggers = self.trigger_engine.check(ocr_text, app_name);
 
         if triggers.is_empty() {
@@ -335,6 +431,22 @@ impl AgentManager {
                 eprintln!("[Agent] Error: {}", e);
                 None
             }
+        }
+    }
+
+    /// Record user feedback on the last decision
+    pub fn record_feedback(&mut self, context: &str, accepted: bool) {
+        if let Some(meta_agent) = &mut self.meta_agent {
+            meta_agent.record_feedback(context, accepted);
+        }
+    }
+
+    /// Save Meta Agent memory
+    pub fn save_meta_memory(&self) -> Result<(), String> {
+        if let Some(meta_agent) = &self.meta_agent {
+            meta_agent.save_memory()
+        } else {
+            Ok(())
         }
     }
 
