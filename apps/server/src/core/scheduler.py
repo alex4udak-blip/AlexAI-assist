@@ -12,9 +12,8 @@ from src.db.session import async_session_maker
 from src.services.cleanup import CleanupService
 from src.services.evolution.orchestrator import EvolutionOrchestrator
 from src.services.pattern_detector import PatternDetectorService
-from src.services.agent_suggester import AgentSuggester
-from src.services.ai_router import AIRouter
-from src.core.websocket import broadcast_suggestion
+# DEPRECATED: AgentSuggester и AIRouter больше не используются для suggestions
+# Теперь используются Claude Code агенты на стороне desktop клиента
 
 logger = logging.getLogger(__name__)
 
@@ -60,73 +59,9 @@ async def detect_patterns_job() -> None:
         logger.error(f"Pattern detection job failed: {e}")
 
 
-async def generate_suggestions_job() -> None:
-    """Periodic job to generate automation suggestions from patterns."""
-    logger.info("Running scheduled suggestion generation...")
-    try:
-        async with async_session_maker() as db:
-            from src.db.models import Suggestion
-
-            ai_router = AIRouter()
-            suggester = AgentSuggester(ai_router)
-
-            # Analyze patterns and generate suggestion
-            suggestion_data = await suggester.analyze_and_suggest(
-                user_id="default",
-                db=db,
-            )
-
-            if suggestion_data:
-                # Save suggestion to database
-                suggestion = Suggestion(
-                    title=suggestion_data["suggestion"].get("agent_name", "Automation Suggestion"),
-                    description=suggestion_data["suggestion"].get("description", ""),
-                    agent_type=suggestion_data["pattern_type"],
-                    agent_config={
-                        "trigger": suggestion_data["suggestion"].get("trigger", ""),
-                        "actions": suggestion_data["suggestion"].get("actions", []),
-                        "benefit": suggestion_data["suggestion"].get("benefit", ""),
-                        "pattern_data": suggestion_data["pattern_data"],
-                    },
-                    confidence=suggestion_data["confidence"],
-                    impact="medium" if suggestion_data["confidence"] < 0.7 else "high",
-                    time_saved_minutes=5.0,  # Default estimate
-                )
-                db.add(suggestion)
-                await db.commit()
-                await db.refresh(suggestion)
-
-                # Send to connected desktop devices
-                from src.api.routes.automation import send_suggestion_to_all_devices
-
-                sent = await send_suggestion_to_all_devices({
-                    "id": str(suggestion.id),
-                    "title": suggestion.title,
-                    "description": suggestion.description,
-                    "confidence": suggestion.confidence,
-                    "impact": suggestion.impact,
-                    "agent_type": suggestion.agent_type,
-                    "agent_config": suggestion.agent_config,
-                })
-
-                # Also broadcast to web clients
-                await broadcast_suggestion({
-                    "id": str(suggestion.id),
-                    "title": suggestion.title,
-                    "description": suggestion.description,
-                    "confidence": suggestion.confidence,
-                    "impact": suggestion.impact,
-                    "agent_type": suggestion.agent_type,
-                })
-
-                logger.info(
-                    f"New suggestion generated: {suggestion.title} "
-                    f"(confidence: {suggestion.confidence:.0%}, sent to {sent} devices)"
-                )
-            else:
-                logger.info("No new suggestions generated - not enough patterns yet")
-    except Exception as e:
-        logger.error(f"Suggestion generation job failed: {e}")
+# DEPRECATED: generate_suggestions_job удалён - теперь используются Claude Code агенты
+# на стороне desktop клиента (apps/desktop/src-tauri/src/agents/)
+# Агенты работают локально и реагируют на триггеры в реальном времени
 
 
 async def memory_consolidation_job() -> None:
@@ -222,17 +157,7 @@ def start_scheduler() -> None:
         coalesce=True,
     )
 
-    # Generate automation suggestions every 30 minutes
-    scheduler.add_job(
-        generate_suggestions_job,
-        trigger=IntervalTrigger(minutes=30),
-        id="generate_suggestions",
-        name="Generate automation suggestions",
-        next_run_time=datetime.now(UTC).replace(tzinfo=None) + timedelta(minutes=10),
-        replace_existing=True,
-        max_instances=1,
-        coalesce=True,
-    )
+    # DEPRECATED: generate_suggestions_job удалён - используются Claude Code агенты
 
     # Run memory consolidation every hour
     scheduler.add_job(
