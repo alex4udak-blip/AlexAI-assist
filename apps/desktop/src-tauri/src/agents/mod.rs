@@ -396,14 +396,42 @@ mod tests {
 
     #[test]
     fn test_create_agent() {
+        // Test all 7 agent kinds
         let agent = AgentManager::create_agent(AgentKind::DevOps);
         assert_eq!(agent.name(), "DevOps");
 
         let agent = AgentManager::create_agent(AgentKind::CodeReview);
         assert_eq!(agent.name(), "Code Review");
 
+        let agent = AgentManager::create_agent(AgentKind::Architect);
+        assert_eq!(agent.name(), "Architect");
+
+        let agent = AgentManager::create_agent(AgentKind::ServerMonitor);
+        assert_eq!(agent.name(), "Server Monitor");
+
+        let agent = AgentManager::create_agent(AgentKind::GitAssistant);
+        assert_eq!(agent.name(), "Git Assistant");
+
+        let agent = AgentManager::create_agent(AgentKind::MeetingNotes);
+        assert_eq!(agent.name(), "Meeting Notes");
+
         let agent = AgentManager::create_agent(AgentKind::Generic);
         assert_eq!(agent.name(), "Generic");
+    }
+
+    #[test]
+    fn test_agent_priority() {
+        // GitAssistant should have highest priority (80)
+        let agent = AgentManager::create_agent(AgentKind::GitAssistant);
+        assert_eq!(agent.priority(), 80);
+
+        // Architect should have medium priority (50)
+        let agent = AgentManager::create_agent(AgentKind::Architect);
+        assert_eq!(agent.priority(), 50);
+
+        // Others should have default priority (0)
+        let agent = AgentManager::create_agent(AgentKind::DevOps);
+        assert_eq!(agent.priority(), 0);
     }
 
     #[test]
