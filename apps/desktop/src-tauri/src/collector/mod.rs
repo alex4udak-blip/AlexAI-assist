@@ -311,32 +311,34 @@ pub async fn start_collector(
                             println!("[Screenshot] Saved: {}", path_str);
                             event.screenshot_path = Some(path_str.clone());
 
-                            // === SYNC OCR - wait for result to be available for Meta Agent ===
+                            // === ASYNC OCR with timeout - non-blocking ===
                             #[cfg(target_os = "macos")]
                             {
                                 let ocr_path = path_str.clone();
                                 let ocr_text_clone = last_ocr_text.clone();
 
-                                // Run OCR in blocking thread pool and await result
-                                // This ensures OCR data is available for trigger checking
-                                let ocr_handle = tokio::task::spawn_blocking(move || {
-                                    crate::automation::ocr::extract_text_from_path(&ocr_path)
-                                });
+                                // Fire-and-forget with timeout - does NOT block main loop
+                                // OCR result will be available on next tick
+                                tokio::spawn(async move {
+                                    let ocr_handle = tokio::task::spawn_blocking(move || {
+                                        crate::automation::ocr::extract_text_from_path(&ocr_path)
+                                    });
 
-                                match ocr_handle.await {
-                                    Ok(Ok(ocr_result)) => {
-                                        println!("[OCR] Extracted {} chars", ocr_result.text.len());
-                                        if let Ok(mut guard) = ocr_text_clone.lock() {
-                                            *guard = Some(ocr_result.text);
+                                    match tokio::time::timeout(
+                                        tokio::time::Duration::from_secs(5),
+                                        ocr_handle
+                                    ).await {
+                                        Ok(Ok(Ok(ocr_result))) => {
+                                            println!("[OCR] Extracted {} chars", ocr_result.text.len());
+                                            if let Ok(mut guard) = ocr_text_clone.lock() {
+                                                *guard = Some(ocr_result.text);
+                                            }
                                         }
+                                        Ok(Ok(Err(e))) => eprintln!("[OCR] Error: {}", e),
+                                        Ok(Err(e)) => eprintln!("[OCR] Join error: {}", e),
+                                        Err(_) => eprintln!("[OCR] Timeout after 5s - skipping"),
                                     }
-                                    Ok(Err(e)) => {
-                                        eprintln!("[OCR] Error: {}", e);
-                                    }
-                                    Err(e) => {
-                                        eprintln!("[OCR] Task join error: {}", e);
-                                    }
-                                }
+                                });
                             }
                         }
 
@@ -487,6 +489,23 @@ pub async fn start_collector(
                 // Runs on EVERY tick (500ms), not just on focus change
                 // This allows idle trigger and continuous monitoring to work
                 {
+                    // Per-tick debug log (every 5 seconds to avoid spam)
+                    static TICK_LOG: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+                    let tick_now = std::time::SystemTime::now()
+                        .duration_since(std::time::UNIX_EPOCH)
+                        .unwrap_or_default()
+                        .as_secs();
+                    let tick_last = TICK_LOG.load(std::sync::atomic::Ordering::Relaxed);
+                    if tick_now - tick_last >= 5 {
+                        TICK_LOG.store(tick_now, std::sync::atomic::Ordering::Relaxed);
+                        let title_preview: String = current_title.as_deref()
+                            .unwrap_or("none")
+                            .chars().take(50).collect();
+                        println!("[Tick] App={}, Title={}",
+                            current_app.as_deref().unwrap_or("none"),
+                            title_preview);
+                    }
+
                     let mut agent = agent_state.lock().await;
                     // Debug: log agent state periodically
                     static AGENT_STATE_LOG: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
