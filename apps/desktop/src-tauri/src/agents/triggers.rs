@@ -47,34 +47,20 @@ pub struct TriggerConfig {
 impl Default for TriggerConfig {
     fn default() -> Self {
         Self {
+            // Только критичные ошибки — для быстрой реакции
             error_patterns: vec![
-                // Terminal/console errors
                 r"(?i)error:".to_string(),
                 r"(?i)exception:".to_string(),
                 r"(?i)failed:".to_string(),
-                r"(?i)panic:".to_string(),
-                r"(?i)fatal:".to_string(),
-                r"(?i)cannot find module".to_string(),
-                r"(?i)module not found".to_string(),
-                r"(?i)command not found".to_string(),
-                r"(?i)permission denied".to_string(),
-                r"(?i)connection refused".to_string(),
-                // Window title patterns (more common)
+                r"(?i)panic".to_string(),
+                r"(?i)fatal".to_string(),
                 r"(?i)\berror\b".to_string(),
-                r"(?i)\bfailed\b".to_string(),
-                r"(?i)\bcrash".to_string(),
-                r"(?i)not responding".to_string(),
-                r"(?i)problem occurred".to_string(),
+                r"(?i)npm ERR".to_string(),
+                r"(?i)cargo error".to_string(),
             ],
-            idle_timeout_minutes: 2, // Reduced for faster testing
-            app_patterns: vec![
-                ("GitHub".to_string(), "Pull Request".to_string()),
-                ("Terminal".to_string(), "npm ERR!".to_string()),
-                ("Terminal".to_string(), "cargo error".to_string()),
-                ("iTerm".to_string(), "error".to_string()),
-                ("Code".to_string(), "Error".to_string()),
-                ("Xcode".to_string(), "Build Failed".to_string()),
-            ],
+            idle_timeout_minutes: 5, // 5 минут idle
+            // ПУСТО! Meta Agent сам разберётся при смене фокуса
+            app_patterns: vec![],
             enabled: true,
         }
     }

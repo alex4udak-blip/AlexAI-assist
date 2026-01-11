@@ -263,6 +263,48 @@ pub async fn start_collector(
                         // === DEBUG LOG: Focus Change ===
                         println!("[Focus] {} | {}", app_name, window_title);
 
+                        // === META AGENT: Check on focus change ===
+                        // Meta Agent decides: is this PR, Zoom, Railway, or just browsing?
+                        {
+                            let agent_state_clone = agent_state.clone();
+                            let app_handle_clone = app_handle.clone();
+                            let app_for_meta = app_name.to_string();
+                            let title_for_meta = window_title.clone();
+
+                            // Собираем текст для анализа (title + selected text)
+                            let mut meta_text_parts: Vec<String> = vec![window_title.clone()];
+                            if let Some(ref info) = focus_info {
+                                if let Some(ref selected) = info.selected_text {
+                                    if !selected.is_empty() {
+                                        meta_text_parts.push(selected.clone());
+                                    }
+                                }
+                            }
+                            let meta_text = meta_text_parts.join("\n");
+
+                            tokio::spawn(async move {
+                                let mut agent = agent_state_clone.lock().await;
+                                if agent.enabled && agent.manager.status() != crate::agents::AgentStatus::Running {
+                                    if let Some(result) = agent.manager.check_on_focus_change(
+                                        &meta_text,
+                                        &app_for_meta,
+                                        &title_for_meta,
+                                    ).await {
+                                        println!("[Agent] Response: action={}, reason={}",
+                                            result.final_action,
+                                            result.reason.chars().take(100).collect::<String>());
+
+                                        if result.needs_notification {
+                                            let _ = crate::notifications::notify_info(
+                                                &app_handle_clone,
+                                                &result.reason,
+                                            );
+                                        }
+                                    }
+                                }
+                            });
+                        }
+
                         let mut event = Event::new(
                             "app_focus",
                             current_app.clone(),
