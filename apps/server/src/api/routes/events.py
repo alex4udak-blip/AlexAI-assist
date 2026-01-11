@@ -408,11 +408,15 @@ async def receive_screenpipe_events(
     db: AsyncSession = Depends(get_db_session),
 ) -> dict:
     """Receive events from Screenpipe sync pipe."""
+    from src.api.routes.automation import get_or_create_device
     import logging
     logger = logging.getLogger(__name__)
 
     device_id = data.get("device_id", "unknown")
     events = data.get("events", [])
+
+    # Ensure device exists before creating events
+    await get_or_create_device(db, device_id)
 
     saved = 0
     for event in events:
