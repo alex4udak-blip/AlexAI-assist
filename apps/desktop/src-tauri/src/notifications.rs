@@ -147,7 +147,7 @@ pub fn notify_update_available(
     send_notification(app, config)
 }
 
-/// Show automation suggestion notification
+/// Show automation suggestion notification (simple, no buttons)
 pub fn show_suggestion_notification(
     app: &tauri::AppHandle,
     title: &str,
@@ -164,6 +164,27 @@ pub fn show_suggestion_notification(
     };
 
     send_notification(app, config)
+}
+
+/// Show automation suggestion dialog with Accept/Decline buttons
+pub fn show_suggestion_dialog(
+    app: &tauri::AppHandle,
+    title: &str,
+    description: &str,
+    suggestion_id: &str,
+) -> Result<bool, String> {
+    use tauri_plugin_dialog::{DialogExt, MessageDialogKind, MessageDialogButtons};
+
+    println!("[Dialog] Showing suggestion: {} (ID: {})", title, suggestion_id);
+
+    let result = app.dialog()
+        .message(format!("{}\n\nID: {}", description, suggestion_id))
+        .title(format!("Automation: {}", title))
+        .kind(MessageDialogKind::Info)
+        .buttons(MessageDialogButtons::OkCancelCustom("Accept".to_string(), "Decline".to_string()))
+        .blocking_show();
+
+    Ok(result)
 }
 
 /// Notification manager for controlling notification behavior
