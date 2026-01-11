@@ -554,6 +554,30 @@ async def automation_websocket(
                 await websocket.send_json({"type": "pong", "timestamp": int(time.time())})
                 await update_device_status(db, device_id)
 
+            elif message_type == "suggestion_response":
+                suggestion_id = data.get("suggestion_id")
+                accepted = data.get("accepted", False)
+
+                logger.info(
+                    f"Suggestion response: {suggestion_id} - {'Accepted' if accepted else 'Declined'}",
+                    extra={"suggestion_id": suggestion_id, "accepted": accepted, "device_id": device_id}
+                )
+
+                if accepted:
+                    # Send a test action - screenshot
+                    task = translate_command_to_task(
+                        str(uuid4()),
+                        "screenshot",
+                        {}
+                    )
+
+                    await websocket.send_json({
+                        "type": "automation_task",
+                        "task": task,
+                    })
+
+                    logger.info(f"Executed automation for suggestion {suggestion_id}")
+
     except WebSocketDisconnect:
         connected_devices.pop(device_id, None)
         await update_device_status(db, device_id, connected=False)
@@ -1254,7 +1278,12 @@ async def test_suggestion(
         "confidence": 0.85,
         "impact": "medium",
         "agent_type": "test",
-        "agent_config": {},
+        "agent_config": {
+            "trigger": body.get("trigger", "manual"),
+            "actions": body.get("actions", [
+                {"type": "screenshot", "params": {}}
+            ]),
+        },
     }
 
     sent = await send_suggestion_to_all_devices(suggestion)
