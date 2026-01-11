@@ -578,59 +578,45 @@ pub async fn start_collector(
                                 }
                             }
 
-                            // Check triggers (non-blocking check, with cooldown protection)
-                            let triggers = agent.manager.trigger_engine_mut().check(&trigger_text, &app);
-                            if !triggers.is_empty() {
-                                for t in &triggers {
-                                    println!("[Trigger] Matched: {:?} in app={}", t.trigger, &app);
+                            // Use Meta Agent for intelligent routing
+                            // check_and_run() internally uses Meta Agent when enabled,
+                            // or falls back to legacy trigger system
+                            let agent_state_clone = agent_state.clone();
+                            let app_handle_clone = app_handle.clone();
+                            let trigger_text_clone = trigger_text.clone();
+                            let app_clone = app.clone();
+
+                            // Check if agent is running before spawning
+                            if agent.manager.status() == crate::agents::AgentStatus::Running {
+                                continue;
+                            }
+
+                            drop(agent); // Release lock before spawning
+
+                            tokio::spawn(async move {
+                                let mut agent = agent_state_clone.lock().await;
+                                // Double-check agent is still enabled and not running
+                                if !agent.enabled || agent.manager.status() == crate::agents::AgentStatus::Running {
+                                    return;
                                 }
 
-                                // Run agent in background if triggered
-                                let agent_state_clone = agent_state.clone();
-                                let app_handle_clone = app_handle.clone();
-                                let context = format!(
-                                    "Приложение: {}\nОкно: {}\nТекст: {}",
-                                    app,
-                                    current_title.clone().unwrap_or_default(),
-                                    trigger_text
-                                );
+                                // Meta Agent decides whether to act and which agent to use
+                                if let Some(result) = agent.manager.check_and_run(&trigger_text_clone, &app_clone).await {
+                                    let reason_preview: String = result.reason.chars().take(100).collect();
+                                    println!("[Agent] Response: action={}, reason={}",
+                                        result.final_action, reason_preview);
 
-                                // Select the best agent for this context BEFORE dropping lock
-                                let selected_agent = crate::agents::AgentManager::select_agent_for_context(&app, &trigger_text);
-                                println!("[Agent] Selected agent: {:?}", selected_agent);
-
-                                drop(agent); // Release lock before spawning
-
-                                tokio::spawn(async move {
-                                    let mut agent = agent_state_clone.lock().await;
-                                    // Double-check agent is still enabled and not running
-                                    if !agent.enabled || agent.manager.status() == crate::agents::AgentStatus::Running {
-                                        return;
-                                    }
-
-                                    println!("[Agent] Calling Claude with {:?}...", selected_agent);
-                                    match agent.manager.run_with_kind(&context, selected_agent).await {
-                                        Ok(result) => {
-                                            let reason_preview: String = result.reason.chars().take(100).collect();
-                                            println!("[Agent] Response: action={}, reason={}",
-                                                result.final_action, reason_preview);
-
-                                            // Send notification if needed
-                                            if result.needs_notification {
-                                                if let Err(e) = crate::notifications::notify_info(
-                                                    &app_handle_clone,
-                                                    &result.reason
-                                                ) {
-                                                    eprintln!("[Agent] Ошибка отправки уведомления: {}", e);
-                                                }
-                                            }
-                                        }
-                                        Err(e) => {
-                                            eprintln!("[Agent] Ошибка выполнения: {}", e);
+                                    // Send notification if needed
+                                    if result.needs_notification {
+                                        if let Err(e) = crate::notifications::notify_info(
+                                            &app_handle_clone,
+                                            &result.reason
+                                        ) {
+                                            eprintln!("[Agent] Notification error: {}", e);
                                         }
                                     }
-                                });
-                            }
+                                }
+                            });
                         }
                     }
                 }
