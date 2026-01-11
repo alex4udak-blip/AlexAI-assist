@@ -259,56 +259,43 @@ impl AutomationSync {
                     .and_then(|v| v.as_str())
                     .unwrap_or("unknown")
                     .to_string();
-                let agent_config = suggestion.get("agent_config").cloned();
 
                 println!("[Suggestion] Received: {} - {}", title, description);
 
-                // Show dialog and handle response
-                if let Some(app) = &self.app_handle {
-                    let app_clone = app.clone();
-                    let suggestion_id_clone = suggestion_id.clone();
-                    let title_clone = title.clone();
-                    let description_clone = description.clone();
-                    let ws_writer_clone = Arc::clone(&self.ws_writer);
+                if let Some(app) = self.app_handle.clone() {
+                    let ws_writer = Arc::clone(&self.ws_writer);
 
+                    // Spawn blocking task for dialog, then send response
                     std::thread::spawn(move || {
-                        match crate::notifications::show_suggestion_dialog(
-                            &app_clone,
-                            &title_clone,
-                            &description_clone,
-                            &suggestion_id_clone,
+                        let accepted = match crate::notifications::show_suggestion_dialog(
+                            &app, &title, &description, &suggestion_id
                         ) {
-                            Ok(accepted) => {
-                                println!("[Suggestion] User response: {}", if accepted { "Accepted" } else { "Declined" });
-
-                                // Send response to server in async context
-                                let rt = tokio::runtime::Handle::current();
-                                rt.spawn(async move {
-                                    let response = serde_json::json!({
-                                        "type": "suggestion_response",
-                                        "suggestion_id": suggestion_id_clone,
-                                        "accepted": accepted,
-                                    });
-
-                                    if let Ok(json) = serde_json::to_string(&response) {
-                                        let mut writer = ws_writer_clone.lock().await;
-                                        if let Some(w) = writer.as_mut() {
-                                            let _ = w.send(tokio_tungstenite::tungstenite::Message::Text(json)).await;
-                                        }
-                                    }
-                                });
-
-                                // If accepted and has config, could execute automation
-                                if accepted {
-                                    if let Some(_config) = agent_config {
-                                        println!("[Suggestion] Automation accepted, ready to execute");
-                                    }
-                                }
-                            }
+                            Ok(result) => result,
                             Err(e) => {
                                 eprintln!("[Suggestion] Dialog error: {}", e);
+                                false
                             }
-                        }
+                        };
+
+                        println!("[Suggestion] User response: {}", if accepted { "Accepted" } else { "Declined" });
+
+                        // Send response via a new tokio runtime
+                        let rt = tokio::runtime::Runtime::new().unwrap();
+                        rt.block_on(async {
+                            let response = serde_json::json!({
+                                "type": "suggestion_response",
+                                "suggestion_id": suggestion_id,
+                                "accepted": accepted,
+                            });
+
+                            if let Ok(json) = serde_json::to_string(&response) {
+                                let mut writer = ws_writer.lock().await;
+                                if let Some(w) = writer.as_mut() {
+                                    let _ = w.send(tokio_tungstenite::tungstenite::Message::Text(json)).await;
+                                    println!("[Suggestion] Response sent to server");
+                                }
+                            }
+                        });
                     });
                 } else {
                     eprintln!("[Suggestion] No app handle available for dialog");
