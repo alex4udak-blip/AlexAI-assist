@@ -311,26 +311,32 @@ pub async fn start_collector(
                             println!("[Screenshot] Saved: {}", path_str);
                             event.screenshot_path = Some(path_str.clone());
 
-                            // === ASYNC OCR - runs in background thread ===
+                            // === SYNC OCR - wait for result to be available for Meta Agent ===
                             #[cfg(target_os = "macos")]
                             {
                                 let ocr_path = path_str.clone();
                                 let ocr_text_clone = last_ocr_text.clone();
 
-                                // Run OCR in background thread (non-blocking)
-                                std::thread::spawn(move || {
-                                    match crate::automation::ocr::extract_text_from_path(&ocr_path) {
-                                        Ok(ocr_result) => {
-                                            println!("[OCR] Extracted {} chars", ocr_result.text.len());
-                                            if let Ok(mut guard) = ocr_text_clone.lock() {
-                                                *guard = Some(ocr_result.text);
-                                            }
-                                        }
-                                        Err(e) => {
-                                            eprintln!("[OCR] Error: {}", e);
+                                // Run OCR in blocking thread pool and await result
+                                // This ensures OCR data is available for trigger checking
+                                let ocr_handle = tokio::task::spawn_blocking(move || {
+                                    crate::automation::ocr::extract_text_from_path(&ocr_path)
+                                });
+
+                                match ocr_handle.await {
+                                    Ok(Ok(ocr_result)) => {
+                                        println!("[OCR] Extracted {} chars", ocr_result.text.len());
+                                        if let Ok(mut guard) = ocr_text_clone.lock() {
+                                            *guard = Some(ocr_result.text);
                                         }
                                     }
-                                });
+                                    Ok(Err(e)) => {
+                                        eprintln!("[OCR] Error: {}", e);
+                                    }
+                                    Err(e) => {
+                                        eprintln!("[OCR] Task join error: {}", e);
+                                    }
+                                }
                             }
                         }
 

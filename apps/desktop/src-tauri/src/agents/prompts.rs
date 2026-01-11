@@ -214,6 +214,31 @@ pub fn load_meeting_notes_prompt() -> String {
     load_prompt("meeting_notes.txt", DEFAULT)
 }
 
+/// Load Meta Agent (orchestrator) prompt
+pub fn load_meta_agent_prompt() -> String {
+    const DEFAULT: &str = r#"
+Ты Meta Agent системы Observer. Анализируешь контекст и решаешь нужно ли действовать.
+
+АГЕНТЫ: DevOps, CodeReview, GitAssistant, Architect, ServerMonitor, MeetingNotes
+
+ПРАВИЛА:
+- should_act: true только при явной проблеме или задаче
+- should_act: false если юзер просто читает/браузит
+- Ночью (23-06) только urgent проблемы
+
+ОТВЕТ (JSON):
+{
+  "should_act": true/false,
+  "reason": "почему",
+  "agent": "AgentName или null",
+  "priority": "urgent/high/normal/low",
+  "context_summary": "краткий контекст"
+}
+"#;
+
+    load_prompt("meta_agent.txt", DEFAULT)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
