@@ -3,11 +3,11 @@
 //! Analyzes full context and decides which specialized agent should handle
 //! the current situation, or if any action is needed at all.
 
-use crate::agents::claude_code::{ask_claude, AgentResponse};
+use crate::agents::claude_code::ask_claude_raw;
 use crate::agents::context::RichContext;
 use crate::agents::memory::AgentMemory;
 use crate::agents::prompts;
-use crate::agents::types::AgentKind;
+use crate::agents::AgentKind;
 use serde::{Deserialize, Serialize};
 use std::collections::hash_map::DefaultHasher;
 use std::hash::{Hash, Hasher};
@@ -113,11 +113,11 @@ impl MetaAgent {
         // Build the prompt for Meta Agent
         let prompt = self.build_prompt(context);
 
-        // Call Claude for decision
-        let response = ask_claude(&prompt, &self.claude_path, self.timeout_secs).await?;
+        // Call Claude for decision (raw text response)
+        let response_text = ask_claude_raw(&prompt, &self.claude_path, self.timeout_secs).await?;
 
-        // Parse the decision
-        let decision = self.parse_decision(&response)?;
+        // Parse the decision from raw text
+        let decision = self.parse_decision(&response_text)?;
 
         // Cache the decision
         self.cache = Some(CachedDecision {
@@ -146,10 +146,8 @@ impl MetaAgent {
         )
     }
 
-    /// Parse Claude's response into a MetaDecision
-    fn parse_decision(&self, response: &AgentResponse) -> Result<MetaDecision, String> {
-        // Try to extract JSON from response
-        let text = &response.response;
+    /// Parse Claude's raw text response into a MetaDecision
+    fn parse_decision(&self, text: &str) -> Result<MetaDecision, String> {
 
         // Find JSON in the response
         let json_start = text.find('{');

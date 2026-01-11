@@ -49,6 +49,13 @@ pub struct AgentResponse {
 
 /// Call Claude Code CLI with a prompt and timeout
 pub async fn ask_claude(prompt: &str, claude_path: &str, timeout_secs: u64) -> Result<AgentResponse, String> {
+    let response_text = ask_claude_raw(prompt, claude_path, timeout_secs).await?;
+    // Parse JSON response
+    parse_agent_response(&response_text)
+}
+
+/// Call Claude Code CLI and return raw text response (for Meta Agent)
+pub async fn ask_claude_raw(prompt: &str, claude_path: &str, timeout_secs: u64) -> Result<String, String> {
     let system_prompt = prompts::load_system_prompt();
     let full_prompt = format!("{}\n\nКОНТЕКСТ:\n{}", system_prompt, prompt);
     let claude_path = claude_path.to_string(); // Clone for 'static lifetime
@@ -77,8 +84,7 @@ pub async fn ask_claude(prompt: &str, claude_path: &str, timeout_secs: u64) -> R
     let response_text = String::from_utf8_lossy(&output.stdout).to_string();
     println!("[Claude] Raw response ({}): {}", response_text.len(), truncate_str(&response_text, 200));
 
-    // Parse JSON response
-    parse_agent_response(&response_text)
+    Ok(response_text)
 }
 
 /// Parse Claude response to AgentResponse
