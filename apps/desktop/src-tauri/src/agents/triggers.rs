@@ -15,6 +15,8 @@ pub enum Trigger {
     /// User has been idle for specified minutes
     Idle { minutes: u32 },
     /// Scheduled trigger (cron-like)
+    /// NOTE: Schedule parsing not yet implemented - requires cron crate
+    /// Will be implemented in Phase 3 when task_queue.rs is added
     Schedule { cron: String },
     /// Pattern detected in specific app
     Pattern { app: String, event: String },
@@ -194,14 +196,9 @@ impl Default for TriggerEngine {
     }
 }
 
-/// Check triggers from Screenpipe frame (convenience function)
-pub fn check_triggers(ocr_text: &str, app_name: &str) -> Vec<Trigger> {
-    let engine = TriggerEngine::new();
-    engine.check(ocr_text, app_name)
-        .into_iter()
-        .map(|e| e.trigger)
-        .collect()
-}
+// NOTE: Removed standalone check_triggers() function - it was inefficient
+// as it created a new TriggerEngine on each call (losing idle state and
+// recompiling regex patterns). Use AgentManager.check_and_run() instead.
 
 #[cfg(test)]
 mod tests {
