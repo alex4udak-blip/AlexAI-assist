@@ -554,12 +554,10 @@ pub async fn start_collector(
                                     title_len, selected_len, typed_len, ocr_len);
 
                                 if !trigger_text.is_empty() {
-                                    let preview = if trigger_text.len() > 150 {
-                                        format!("{}...", &trigger_text[..150])
-                                    } else {
-                                        trigger_text.clone()
-                                    };
-                                    println!("[Trigger] Text: \"{}\"", preview.replace('\n', " | "));
+                                    // Safely truncate for UTF-8
+                                    let preview: String = trigger_text.chars().take(150).collect();
+                                    let suffix = if trigger_text.chars().count() > 150 { "..." } else { "" };
+                                    println!("[Trigger] Text: \"{}{}\"", preview.replace('\n', " | "), suffix);
                                 }
                             }
 
@@ -592,8 +590,9 @@ pub async fn start_collector(
                                     println!("[Agent] Calling Claude...");
                                     match agent.manager.run(&context).await {
                                         Ok(result) => {
+                                            let reason_preview: String = result.reason.chars().take(100).collect();
                                             println!("[Agent] Response: action={}, reason={}",
-                                                result.final_action, &result.reason[..result.reason.len().min(100)]);
+                                                result.final_action, reason_preview);
 
                                             // Send notification if needed
                                             if result.needs_notification {
