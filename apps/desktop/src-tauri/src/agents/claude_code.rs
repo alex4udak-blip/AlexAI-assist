@@ -4,7 +4,6 @@
 
 use serde::{Deserialize, Serialize};
 use std::process::Command;
-use std::time::Duration;
 
 /// Response from Claude agent
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -176,15 +175,30 @@ pub async fn execute_command(cmd: &str) -> Result<String, String> {
     Ok(format!("{}\n{}", stdout, stderr))
 }
 
+/// Result of agent task execution
+#[derive(Debug, Clone)]
+pub struct AgentTaskResult {
+    pub iterations: u32,
+    pub final_action: String,
+    pub reason: String,
+    pub needs_notification: bool,
+    pub needs_confirmation: bool,
+    pub output: String,
+}
+
 /// Run agent task with iterative loop
 pub async fn run_agent_task(
     initial_context: &str,
     max_iterations: u32,
     claude_path: &str,
-) -> Result<String, String> {
+) -> Result<AgentTaskResult, String> {
     let mut context = initial_context.to_string();
     let mut iteration = 0;
     let mut results = Vec::new();
+    let mut needs_notification = false;
+    let mut needs_confirmation = false;
+    let mut final_action = String::new();
+    let mut final_reason = String::new();
 
     println!("[Agent] Starting task with max {} iterations", max_iterations);
 
@@ -195,6 +209,8 @@ pub async fn run_agent_task(
         // Ask Claude what to do
         let response = ask_claude(&context, claude_path).await?;
         results.push(format!("Iteration {}: {:?}", iteration, response));
+        final_action = response.action.clone();
+        final_reason = response.reason.clone();
 
         match response.action.as_str() {
             "skip" => {
@@ -203,12 +219,12 @@ pub async fn run_agent_task(
             }
             "notify" => {
                 println!("[Agent] Notification: {}", response.reason);
-                // TODO: Send notification to user
+                needs_notification = true;
                 break;
             }
             "confirm" => {
                 println!("[Agent] Needs confirmation: {}", response.reason);
-                // TODO: Request user confirmation
+                needs_confirmation = true;
                 break;
             }
             "command" => {
@@ -251,7 +267,14 @@ pub async fn run_agent_task(
         println!("[Agent] Reached max iterations");
     }
 
-    Ok(results.join("\n"))
+    Ok(AgentTaskResult {
+        iterations: iteration,
+        final_action,
+        reason: final_reason,
+        needs_notification,
+        needs_confirmation,
+        output: results.join("\n"),
+    })
 }
 
 #[cfg(test)]

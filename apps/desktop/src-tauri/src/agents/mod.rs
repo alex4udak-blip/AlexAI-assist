@@ -5,8 +5,8 @@
 pub mod claude_code;
 pub mod triggers;
 
-pub use claude_code::{AgentResponse, ask_claude, execute_command, run_agent_task};
-pub use triggers::{Trigger, TriggerEngine, check_triggers};
+pub use claude_code::{AgentResponse, AgentTaskResult, ask_claude, execute_command, run_agent_task};
+pub use triggers::{Trigger, TriggerEngine};
 
 use serde::{Deserialize, Serialize};
 
@@ -67,7 +67,7 @@ impl AgentManager {
     }
 
     /// Run agent with context
-    pub async fn run(&mut self, context: &str) -> Result<String, String> {
+    pub async fn run(&mut self, context: &str) -> Result<AgentTaskResult, String> {
         self.status = AgentStatus::Running;
 
         let result = run_agent_task(
@@ -77,7 +77,13 @@ impl AgentManager {
         ).await;
 
         match &result {
-            Ok(_) => self.status = AgentStatus::Completed,
+            Ok(task_result) => {
+                if task_result.needs_confirmation {
+                    self.status = AgentStatus::WaitingConfirmation;
+                } else {
+                    self.status = AgentStatus::Completed;
+                }
+            }
             Err(_) => self.status = AgentStatus::Failed,
         }
 
@@ -85,7 +91,7 @@ impl AgentManager {
     }
 
     /// Check triggers and run agent if triggered
-    pub async fn check_and_run(&mut self, ocr_text: &str, app_name: &str) -> Option<String> {
+    pub async fn check_and_run(&mut self, ocr_text: &str, app_name: &str) -> Option<AgentTaskResult> {
         let triggers = self.trigger_engine.check(ocr_text, app_name);
 
         if triggers.is_empty() {
@@ -107,6 +113,16 @@ impl AgentManager {
                 None
             }
         }
+    }
+
+    /// Record user activity (resets idle timer)
+    pub fn record_activity(&mut self) {
+        self.trigger_engine.record_activity();
+    }
+
+    /// Get trigger engine for configuration
+    pub fn trigger_engine_mut(&mut self) -> &mut TriggerEngine {
+        &mut self.trigger_engine
     }
 }
 
