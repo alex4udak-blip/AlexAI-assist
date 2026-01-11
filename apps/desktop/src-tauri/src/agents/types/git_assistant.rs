@@ -316,7 +316,7 @@ impl GitAssistantAgent {
         }
 
         // Create suggestions for each group
-        for (category, files) in groups {
+        for (_category, files) in groups {
             let file_paths: Vec<String> = files.iter().map(|f| f.path.clone()).collect();
             let message = Self::generate_commit_message(&files);
 
