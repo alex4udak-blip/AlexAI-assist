@@ -32,6 +32,12 @@ pub struct AppState {
     pub top_apps_cache: std::collections::HashMap<String, u32>,
 }
 
+/// Separate state for AI Agent Manager (needs mutable access)
+pub struct AgentState {
+    pub manager: agents::AgentManager,
+    pub enabled: bool,
+}
+
 fn main() {
     // Initialize database
     let db = Arc::new(
@@ -69,6 +75,14 @@ fn main() {
         db: db.clone(),
         top_apps_cache: initial_top_apps,
     }));
+
+    // Create agent state with loaded config
+    let agent_config = agents::AgentConfig::load().unwrap_or_default();
+    let agent_state = Arc::new(Mutex::new(AgentState {
+        manager: agents::AgentManager::new(agent_config),
+        enabled: true, // Agents enabled by default
+    }));
+
     let shutdown_token = CancellationToken::new();
 
     // Create automation queue
@@ -93,6 +107,7 @@ fn main() {
         .plugin(tauri_plugin_process::init())
         .manage(state.clone())
         .manage(automation_queue.clone())
+        .manage(agent_state.clone())
         .setup(move |app| {
             // Create system tray
             tray::create_tray(app)?;
@@ -103,12 +118,13 @@ fn main() {
                 updater::check_for_updates(app_handle).await;
             });
 
-            // Start collector with shutdown token
+            // Start collector with shutdown token and agent state
             let state_clone = state.clone();
+            let agent_state_clone = agent_state.clone();
             let app_handle = app.handle().clone();
             let shutdown_token_clone = shutdown_token.clone();
             tauri::async_runtime::spawn(async move {
-                collector::start_collector(state_clone, app_handle, shutdown_token_clone).await;
+                collector::start_collector(state_clone, agent_state_clone, app_handle, shutdown_token_clone).await;
             });
 
             // Start sync service
@@ -201,6 +217,12 @@ fn main() {
             commands::trigger_automation_permission,
             commands::request_all_automations,
             commands::open_automation_prefs,
+            // Agent commands
+            commands::agent_status,
+            commands::agent_enable,
+            commands::agent_disable,
+            commands::agent_get_config,
+            commands::agent_set_config,
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application")
