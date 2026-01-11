@@ -59,12 +59,13 @@ const SYSTEM_PROMPT: &str = r#"
 /// Call Claude Code CLI with a prompt
 pub async fn ask_claude(prompt: &str, claude_path: &str) -> Result<AgentResponse, String> {
     let full_prompt = format!("{}\n\nКОНТЕКСТ:\n{}", SYSTEM_PROMPT, prompt);
+    let claude_path = claude_path.to_string(); // Clone for 'static lifetime
 
     println!("[Claude] Calling with prompt: {}...", &prompt[..prompt.len().min(100)]);
 
     // Call Claude CLI
     let output = tokio::task::spawn_blocking(move || {
-        Command::new(claude_path)
+        Command::new(&claude_path)
             .arg("-p")
             .arg(&full_prompt)
             .output()
