@@ -458,13 +458,36 @@ pub async fn start_collector(
                         if agent.manager.status() == crate::agents::AgentStatus::Running {
                             // Silent skip - don't spam logs
                         } else {
-                            // Get window title or selected text for trigger checking
-                            let trigger_text = if let Some(ref info) = focus_info {
-                                info.selected_text.clone().unwrap_or_else(|| info.window_title.clone())
-                            } else {
-                                current_title.clone().unwrap_or_default()
-                            };
+                            // Build trigger_text from ALL available sources:
+                            // 1. Window title (always available)
+                            // 2. Selected text (when user selects something)
+                            // 3. Typed text (browser input)
+                            let mut text_parts: Vec<String> = Vec::new();
 
+                            // Add window title
+                            if let Some(ref title) = current_title {
+                                if !title.is_empty() {
+                                    text_parts.push(title.clone());
+                                }
+                            }
+
+                            // Add selected text
+                            if let Some(ref info) = focus_info {
+                                if let Some(ref selected) = info.selected_text {
+                                    if !selected.is_empty() {
+                                        text_parts.push(selected.clone());
+                                    }
+                                }
+                            }
+
+                            // Add typed text (browser input)
+                            if let Some(ref typed) = last_typed_text {
+                                if !typed.is_empty() {
+                                    text_parts.push(typed.clone());
+                                }
+                            }
+
+                            let trigger_text = text_parts.join("\n");
                             let app = current_app.clone().unwrap_or_default();
 
                             // Debug: log trigger check (every 10 seconds to avoid spam)
@@ -476,8 +499,8 @@ pub async fn start_collector(
                             let last = LAST_LOG.load(std::sync::atomic::Ordering::Relaxed);
                             if now - last >= 10 {
                                 LAST_LOG.store(now, std::sync::atomic::Ordering::Relaxed);
-                                println!("[Agent] Проверка триггеров: app={}, text={}...",
-                                    &app, &trigger_text[..trigger_text.len().min(50)]);
+                                println!("[Agent] Проверка: app={}, text_len={}, sources={}",
+                                    &app, trigger_text.len(), text_parts.len());
                             }
 
                             // Check triggers (non-blocking check)
