@@ -13,21 +13,16 @@ pub mod triggers;
 pub mod types;
 
 pub use claude_code::{AgentTaskResult, run_agent_task};
-pub use context::{ProjectContext, RecentAction, RichContext, TimeContext, UserResponse};
-pub use memory::AgentMemory;
-pub use meta_agent::{MetaAgent, MetaDecision, Priority as MetaPriority};
-pub use task_queue::{AgentTask, Priority, TaskQueue, TaskStatus};
+pub use context::RichContext;
+pub use meta_agent::MetaAgent;
+pub use task_queue::{AgentTask, Priority, TaskQueue};
 pub use triggers::TriggerEngine;
 pub use types::{
-    ActionItem,
     AgentType,
     ArchitectAgent,
     CodeReviewAgent,
     DevOpsAgent,
-    ErrorType,
     GitAssistantAgent,
-    HealthStatus,
-    MeetingData,
     MeetingNotesAgent,
     ServerMonitorAgent,
 };
