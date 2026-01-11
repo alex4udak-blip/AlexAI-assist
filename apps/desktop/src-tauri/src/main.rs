@@ -123,10 +123,12 @@ fn main() {
 
             // Create WebSocket automation sync
             let ws_url = automation::sync::get_websocket_url();
-            let sync = Arc::new(automation::sync::AutomationSync::new(
+            let mut sync = automation::sync::AutomationSync::new(
                 ws_url,
                 automation_queue.clone(),
-            ));
+            );
+            sync.set_app_handle(app.handle().clone());
+            let sync = Arc::new(sync);
 
             // Handle automation task results
             let app_handle = app.handle().clone();
