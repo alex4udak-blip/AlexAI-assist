@@ -179,9 +179,9 @@ pub fn show_suggestion_dialog(
 
     let result = app.dialog()
         .message(format!("{}\n\nID: {}", description, suggestion_id))
-        .title(format!("Automation: {}", title))
+        .title(format!("Автоматизация: {}", title))
         .kind(MessageDialogKind::Info)
-        .buttons(MessageDialogButtons::OkCancelCustom("Accept".to_string(), "Decline".to_string()))
+        .buttons(MessageDialogButtons::OkCancelCustom("Принять".to_string(), "Отклонить".to_string()))
         .blocking_show();
 
     Ok(result)
