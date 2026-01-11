@@ -115,8 +115,31 @@ fn is_browser(app_name: &str) -> bool {
 pub fn get_current_focus() -> Option<FocusInfo> {
     // First try accessibility API for detailed info
     if has_accessibility_permission() {
-        if let Some((app_name, window_title)) = get_focused_element_info() {
+        if let Some((app_name, mut window_title)) = get_focused_element_info() {
+            // If window_title is empty, try AppleScript fallback (works better for Terminal)
+            if window_title.is_empty() {
+                if let (_, Some(title)) = apps::get_active_window() {
+                    window_title = title;
+                }
+            }
+
             let selected_text = get_selected_text();
+
+            // For Terminal/iTerm, also try to get focused text field value (AXValue)
+            let app_lower = app_name.to_lowercase();
+            let text_field_value = if app_lower.contains("terminal") || app_lower.contains("iterm") {
+                get_focused_text_field_value()
+            } else {
+                None
+            };
+
+            // Combine selected_text and text_field_value
+            let combined_text = match (selected_text, text_field_value) {
+                (Some(sel), Some(val)) => Some(format!("{}\n{}", sel, val)),
+                (Some(sel), None) => Some(sel),
+                (None, Some(val)) => Some(val),
+                (None, None) => None,
+            };
 
             // Get URL using AppleScript for browsers
             let url = if is_browser(&app_name) {
@@ -132,7 +155,7 @@ pub fn get_current_focus() -> Option<FocusInfo> {
             return Some(FocusInfo {
                 app_name,
                 window_title,
-                selected_text,
+                selected_text: combined_text,
                 url,
             });
         }
@@ -161,6 +184,8 @@ pub async fn start_collector(
     let mut last_app: Option<String> = None;
     let mut last_title: Option<String> = None;
     let mut last_typed_text: Option<String> = None;
+    // Shared OCR text from background processing
+    let last_ocr_text: Arc<std::sync::Mutex<Option<String>>> = Arc::new(std::sync::Mutex::new(None));
 
     // Initialize collectors
     let metrics_collector = SystemMetricsCollector::new();
@@ -168,7 +193,7 @@ pub async fn start_collector(
     let messenger_monitor = messenger::MessengerMonitor::new();
     let browser_monitor = browser::BrowserMonitor::new();
 
-    println!("[Collector] Initialized: ScreenshotManager, MessengerMonitor, BrowserMonitor, AgentManager");
+    println!("[Collector] Initialized: ScreenshotManager, MessengerMonitor, BrowserMonitor, AgentManager, AsyncOCR");
 
     // Request permissions on start
     #[cfg(target_os = "macos")]
@@ -275,21 +300,27 @@ pub async fn start_collector(
                             println!("[Screenshot] Saved: {}", path_str);
                             event.screenshot_path = Some(path_str.clone());
 
-                            // === OCR DISABLED - blocks entire app (compiles Swift synchronously 5-30 sec) ===
-                            // #[cfg(target_os = "macos")]
-                            // {
-                            //     match crate::automation::ocr::extract_text_from_path(&path_str) {
-                            //         Ok(ocr_result) => {
-                            //             println!("[OCR] Extracted {} chars", ocr_result.text.len());
-                            //             if let serde_json::Value::Object(ref mut map) = event.data {
-                            //                 map.insert("ocr_text".to_string(), serde_json::json!(ocr_result.text));
-                            //             }
-                            //         }
-                            //         Err(e) => {
-                            //             eprintln!("[OCR] Error: {}", e);
-                            //         }
-                            //     }
-                            // }
+                            // === ASYNC OCR - runs in background thread ===
+                            #[cfg(target_os = "macos")]
+                            {
+                                let ocr_path = path_str.clone();
+                                let ocr_text_clone = last_ocr_text.clone();
+
+                                // Run OCR in background thread (non-blocking)
+                                std::thread::spawn(move || {
+                                    match crate::automation::ocr::extract_text_from_path(&ocr_path) {
+                                        Ok(ocr_result) => {
+                                            println!("[OCR] Extracted {} chars", ocr_result.text.len());
+                                            if let Ok(mut guard) = ocr_text_clone.lock() {
+                                                *guard = Some(ocr_result.text);
+                                            }
+                                        }
+                                        Err(e) => {
+                                            eprintln!("[OCR] Error: {}", e);
+                                        }
+                                    }
+                                });
+                            }
                         }
 
                         // === MESSENGER MESSAGES ===
@@ -462,6 +493,7 @@ pub async fn start_collector(
                             // 1. Window title (always available)
                             // 2. Selected text (when user selects something)
                             // 3. Typed text (browser input)
+                            // 4. OCR text (from background processing)
                             let mut text_parts: Vec<String> = Vec::new();
 
                             // Add window title
@@ -487,6 +519,15 @@ pub async fn start_collector(
                                 }
                             }
 
+                            // Add OCR text (from async background processing)
+                            if let Ok(guard) = last_ocr_text.lock() {
+                                if let Some(ref ocr) = *guard {
+                                    if !ocr.is_empty() {
+                                        text_parts.push(ocr.clone());
+                                    }
+                                }
+                            }
+
                             let trigger_text = text_parts.join("\n");
                             let app = current_app.clone().unwrap_or_default();
 
@@ -499,14 +540,35 @@ pub async fn start_collector(
                             let last = LAST_LOG.load(std::sync::atomic::Ordering::Relaxed);
                             if now - last >= 10 {
                                 LAST_LOG.store(now, std::sync::atomic::Ordering::Relaxed);
-                                println!("[Agent] Проверка: app={}, text_len={}, sources={}",
-                                    &app, trigger_text.len(), text_parts.len());
+
+                                // Log each source separately for debugging
+                                let title_len = current_title.as_ref().map(|t| t.len()).unwrap_or(0);
+                                let selected_len = focus_info.as_ref()
+                                    .and_then(|i| i.selected_text.as_ref())
+                                    .map(|t| t.len()).unwrap_or(0);
+                                let typed_len = last_typed_text.as_ref().map(|t| t.len()).unwrap_or(0);
+                                let ocr_len = last_ocr_text.lock().ok()
+                                    .and_then(|g| g.as_ref().map(|t| t.len())).unwrap_or(0);
+
+                                println!("[Trigger] Sources: title={}, selected={}, typed={}, ocr={}",
+                                    title_len, selected_len, typed_len, ocr_len);
+
+                                if !trigger_text.is_empty() {
+                                    let preview = if trigger_text.len() > 150 {
+                                        format!("{}...", &trigger_text[..150])
+                                    } else {
+                                        trigger_text.clone()
+                                    };
+                                    println!("[Trigger] Text: \"{}\"", preview.replace('\n', " | "));
+                                }
                             }
 
                             // Check triggers (non-blocking check)
                             let triggers = agent.manager.trigger_engine().check(&trigger_text, &app);
                             if !triggers.is_empty() {
-                                println!("[Agent] Триггеры обнаружены: {:?}", triggers.iter().map(|t| &t.trigger).collect::<Vec<_>>());
+                                for t in &triggers {
+                                    println!("[Trigger] Matched: {:?} in app={}", t.trigger, &app);
+                                }
 
                                 // Run agent in background if triggered
                                 let agent_state_clone = agent_state.clone();
@@ -527,9 +589,11 @@ pub async fn start_collector(
                                         return;
                                     }
 
+                                    println!("[Agent] Calling Claude...");
                                     match agent.manager.run(&context).await {
                                         Ok(result) => {
-                                            println!("[Agent] Задача завершена: {}", result.final_action);
+                                            println!("[Agent] Response: action={}, reason={}",
+                                                result.final_action, &result.reason[..result.reason.len().min(100)]);
 
                                             // Send notification if needed
                                             if result.needs_notification {
