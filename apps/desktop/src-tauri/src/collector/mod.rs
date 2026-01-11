@@ -375,77 +375,11 @@ pub async fn start_collector(
                         state.events_today += 1;
                     }
 
-                    // === AGENT TRIGGER CHECK ===
-                    // Check if agent should be triggered based on window content
+                    // Record activity on focus change (actual user activity)
                     {
-                        let agent = agent_state.lock().await;
+                        let mut agent = agent_state.lock().await;
                         if agent.enabled {
-                            // Skip if agent is already running (debounce)
-                            if agent.manager.status() == crate::agents::AgentStatus::Running {
-                                println!("[Agent] Пропуск: агент уже выполняется");
-                            } else {
-                                // Record activity to reset idle timer (need mutable access)
-                                drop(agent);
-                                {
-                                    let mut agent = agent_state.lock().await;
-                                    agent.manager.record_activity();
-                                }
-                                let agent = agent_state.lock().await;
-
-                                // Get window title or selected text for trigger checking
-                                let trigger_text = if let Some(ref info) = focus_info {
-                                    info.selected_text.clone().unwrap_or_else(|| info.window_title.clone())
-                                } else {
-                                    current_title.clone().unwrap_or_default()
-                                };
-
-                                let app = current_app.clone().unwrap_or_default();
-
-                                // Check triggers (non-blocking check)
-                                let triggers = agent.manager.trigger_engine().check(&trigger_text, &app);
-                                if !triggers.is_empty() {
-                                    println!("[Agent] Триггеры обнаружены: {:?}", triggers.iter().map(|t| &t.trigger).collect::<Vec<_>>());
-
-                                    // Run agent in background if triggered
-                                    let agent_state_clone = agent_state.clone();
-                                    let app_handle_clone = app_handle.clone();
-                                    let context = format!(
-                                        "Приложение: {}\nОкно: {}\nТекст: {}",
-                                        app,
-                                        current_title.clone().unwrap_or_default(),
-                                        trigger_text
-                                    );
-
-                                    drop(agent); // Release lock before spawning
-
-                                    tokio::spawn(async move {
-                                        let mut agent = agent_state_clone.lock().await;
-                                        // Double-check agent is still enabled and not running
-                                        if !agent.enabled || agent.manager.status() == crate::agents::AgentStatus::Running {
-                                            return;
-                                        }
-
-                                        match agent.manager.run(&context).await {
-                                            Ok(result) => {
-                                                println!("[Agent] Задача завершена: {}", result.final_action);
-
-                                                // Send notification if needed
-                                                if result.needs_notification {
-                                                    if let Err(e) = crate::notifications::notify_info(
-                                                        &app_handle_clone,
-                                                        &result.reason
-                                                    ) {
-                                                        eprintln!("[Agent] Ошибка отправки уведомления: {}", e);
-                                                    }
-                                                }
-                                            }
-                                            Err(e) => {
-                                                eprintln!("[Agent] Ошибка выполнения: {}", e);
-                                            }
-                                        }
-                                    });
-                                }
-                            }
+                            agent.manager.record_activity();
                         }
                     }
 
@@ -496,6 +430,73 @@ pub async fn start_collector(
                                 }
                             } else if last_typed_text.is_some() {
                                 last_typed_text = None;
+                            }
+                        }
+                    }
+                }
+
+                // === AGENT TRIGGER CHECK ===
+                // Runs on EVERY tick (500ms), not just on focus change
+                // This allows idle trigger and continuous monitoring to work
+                {
+                    let agent = agent_state.lock().await;
+                    if agent.enabled {
+                        // Skip if agent is already running (debounce)
+                        if agent.manager.status() == crate::agents::AgentStatus::Running {
+                            // Silent skip - don't spam logs
+                        } else {
+                            // Get window title or selected text for trigger checking
+                            let trigger_text = if let Some(ref info) = focus_info {
+                                info.selected_text.clone().unwrap_or_else(|| info.window_title.clone())
+                            } else {
+                                current_title.clone().unwrap_or_default()
+                            };
+
+                            let app = current_app.clone().unwrap_or_default();
+
+                            // Check triggers (non-blocking check)
+                            let triggers = agent.manager.trigger_engine().check(&trigger_text, &app);
+                            if !triggers.is_empty() {
+                                println!("[Agent] Триггеры обнаружены: {:?}", triggers.iter().map(|t| &t.trigger).collect::<Vec<_>>());
+
+                                // Run agent in background if triggered
+                                let agent_state_clone = agent_state.clone();
+                                let app_handle_clone = app_handle.clone();
+                                let context = format!(
+                                    "Приложение: {}\nОкно: {}\nТекст: {}",
+                                    app,
+                                    current_title.clone().unwrap_or_default(),
+                                    trigger_text
+                                );
+
+                                drop(agent); // Release lock before spawning
+
+                                tokio::spawn(async move {
+                                    let mut agent = agent_state_clone.lock().await;
+                                    // Double-check agent is still enabled and not running
+                                    if !agent.enabled || agent.manager.status() == crate::agents::AgentStatus::Running {
+                                        return;
+                                    }
+
+                                    match agent.manager.run(&context).await {
+                                        Ok(result) => {
+                                            println!("[Agent] Задача завершена: {}", result.final_action);
+
+                                            // Send notification if needed
+                                            if result.needs_notification {
+                                                if let Err(e) = crate::notifications::notify_info(
+                                                    &app_handle_clone,
+                                                    &result.reason
+                                                ) {
+                                                    eprintln!("[Agent] Ошибка отправки уведомления: {}", e);
+                                                }
+                                            }
+                                        }
+                                        Err(e) => {
+                                            eprintln!("[Agent] Ошибка выполнения: {}", e);
+                                        }
+                                    }
+                                });
                             }
                         }
                     }
