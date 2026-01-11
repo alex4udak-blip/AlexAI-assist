@@ -2,7 +2,7 @@
 
 from datetime import UTC, datetime
 from typing import Any
-from uuid import UUID
+from uuid import UUID, uuid4
 
 from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel, Field, field_serializer
@@ -400,3 +400,49 @@ async def get_timeline(
         await cache.set(cache_key, events_data, TIMELINE_CACHE_TTL)
 
     return events_data
+
+
+@router.post("/screenpipe")
+async def receive_screenpipe_events(
+    data: dict,
+    db: AsyncSession = Depends(get_db_session),
+) -> dict:
+    """Receive events from Screenpipe sync pipe."""
+    import logging
+    logger = logging.getLogger(__name__)
+
+    device_id = data.get("device_id", "unknown")
+    events = data.get("events", [])
+
+    saved = 0
+    for event in events:
+        # Parse timestamp
+        ts = event.get("timestamp")
+        if isinstance(ts, str):
+            try:
+                ts = datetime.fromisoformat(ts.replace("Z", "+00:00"))
+            except ValueError:
+                ts = datetime.now(UTC)
+        elif ts is None:
+            ts = datetime.now(UTC)
+
+        # Normalize to naive UTC
+        if ts.tzinfo is not None:
+            ts = ts.astimezone(UTC).replace(tzinfo=None)
+
+        db_event = Event(
+            event_id=str(uuid4()),
+            device_id=device_id,
+            event_type="screenpipe_ocr",
+            timestamp=ts,
+            app_name=event.get("app_name", "unknown"),
+            window_title=event.get("window_title", ""),
+            data={"ocr_text": event.get("ocr_text", ""), "source": "screenpipe"},
+        )
+        db.add(db_event)
+        saved += 1
+
+    await db.commit()
+    logger.info(f"Screenpipe sync: saved {saved} events from {device_id}")
+
+    return {"status": "ok", "saved": saved}
