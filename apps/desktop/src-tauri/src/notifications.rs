@@ -147,6 +147,25 @@ pub fn notify_update_available(
     send_notification(app, config)
 }
 
+/// Show automation suggestion notification
+pub fn show_suggestion_notification(
+    app: &tauri::AppHandle,
+    title: &str,
+    description: &str,
+    suggestion_id: &str,
+) -> Result<(), String> {
+    println!("[Notification] Showing suggestion: {} (ID: {})", title, suggestion_id);
+
+    let config = NotificationConfig {
+        title: format!("Suggestion: {}", title),
+        body: description.to_string(),
+        priority: NotificationPriority::High,
+        action: Some(suggestion_id.to_string()),
+    };
+
+    send_notification(app, config)
+}
+
 /// Notification manager for controlling notification behavior
 pub struct NotificationManager {
     enabled: std::sync::RwLock<bool>,

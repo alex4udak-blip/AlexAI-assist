@@ -67,6 +67,7 @@ pub struct AutomationSync {
     is_connected: Arc<Mutex<bool>>,
     queue: Arc<crate::automation::queue::AutomationQueue>,
     ws_writer: Arc<Mutex<Option<WsWriter>>>,
+    app_handle: Option<tauri::AppHandle>,
 }
 
 impl AutomationSync {
@@ -78,12 +79,18 @@ impl AutomationSync {
             is_connected: Arc::new(Mutex::new(false)),
             queue,
             ws_writer: Arc::new(Mutex::new(None)),
+            app_handle: None,
         }
     }
 
     /// Set authentication token
     pub fn set_auth_token(&mut self, token: String) {
         self.auth_token = Some(token);
+    }
+
+    /// Set app handle for notifications
+    pub fn set_app_handle(&mut self, app: tauri::AppHandle) {
+        self.app_handle = Some(app);
     }
 
     /// Check if connected
@@ -253,7 +260,19 @@ impl AutomationSync {
                 println!("[Suggestion] Received: {} - {}", title, description);
                 println!("[Suggestion] ID: {} | Full data: {:?}", suggestion_id, suggestion);
 
-                // TODO: Show macOS notification with Accept/Decline buttons
+                // Show macOS notification
+                if let Some(app) = &self.app_handle {
+                    if let Err(e) = crate::notifications::show_suggestion_notification(
+                        app,
+                        title,
+                        description,
+                        suggestion_id,
+                    ) {
+                        eprintln!("[Suggestion] Failed to show notification: {}", e);
+                    }
+                } else {
+                    eprintln!("[Suggestion] No app handle available for notification");
+                }
             }
             _ => {
                 println!("Received unknown message type");
