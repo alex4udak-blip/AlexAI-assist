@@ -249,29 +249,69 @@ impl AutomationSync {
             WsMessage::AutomationSuggestion { suggestion } => {
                 let title = suggestion.get("title")
                     .and_then(|v| v.as_str())
-                    .unwrap_or("Automation Suggestion");
+                    .unwrap_or("Automation Suggestion")
+                    .to_string();
                 let description = suggestion.get("description")
                     .and_then(|v| v.as_str())
-                    .unwrap_or("");
+                    .unwrap_or("")
+                    .to_string();
                 let suggestion_id = suggestion.get("id")
                     .and_then(|v| v.as_str())
-                    .unwrap_or("unknown");
+                    .unwrap_or("unknown")
+                    .to_string();
+                let agent_config = suggestion.get("agent_config").cloned();
 
                 println!("[Suggestion] Received: {} - {}", title, description);
-                println!("[Suggestion] ID: {} | Full data: {:?}", suggestion_id, suggestion);
 
-                // Show macOS notification
+                // Show dialog and handle response
                 if let Some(app) = &self.app_handle {
-                    if let Err(e) = crate::notifications::show_suggestion_notification(
-                        app,
-                        title,
-                        description,
-                        suggestion_id,
-                    ) {
-                        eprintln!("[Suggestion] Failed to show notification: {}", e);
-                    }
+                    let app_clone = app.clone();
+                    let suggestion_id_clone = suggestion_id.clone();
+                    let title_clone = title.clone();
+                    let description_clone = description.clone();
+                    let ws_writer_clone = Arc::clone(&self.ws_writer);
+
+                    std::thread::spawn(move || {
+                        match crate::notifications::show_suggestion_dialog(
+                            &app_clone,
+                            &title_clone,
+                            &description_clone,
+                            &suggestion_id_clone,
+                        ) {
+                            Ok(accepted) => {
+                                println!("[Suggestion] User response: {}", if accepted { "Accepted" } else { "Declined" });
+
+                                // Send response to server in async context
+                                let rt = tokio::runtime::Handle::current();
+                                rt.spawn(async move {
+                                    let response = serde_json::json!({
+                                        "type": "suggestion_response",
+                                        "suggestion_id": suggestion_id_clone,
+                                        "accepted": accepted,
+                                    });
+
+                                    if let Ok(json) = serde_json::to_string(&response) {
+                                        let mut writer = ws_writer_clone.lock().await;
+                                        if let Some(w) = writer.as_mut() {
+                                            let _ = w.send(tokio_tungstenite::tungstenite::Message::Text(json)).await;
+                                        }
+                                    }
+                                });
+
+                                // If accepted and has config, could execute automation
+                                if accepted {
+                                    if let Some(_config) = agent_config {
+                                        println!("[Suggestion] Automation accepted, ready to execute");
+                                    }
+                                }
+                            }
+                            Err(e) => {
+                                eprintln!("[Suggestion] Dialog error: {}", e);
+                            }
+                        }
+                    });
                 } else {
-                    eprintln!("[Suggestion] No app handle available for notification");
+                    eprintln!("[Suggestion] No app handle available for dialog");
                 }
             }
             _ => {
