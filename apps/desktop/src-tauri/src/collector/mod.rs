@@ -125,12 +125,23 @@ pub fn get_current_focus() -> Option<FocusInfo> {
 
             let selected_text = get_selected_text();
 
-            // For Terminal/iTerm, also try to get focused text field value (AXValue)
+            // For Terminal/iTerm, try to get terminal content (uses different approach than text fields)
             let app_lower = app_name.to_lowercase();
-            let text_field_value = if app_lower.contains("terminal") || app_lower.contains("iterm") {
-                get_focused_text_field_value()
+            let is_terminal = app_lower.contains("terminal")
+                || app_lower.contains("терминал")
+                || app_lower.contains("iterm");
+
+            let text_field_value = if is_terminal {
+                println!("[Terminal] Trying to get content from: {}", app_name);
+                let content = get_terminal_content();
+                if let Some(ref text) = content {
+                    println!("[Terminal] Got content: {} chars", text.len());
+                } else {
+                    println!("[Terminal] No content available");
+                }
+                content
             } else {
-                None
+                get_focused_text_field_value()
             };
 
             // Combine selected_text and text_field_value
