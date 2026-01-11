@@ -5,6 +5,23 @@
 use serde::{Deserialize, Serialize};
 use std::process::Command;
 
+/// Dangerous command patterns that require confirmation
+const DANGEROUS_PATTERNS: &[&str] = &[
+    "rm -rf",
+    "rm -r /",
+    "sudo rm",
+    "mkfs",
+    "dd if=",
+    "> /dev/",
+    "chmod 000",
+    "chmod 777",
+    ":(){:|:&};:",  // fork bomb
+    "mv /* ",
+    "wget | sh",
+    "curl | sh",
+    ":(){ :|:& };:",
+];
+
 /// Response from Claude agent
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AgentResponse {
@@ -53,12 +70,12 @@ pub async fn ask_claude(prompt: &str, claude_path: &str) -> Result<AgentResponse
             .output()
     })
     .await
-    .map_err(|e| format!("Task join error: {}", e))?
-    .map_err(|e| format!("Failed to execute claude: {}", e))?;
+    .map_err(|e| format!("Ошибка выполнения задачи: {}", e))?
+    .map_err(|e| format!("Не удалось запустить Claude CLI: {}", e))?;
 
     if !output.status.success() {
         let stderr = String::from_utf8_lossy(&output.stderr);
-        return Err(format!("Claude CLI error: {}", stderr));
+        return Err(format!("Ошибка Claude CLI: {}", stderr));
     }
 
     let response_text = String::from_utf8_lossy(&output.stdout).to_string();
@@ -74,7 +91,7 @@ fn parse_agent_response(text: &str) -> Result<AgentResponse, String> {
     let json_str = extract_json(text)?;
 
     serde_json::from_str(&json_str)
-        .map_err(|e| format!("Failed to parse JSON: {} - text: {}", e, json_str))
+        .map_err(|e| format!("Не удалось распарсить JSON: {} - текст: {}", e, json_str))
 }
 
 /// Extract JSON from text (handles markdown code blocks)
@@ -114,7 +131,7 @@ fn extract_json(text: &str) -> Result<String, String> {
         }
     }
 
-    Err(format!("No JSON found in response: {}", &text[..text.len().min(200)]))
+    Err(format!("JSON не найден в ответе: {}", &text[..text.len().min(200)]))
 }
 
 /// Find the closing brace of a JSON object
@@ -146,8 +163,27 @@ fn find_json_end(text: &str) -> Option<usize> {
     None
 }
 
-/// Execute a shell command
+/// Check if command is potentially dangerous
+fn is_dangerous_command(cmd: &str) -> Option<&'static str> {
+    let cmd_lower = cmd.to_lowercase();
+    for pattern in DANGEROUS_PATTERNS {
+        if cmd_lower.contains(&pattern.to_lowercase()) {
+            return Some(pattern);
+        }
+    }
+    None
+}
+
+/// Execute a shell command with safety checks
 pub async fn execute_command(cmd: &str) -> Result<String, String> {
+    // Safety check: block dangerous commands
+    if let Some(pattern) = is_dangerous_command(cmd) {
+        return Err(format!(
+            "Опасная команда заблокирована: обнаружен паттерн '{}'. Требуется подтверждение пользователя.",
+            pattern
+        ));
+    }
+
     println!("[Execute] Running: {}", cmd);
 
     let output = tokio::task::spawn_blocking({
@@ -160,15 +196,15 @@ pub async fn execute_command(cmd: &str) -> Result<String, String> {
         }
     })
     .await
-    .map_err(|e| format!("Task join error: {}", e))?
-    .map_err(|e| format!("Failed to execute command: {}", e))?;
+    .map_err(|e| format!("Ошибка выполнения задачи: {}", e))?
+    .map_err(|e| format!("Не удалось выполнить команду: {}", e))?;
 
     let stdout = String::from_utf8_lossy(&output.stdout).to_string();
     let stderr = String::from_utf8_lossy(&output.stderr).to_string();
 
     if !output.status.success() {
         println!("[Execute] Command failed: {}", stderr);
-        return Err(format!("Command failed: {}\n{}", stderr, stdout));
+        return Err(format!("Команда завершилась с ошибкой: {}\n{}", stderr, stdout));
     }
 
     println!("[Execute] Success: {}...", &stdout[..stdout.len().min(100)]);
