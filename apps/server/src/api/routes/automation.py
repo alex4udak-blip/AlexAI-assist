@@ -525,7 +525,8 @@ async def automation_websocket(
 
             elif message_type == "ping":
                 # Respond to ping and update last_seen
-                await websocket.send_json({"type": "pong"})
+                import time
+                await websocket.send_json({"type": "pong", "timestamp": int(time.time())})
                 await update_device_status(db, device_id)
 
     except WebSocketDisconnect:
