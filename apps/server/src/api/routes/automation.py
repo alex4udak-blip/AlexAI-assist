@@ -366,7 +366,7 @@ def translate_command_to_task(command_id: str, command_type: str, params: dict[s
     }
 
 
-@router.websocket("/ws/automation/{device_id}")
+# WebSocket endpoint - registered directly on app in main.py for clean URL
 async def automation_websocket(
     websocket: WebSocket,
     device_id: str,
