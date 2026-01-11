@@ -84,8 +84,22 @@ impl Default for TriggerConfig {
 pub struct TriggerEngine {
     config: TriggerConfig,
     last_activity: Instant,
+    last_trigger_time: Instant,
     compiled_error_patterns: Vec<Regex>,
 }
+
+/// Cooldown period after trigger fires (prevents recursive loops)
+const TRIGGER_COOLDOWN_SECS: u64 = 30;
+
+/// Patterns to ignore (our own logs that might contain "error" etc)
+const IGNORE_PATTERNS: &[&str] = &[
+    "[Agent]",
+    "[Trigger]",
+    "[Claude]",
+    "[Execute]",
+    "[OCR]",
+    "[Collector]",
+];
 
 impl TriggerEngine {
     /// Create new trigger engine with default config
@@ -95,6 +109,7 @@ impl TriggerEngine {
         Self {
             config,
             last_activity: Instant::now(),
+            last_trigger_time: Instant::now() - std::time::Duration::from_secs(TRIGGER_COOLDOWN_SECS + 1),
             compiled_error_patterns: compiled,
         }
     }
@@ -105,6 +120,7 @@ impl TriggerEngine {
         Self {
             config,
             last_activity: Instant::now(),
+            last_trigger_time: Instant::now() - std::time::Duration::from_secs(TRIGGER_COOLDOWN_SECS + 1),
             compiled_error_patterns: compiled,
         }
     }
@@ -128,9 +144,39 @@ impl TriggerEngine {
         self.last_activity.elapsed() >= idle_duration
     }
 
+    /// Check if text contains our own log patterns (to avoid recursive triggers)
+    fn should_ignore_text(text: &str) -> bool {
+        for pattern in IGNORE_PATTERNS {
+            if text.contains(pattern) {
+                return true;
+            }
+        }
+        false
+    }
+
+    /// Check if cooldown is active
+    pub fn is_in_cooldown(&self) -> bool {
+        self.last_trigger_time.elapsed() < Duration::from_secs(TRIGGER_COOLDOWN_SECS)
+    }
+
+    /// Record that a trigger fired (starts cooldown)
+    pub fn record_trigger(&mut self) {
+        self.last_trigger_time = Instant::now();
+    }
+
     /// Check all triggers against current context
-    pub fn check(&self, ocr_text: &str, app_name: &str) -> Vec<TriggeredEvent> {
+    pub fn check(&mut self, ocr_text: &str, app_name: &str) -> Vec<TriggeredEvent> {
         if !self.config.enabled {
+            return Vec::new();
+        }
+
+        // Check cooldown - don't trigger if we recently fired
+        if self.is_in_cooldown() {
+            return Vec::new();
+        }
+
+        // Ignore our own logs to prevent recursive triggers
+        if Self::should_ignore_text(ocr_text) {
             return Vec::new();
         }
 
@@ -171,6 +217,11 @@ impl TriggerEngine {
                 app_name: None,
                 timestamp: Instant::now(),
             });
+        }
+
+        // Record trigger time if any triggers fired (starts cooldown)
+        if !triggered.is_empty() {
+            self.last_trigger_time = Instant::now();
         }
 
         triggered
