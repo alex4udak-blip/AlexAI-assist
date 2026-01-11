@@ -555,7 +555,7 @@ mod tests {
         assert_eq!(FileStatus::from_git_code(" M"), FileStatus::Modified);
         assert_eq!(FileStatus::from_git_code("D"), FileStatus::Deleted);
         assert_eq!(FileStatus::from_git_code("R"), FileStatus::Renamed);
-        assert_eq!(FileStatus::from_git_code("??"), FileStatus::Added);
+        assert_eq!(FileStatus::from_git_code("??"), FileStatus::Untracked);
     }
 
     #[test]

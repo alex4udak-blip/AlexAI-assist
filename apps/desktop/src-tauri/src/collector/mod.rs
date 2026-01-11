@@ -589,6 +589,10 @@ pub async fn start_collector(
                                     trigger_text
                                 );
 
+                                // Select the best agent for this context BEFORE dropping lock
+                                let selected_agent = crate::agents::AgentManager::select_agent_for_context(&app, &trigger_text);
+                                println!("[Agent] Selected agent: {:?}", selected_agent);
+
                                 drop(agent); // Release lock before spawning
 
                                 tokio::spawn(async move {
@@ -598,8 +602,8 @@ pub async fn start_collector(
                                         return;
                                     }
 
-                                    println!("[Agent] Calling Claude...");
-                                    match agent.manager.run(&context).await {
+                                    println!("[Agent] Calling Claude with {:?}...", selected_agent);
+                                    match agent.manager.run_with_kind(&context, selected_agent).await {
                                         Ok(result) => {
                                             let reason_preview: String = result.reason.chars().take(100).collect();
                                             println!("[Agent] Response: action={}, reason={}",
