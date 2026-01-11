@@ -48,6 +48,7 @@ impl Default for TriggerConfig {
     fn default() -> Self {
         Self {
             error_patterns: vec![
+                // Terminal/console errors
                 r"(?i)error:".to_string(),
                 r"(?i)exception:".to_string(),
                 r"(?i)failed:".to_string(),
@@ -58,12 +59,21 @@ impl Default for TriggerConfig {
                 r"(?i)command not found".to_string(),
                 r"(?i)permission denied".to_string(),
                 r"(?i)connection refused".to_string(),
+                // Window title patterns (more common)
+                r"(?i)\berror\b".to_string(),
+                r"(?i)\bfailed\b".to_string(),
+                r"(?i)\bcrash".to_string(),
+                r"(?i)not responding".to_string(),
+                r"(?i)problem occurred".to_string(),
             ],
-            idle_timeout_minutes: 5,
+            idle_timeout_minutes: 2, // Reduced for faster testing
             app_patterns: vec![
                 ("GitHub".to_string(), "Pull Request".to_string()),
                 ("Terminal".to_string(), "npm ERR!".to_string()),
                 ("Terminal".to_string(), "cargo error".to_string()),
+                ("iTerm".to_string(), "error".to_string()),
+                ("Code".to_string(), "Error".to_string()),
+                ("Xcode".to_string(), "Build Failed".to_string()),
             ],
             enabled: true,
         }
