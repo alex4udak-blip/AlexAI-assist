@@ -115,8 +115,31 @@ fn is_browser(app_name: &str) -> bool {
 pub fn get_current_focus() -> Option<FocusInfo> {
     // First try accessibility API for detailed info
     if has_accessibility_permission() {
-        if let Some((app_name, window_title)) = get_focused_element_info() {
+        if let Some((app_name, mut window_title)) = get_focused_element_info() {
+            // If window_title is empty, try AppleScript fallback (works better for Terminal)
+            if window_title.is_empty() {
+                if let (_, Some(title)) = apps::get_active_window() {
+                    window_title = title;
+                }
+            }
+
             let selected_text = get_selected_text();
+
+            // For Terminal/iTerm, also try to get focused text field value (AXValue)
+            let app_lower = app_name.to_lowercase();
+            let text_field_value = if app_lower.contains("terminal") || app_lower.contains("iterm") {
+                get_focused_text_field_value()
+            } else {
+                None
+            };
+
+            // Combine selected_text and text_field_value
+            let combined_text = match (selected_text, text_field_value) {
+                (Some(sel), Some(val)) => Some(format!("{}\n{}", sel, val)),
+                (Some(sel), None) => Some(sel),
+                (None, Some(val)) => Some(val),
+                (None, None) => None,
+            };
 
             // Get URL using AppleScript for browsers
             let url = if is_browser(&app_name) {
@@ -132,7 +155,7 @@ pub fn get_current_focus() -> Option<FocusInfo> {
             return Some(FocusInfo {
                 app_name,
                 window_title,
-                selected_text,
+                selected_text: combined_text,
                 url,
             });
         }
@@ -517,13 +540,27 @@ pub async fn start_collector(
                             let last = LAST_LOG.load(std::sync::atomic::Ordering::Relaxed);
                             if now - last >= 10 {
                                 LAST_LOG.store(now, std::sync::atomic::Ordering::Relaxed);
-                                let preview = if trigger_text.len() > 100 {
-                                    format!("{}...", &trigger_text[..100])
-                                } else {
-                                    trigger_text.clone()
-                                };
-                                println!("[Trigger] Checking: app={}, sources={}, text=\"{}\"",
-                                    &app, text_parts.len(), preview.replace('\n', " | "));
+
+                                // Log each source separately for debugging
+                                let title_len = current_title.as_ref().map(|t| t.len()).unwrap_or(0);
+                                let selected_len = focus_info.as_ref()
+                                    .and_then(|i| i.selected_text.as_ref())
+                                    .map(|t| t.len()).unwrap_or(0);
+                                let typed_len = last_typed_text.as_ref().map(|t| t.len()).unwrap_or(0);
+                                let ocr_len = last_ocr_text.lock().ok()
+                                    .and_then(|g| g.as_ref().map(|t| t.len())).unwrap_or(0);
+
+                                println!("[Trigger] Sources: title={}, selected={}, typed={}, ocr={}",
+                                    title_len, selected_len, typed_len, ocr_len);
+
+                                if !trigger_text.is_empty() {
+                                    let preview = if trigger_text.len() > 150 {
+                                        format!("{}...", &trigger_text[..150])
+                                    } else {
+                                        trigger_text.clone()
+                                    };
+                                    println!("[Trigger] Text: \"{}\"", preview.replace('\n', " | "));
+                                }
                             }
 
                             // Check triggers (non-blocking check)
