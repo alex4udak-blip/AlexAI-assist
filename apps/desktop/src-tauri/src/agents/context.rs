@@ -7,7 +7,7 @@
 //! - User project detection
 //! - Time context
 
-use chrono::{DateTime, Local, Timelike, Utc};
+use chrono::{DateTime, Datelike, Local, Timelike, Utc};
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
@@ -97,12 +97,17 @@ impl RichContext {
             .build()
     }
 
-    /// Get a truncated version of OCR text for logging
+    /// Get a truncated version of OCR text for logging (UTF-8 safe)
     pub fn ocr_preview(&self, max_len: usize) -> &str {
         if self.ocr_text.len() <= max_len {
             &self.ocr_text
         } else {
-            &self.ocr_text[..max_len]
+            // Find the last valid char boundary at or before max_len
+            let mut end = max_len;
+            while end > 0 && !self.ocr_text.is_char_boundary(end) {
+                end -= 1;
+            }
+            &self.ocr_text[..end]
         }
     }
 }
@@ -376,5 +381,17 @@ mod tests {
         let ctx = RichContext::from_raw("App", "Title", "Hello, World! This is a test.");
         assert_eq!(ctx.ocr_preview(10), "Hello, Wor");
         assert_eq!(ctx.ocr_preview(100), "Hello, World! This is a test.");
+    }
+
+    #[test]
+    fn test_ocr_preview_utf8_safe() {
+        // Test with multi-byte UTF-8 characters (Russian text)
+        let ctx = RichContext::from_raw("App", "Title", "Привет мир!");
+        // Each Cyrillic char is 2 bytes, so 5 bytes might cut in middle
+        // Should NOT panic, should return valid UTF-8
+        let preview = ctx.ocr_preview(5);
+        assert!(preview.len() <= 5);
+        // Verify it's valid UTF-8 by checking char count
+        assert!(preview.chars().count() > 0);
     }
 }
