@@ -436,8 +436,14 @@ impl AgentManager {
             format!("Task: {}", description)
         };
 
-        // Run the agent
-        let result = self.run(&context).await;
+        // Select appropriate agent based on task description
+        // Use empty app_name since tasks don't have app context
+        let agent_kind = Self::select_agent_for_context("", &description);
+        let desc_preview: String = description.chars().take(50).collect();
+        println!("[TaskQueue] Selected agent {:?} for task: {}", agent_kind, desc_preview);
+
+        // Run the agent with the selected kind
+        let result = self.run_with_kind(&context, agent_kind).await;
 
         // Update task status based on result
         match &result {
