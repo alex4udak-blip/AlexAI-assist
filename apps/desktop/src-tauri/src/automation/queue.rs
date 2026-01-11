@@ -421,7 +421,7 @@ impl AutomationQueue {
                     Ok(img) => {
                         match screen::encode_to_base64(&img) {
                             Ok(base64) => {
-                                let output = serde_json::json!({ "base64": base64 });
+                                let output = serde_json::json!({ "screenshot": base64 });
                                 Ok(Some(output))
                             }
                             Err(e) => Err(e),
