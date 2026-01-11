@@ -493,6 +493,121 @@ pub mod macos {
         run_on_main_thread(|| get_focused_text_field_value_impl())
     }
 
+    /// Get terminal content from focused element (works for Terminal.app and iTerm2)
+    /// Unlike get_focused_text_field_value, this doesn't filter by role
+    ///
+    /// # Thread Safety
+    /// This function is thread-safe. It can be called from any thread.
+    fn get_terminal_content_impl() -> Option<String> {
+        assert_main_thread();
+
+        unsafe {
+            let system_wide = AXUIElementCreateSystemWide();
+            if system_wide.is_null() {
+                return None;
+            }
+
+            // Get focused application
+            let attr_name = CFString::new(K_AX_FOCUSED_APPLICATION_ATTRIBUTE);
+            let mut focused_app: *mut c_void = std::ptr::null_mut();
+
+            let result = AXUIElementCopyAttributeValue(
+                system_wide,
+                attr_name.as_concrete_TypeRef() as *const c_void,
+                &mut focused_app,
+            );
+
+            CFRelease(system_wide);
+
+            if result != K_AX_ERROR_SUCCESS || focused_app.is_null() {
+                return None;
+            }
+
+            // Get focused UI element
+            let focused_attr = CFString::new(K_AX_FOCUSED_UI_ELEMENT_ATTRIBUTE);
+            let mut focused_element: *mut c_void = std::ptr::null_mut();
+
+            let element_result = AXUIElementCopyAttributeValue(
+                focused_app,
+                focused_attr.as_concrete_TypeRef() as *const c_void,
+                &mut focused_element,
+            );
+
+            CFRelease(focused_app);
+
+            if element_result != K_AX_ERROR_SUCCESS || focused_element.is_null() {
+                return None;
+            }
+
+            // Log the role for debugging
+            let role_attr = CFString::new(K_AX_ROLE_ATTRIBUTE);
+            let mut role_value: *mut c_void = std::ptr::null_mut();
+            let role_result = AXUIElementCopyAttributeValue(
+                focused_element,
+                role_attr.as_concrete_TypeRef() as *const c_void,
+                &mut role_value,
+            );
+            if role_result == K_AX_ERROR_SUCCESS && !role_value.is_null() {
+                let cf_string = CFString::wrap_under_create_rule(role_value as _);
+                let role = cf_string.to_string();
+                println!("[Terminal] Focused element role: {}", role);
+            }
+
+            // Try to get AXValue directly (works for many text elements)
+            let value_attr = CFString::new(K_AX_VALUE_ATTRIBUTE);
+            let mut value: *mut c_void = std::ptr::null_mut();
+
+            let value_result = AXUIElementCopyAttributeValue(
+                focused_element,
+                value_attr.as_concrete_TypeRef() as *const c_void,
+                &mut value,
+            );
+
+            if value_result == K_AX_ERROR_SUCCESS && !value.is_null() {
+                let cf_string = CFString::wrap_under_create_rule(value as _);
+                let text = cf_string.to_string();
+                CFRelease(focused_element);
+                if !text.is_empty() {
+                    println!("[Terminal] Got AXValue: {} chars", text.len());
+                    return Some(text);
+                }
+            }
+
+            // Try AXSelectedText as fallback
+            let selected_attr = CFString::new(K_AX_SELECTED_TEXT_ATTRIBUTE);
+            let mut selected: *mut c_void = std::ptr::null_mut();
+
+            let selected_result = AXUIElementCopyAttributeValue(
+                focused_element,
+                selected_attr.as_concrete_TypeRef() as *const c_void,
+                &mut selected,
+            );
+
+            CFRelease(focused_element);
+
+            if selected_result == K_AX_ERROR_SUCCESS && !selected.is_null() {
+                let cf_string = CFString::wrap_under_create_rule(selected as _);
+                let text = cf_string.to_string();
+                if !text.is_empty() {
+                    println!("[Terminal] Got AXSelectedText: {} chars", text.len());
+                    return Some(text);
+                }
+            }
+
+            println!("[Terminal] No text content found");
+            None
+        }
+    }
+
+    /// Get terminal content from the focused terminal window
+    /// Works for Terminal.app and iTerm2
+    ///
+    /// # Thread Safety
+    /// This function is thread-safe. It can be called from any thread.
+    pub fn get_terminal_content() -> Option<String> {
+        run_on_main_thread(|| get_terminal_content_impl())
+    }
+
     /// Get browser input data including the current text being typed
     /// Returns (url, typed_text) if in a browser with a focused text field
     ///
