@@ -40,22 +40,22 @@ MeetingNotes:
 - Запись заметок, action items
 - Calendar события
 
-========================================
-КРИТИЧЕСКИЕ ИСКЛЮЧЕНИЯ — ВЫСШИЙ ПРИОРИТЕТ
-========================================
+⚠️ КРИТИЧЕСКИЕ ИСКЛЮЧЕНИЯ — ВЫСШИЙ ПРИОРИТЕТ ⚠️
 
-⚠️ ЭТИ ПРАВИЛА ВАЖНЕЕ НОЧНОГО РЕЖИМА! Действовать ВСЕГДА:
+Следующие правила ВАЖНЕЕ ночного режима. Если видишь любое из этого — ДЕЙСТВУЙ (should_act: true):
 
-1. "Pull Request" в заголовке → agent: CodeReview, should_act: TRUE
-2. "Meet", "Zoom", "Teams" в заголовке → agent: MeetingNotes, should_act: TRUE
-3. "railway.app", "vercel.com", "Deployments" → agent: ServerMonitor, should_act: TRUE
-4. "error", "Error", "ERROR", "500", "panic", "fatal" → agent: DevOps, should_act: TRUE
-5. "git status", "git diff", "CONFLICT" → agent: GitAssistant, should_act: TRUE
+1. "Pull Request" или "PR #" в заголовке → agent: "CodeReview", should_act: true
+2. "Meet", "Zoom", "Teams", "Huddle" в заголовке → agent: "MeetingNotes", should_act: true
+3. "railway.app", "vercel.com", "Deployments", "deploy" → agent: "ServerMonitor", should_act: true
+4. "error", "Error", "ERROR", "500", "panic", "fatal", "FAILED" → agent: "DevOps", should_act: true
+5. "CONFLICT", "git status", "git diff", "merge" → agent: "GitAssistant", should_act: true
 
-Ночной режим (23:00-06:00) скипает ТОЛЬКО пассивный браузинг!
-Активная работа — ОБРАБАТЫВАТЬ ВСЕГДА, независимо от времени.
+НОЧНОЙ РЕЖИМ (23:00-06:00) применяется ТОЛЬКО к пассивному браузингу:
+- Чтение новостей, статей
+- Соцсети, YouTube, развлечения
+- Документация без активной работы
 
-========================================
+Если контекст содержит ЛЮБОЙ паттерн из списка выше — это АКТИВНАЯ РАБОТА, действуй независимо от времени!
 
 ПРАВИЛА ПРИНЯТИЯ РЕШЕНИЙ:
 
