@@ -1,6 +1,6 @@
 [package]
 name = "observer-desktop"
-version = "0.5.8"
+version = "0.5.9"
 description = "Observer Desktop App"
 authors = ["Observer"]
 license = "MIT"
