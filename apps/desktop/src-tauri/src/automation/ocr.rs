@@ -286,11 +286,11 @@ pub fn get_screenpipe_ocr() -> Result<OcrResult, String> {
     let conn = rusqlite::Connection::open(&db_path)
         .map_err(|e| format!("Failed to open Screenpipe db: {}", e))?;
 
-    // Get last 30 seconds of OCR data
+    // Get last 10 OCR entries (join with frames for proper ordering)
     let mut stmt = conn.prepare(
-        "SELECT text FROM ocr_text
-         WHERE timestamp > datetime('now', '-30 seconds')
-         ORDER BY timestamp DESC LIMIT 10"
+        "SELECT o.text FROM ocr_text o
+         JOIN frames f ON o.frame_id = f.id
+         ORDER BY f.timestamp DESC LIMIT 10"
     ).map_err(|e| format!("Query prepare error: {}", e))?;
 
     let texts: Vec<String> = stmt.query_map([], |row| row.get(0))
