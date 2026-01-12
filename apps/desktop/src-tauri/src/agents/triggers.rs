@@ -169,10 +169,12 @@ impl TriggerEngine {
         let mut triggered = Vec::new();
 
         // Check error patterns
-        for (pattern, regex) in self.config.error_patterns.iter().zip(&self.compiled_error_patterns) {
+        // FIX: Use compiled_error_patterns directly (already validated at compile time)
+        // Pattern strings are only for logging, regex is source of truth
+        for regex in &self.compiled_error_patterns {
             if let Some(mat) = regex.find(ocr_text) {
                 triggered.push(TriggeredEvent {
-                    trigger: Trigger::Error { pattern: pattern.clone() },
+                    trigger: Trigger::Error { pattern: regex.as_str().to_string() },
                     matched_text: Some(mat.as_str().to_string()),
                     app_name: Some(app_name.to_string()),
                     timestamp: Instant::now(),

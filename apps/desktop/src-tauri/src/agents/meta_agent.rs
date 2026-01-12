@@ -148,14 +148,9 @@ impl MetaAgent {
 
     /// Parse Claude's raw text response into a MetaDecision
     fn parse_decision(&self, text: &str) -> Result<MetaDecision, String> {
-
-        // Find JSON in the response
-        let json_start = text.find('{');
-        let json_end = text.rfind('}');
-
-        if let (Some(start), Some(end)) = (json_start, json_end) {
-            let json_str = &text[start..=end];
-            if let Ok(parsed) = serde_json::from_str::<serde_json::Value>(json_str) {
+        // ROBUST FIX: Extract JSON using bracket counting (handles nested objects)
+        if let Some(json_str) = Self::extract_json_object(text) {
+            if let Ok(parsed) = serde_json::from_str::<serde_json::Value>(&json_str) {
                 return Ok(MetaDecision {
                     should_act: parsed["should_act"].as_bool().unwrap_or(false),
                     reason: parsed["reason"]
@@ -179,6 +174,51 @@ impl MetaAgent {
             reason: "Could not parse structured response".to_string(),
             ..Default::default()
         })
+    }
+
+    /// Extract first valid JSON object from text using bracket counting
+    fn extract_json_object(text: &str) -> Option<String> {
+        let chars: Vec<char> = text.chars().collect();
+        let mut start_idx = None;
+        let mut brace_count = 0;
+        let mut in_string = false;
+        let mut escape_next = false;
+
+        for (i, &ch) in chars.iter().enumerate() {
+            if escape_next {
+                escape_next = false;
+                continue;
+            }
+
+            if ch == '\\' && in_string {
+                escape_next = true;
+                continue;
+            }
+
+            if ch == '"' {
+                in_string = !in_string;
+                continue;
+            }
+
+            if in_string {
+                continue;
+            }
+
+            if ch == '{' {
+                if start_idx.is_none() {
+                    start_idx = Some(i);
+                }
+                brace_count += 1;
+            } else if ch == '}' {
+                brace_count -= 1;
+                if brace_count == 0 && start_idx.is_some() {
+                    let s = start_idx.unwrap();
+                    return Some(chars[s..=i].iter().collect());
+                }
+            }
+        }
+
+        None
     }
 
     /// Parse agent kind from string

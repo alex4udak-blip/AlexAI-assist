@@ -287,10 +287,13 @@ pub fn get_screenpipe_ocr() -> Result<OcrResult, String> {
         .map_err(|e| format!("Failed to open Screenpipe db: {}", e))?;
 
     // Get last 30 seconds of OCR data (join with frames for timestamp)
+    // FIX: Added o.text IS NOT NULL AND o.text != '' to filter empty entries
     let mut stmt = conn.prepare(
         "SELECT o.text FROM ocr_text o
          JOIN frames f ON o.frame_id = f.id
          WHERE f.timestamp > datetime('now', '-30 seconds')
+           AND o.text IS NOT NULL
+           AND o.text != ''
          ORDER BY f.timestamp DESC LIMIT 10"
     ).map_err(|e| format!("Query prepare error: {}", e))?;
 

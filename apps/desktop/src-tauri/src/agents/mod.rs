@@ -379,7 +379,14 @@ impl AgentManager {
             .ocr_text(ocr_text)
             .build();
 
-        let meta_agent = self.meta_agent.as_mut()?;
+        // CRITICAL FIX: fallback to legacy instead of silent None
+        let meta_agent = match self.meta_agent.as_mut() {
+            Some(m) => m,
+            None => {
+                eprintln!("[MetaAgent] Not initialized, falling back to legacy");
+                return self.check_and_run_legacy(ocr_text, app_name).await;
+            }
+        };
         let decision = match meta_agent.analyze(&rich_context).await {
             Ok(d) => d,
             Err(e) => {
