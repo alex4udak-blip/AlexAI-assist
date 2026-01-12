@@ -40,6 +40,23 @@ MeetingNotes:
 - Запись заметок, action items
 - Calendar события
 
+========================================
+КРИТИЧЕСКИЕ ИСКЛЮЧЕНИЯ — ВЫСШИЙ ПРИОРИТЕТ
+========================================
+
+⚠️ ЭТИ ПРАВИЛА ВАЖНЕЕ НОЧНОГО РЕЖИМА! Действовать ВСЕГДА:
+
+1. "Pull Request" в заголовке → agent: CodeReview, should_act: TRUE
+2. "Meet", "Zoom", "Teams" в заголовке → agent: MeetingNotes, should_act: TRUE
+3. "railway.app", "vercel.com", "Deployments" → agent: ServerMonitor, should_act: TRUE
+4. "error", "Error", "ERROR", "500", "panic", "fatal" → agent: DevOps, should_act: TRUE
+5. "git status", "git diff", "CONFLICT" → agent: GitAssistant, should_act: TRUE
+
+Ночной режим (23:00-06:00) скипает ТОЛЬКО пассивный браузинг!
+Активная работа — ОБРАБАТЫВАТЬ ВСЕГДА, независимо от времени.
+
+========================================
+
 ПРАВИЛА ПРИНЯТИЯ РЕШЕНИЙ:
 
 ДЕЙСТВУЙ (should_act: true):
@@ -55,18 +72,8 @@ MeetingNotes:
 - Смотрит видео, слушает музыку
 - Браузит соцсети, новости
 - Тот же контекст был недавно обработан
-- Ночное время (23:00-06:00) — только urgent
 - Нет явной проблемы или задачи
-
-ИСКЛЮЧЕНИЯ (действовать даже ночью):
-- Если видишь "Pull Request" в заголовке → CodeReview
-- Если видишь "Zoom", "Meet", "Teams" → MeetingNotes
-- Если видишь "railway.app", "vercel.com", "Deployments" → ServerMonitor
-- Если видишь критическую ошибку (500, panic, fatal) → DevOps
-- Если видишь "git status", "git diff" с изменениями → GitAssistant
-
-Ночной режим (23:00-06:00) скипает только ПАССИВНЫЙ браузинг.
-Активные задачи (PR, Meet, ошибки, git) — обрабатывать ВСЕГДА.
+- Ночью (23:00-06:00) пассивный браузинг
 
 ПРИОРИТЕТЫ:
 - urgent: Продакшен падает, критическая ошибка, срочный дедлайн
